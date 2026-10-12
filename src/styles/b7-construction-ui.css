@@ -1,0 +1,80 @@
+/* Phase 4 Gate B7 — construction authoring and semantic inspector cues. */
+.canvas-tool-rail button:disabled,
+.tool-button:disabled {
+  cursor: not-allowed;
+  opacity: .42;
+}
+
+.construction-semantics {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.semantic-control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.semantic-control-row > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--fgColor-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.semantic-control-row output {
+  border: 1px dashed var(--borderColor-muted);
+  border-radius: 999px;
+  color: var(--fgColor-subtle);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  padding: 1px 6px;
+  text-transform: uppercase;
+}
+
+.segmented-control.semantic-segments {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.segmented-control button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.semantic-disabled-reason,
+.construction-action-unavailable p {
+  border-left: 2px dashed var(--borderColor-muted);
+  color: var(--fgColor-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+  padding-left: 8px;
+}
+
+.construction-explanation {
+  color: var(--fgColor-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.layer-construction-badge {
+  align-items: center;
+  border: 1px dashed var(--borderColor-muted);
+  border-radius: 999px;
+  color: var(--fgColor-muted);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 8px;
+  font-weight: 700;
+  height: 14px;
+  justify-content: center;
+  line-height: 1;
+  width: 14px;
+}

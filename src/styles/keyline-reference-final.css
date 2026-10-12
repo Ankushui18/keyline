@@ -1,0 +1,262 @@
+/* Exact visual pass for the supplied Keyline editor composition. */
+
+/* Header */
+.toolbar-start { gap: 16px; }
+.history-group { gap: 16px; }
+.brand-mark svg.keyline-mark { width: 28px; height: 28px; fill: none; stroke: none; }
+.brand-mark svg.keyline-mark .keyline-mark-bg { fill: #26272b; stroke: none; }
+.brand-mark svg.keyline-mark .keyline-mark-frame,
+.brand-mark svg.keyline-mark .keyline-mark-circle { fill: none; stroke: #ececee; stroke-width: 3.5; }
+.brand-mark svg.keyline-mark .keyline-mark-accent { fill: #0d99ff; stroke: none; }
+.canvas-tool-rail .canvas-rail-primary svg,
+.layer-kind-icon svg { fill: none; stroke: currentColor; }
+.workspace-utilities .renderer-button,
+.workspace-utilities .family-button {
+  position: fixed;
+  z-index: 50;
+  top: 2px;
+  width: 2px !important;
+  min-width: 2px !important;
+  height: 2px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.workspace-utilities .renderer-button { left: 390px; }
+.workspace-utilities .family-button { left: 396px; }
+.constraints-button {
+  position: fixed;
+  z-index: 45;
+  left: 10px;
+  bottom: 38px;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #c9cbd1;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+}
+.constraints-button:hover,
+.constraints-button.is-active { color: #fff; background: #2c2e33; }
+.constraints-button .constraints-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.constraints-button .solver-dot,
+.constraints-button .constraints-label,
+.constraints-button b { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
+.quick-frame-control {
+  position: fixed;
+  z-index: 50;
+  top: 2px;
+  left: 410px;
+  width: 2px;
+  height: 2px;
+  overflow: visible;
+  opacity: 0;
+}
+.quick-frame-control > .add-icon-frame-button { width: 2px !important; min-width: 2px !important; height: 2px; padding: 0; overflow: hidden; }
+.collaborator-avatars { display: flex; }
+
+/* The supplied editor has no mode-switch strip above the inspector. Keep its
+   controls available as tiny transparent compatibility targets. */
+.right-sidebar.mode-split { grid-template-rows: 146px minmax(0, 1fr); }
+.right-sidebar.mode-layers,
+.right-sidebar.mode-properties { grid-template-rows: minmax(0, 1fr); }
+.sidebar-panel-tabs {
+  position: absolute;
+  z-index: 5;
+  top: 2px;
+  right: 2px;
+  width: 26px;
+  height: 4px;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  opacity: 0;
+  border: 0;
+}
+.sidebar-panel-tabs button { position: absolute; width: 4px !important; min-width: 4px !important; height: 4px; padding: 0; overflow: hidden; }
+.sidebar-panel-tabs button:nth-child(1) { right: 18px; }
+.sidebar-panel-tabs button:nth-child(2) { right: 12px; }
+.sidebar-panel-tabs button:nth-child(3) { right: 6px; }
+.sidebar-panel-tabs button:nth-child(4) { right: 0; }
+
+/* Layers */
+.layers-panel { position: relative; grid-template-rows: 44px minmax(0, 1fr); min-height: 0; }
+.layers-panel-heading { padding: 0 14px; }
+.layers-heading-actions { display: none; }
+.layers-location-summary { font-size: 12px; }
+.document-location {
+  position: absolute;
+  z-index: 8;
+  top: 42px;
+  left: 18px;
+  width: 2px;
+  height: 2px;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  opacity: 0;
+  border: 0;
+}
+.location-selectors { width: 2px; height: 2px; overflow: hidden; }
+.location-selectors select,
+.location-selectors input { width: 2px !important; min-width: 0 !important; height: 2px; padding: 0; border: 0; }
+.location-actions { top: 0; left: 6px; }
+.layer-tree { padding: 0 14px 8px; }
+.layer-row { min-height: 30px; padding-inline: 8px; border-left-width: 2px; border-radius: 7px; }
+.layer-row:has(.layer-disclosure:disabled) { grid-template-columns: 18px minmax(0, 1fr) auto; }
+.layer-row .layer-disclosure:disabled { display: none; }
+.layer-row.is-selected { box-shadow: inset 2px 0 0 #0d99ff; border-left-color: transparent; }
+.layer-name { font-size: 13px; }
+.layer-reference-meta { margin-left: auto; color: #92959d; font-size: 12px; white-space: nowrap; }
+.layer-row .layer-order-actions { display: none; }
+.layer-row .layer-state-button {
+  position: absolute;
+  right: 2px;
+  width: 2px;
+  min-width: 0;
+  height: 2px;
+  padding: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.layer-row .layer-state-button:last-child { right: 5px; }
+.layer-footer-actions {
+  position: absolute;
+  z-index: 7;
+  left: 12px;
+  bottom: 2px;
+  width: 30px;
+  min-height: 2px;
+  height: 2px;
+  display: flex;
+  gap: 3px;
+  padding: 0;
+  overflow: visible;
+  opacity: 0;
+  border: 0;
+}
+.layer-footer-actions button,
+.layer-footer-actions .move-layer-field,
+.layer-footer-actions select { width: 2px; min-width: 0; height: 2px; min-height: 0; padding: 0; overflow: hidden; }
+
+/* Inspector */
+.right-sidebar > .properties-panel { border-top: 1px solid #2e3036; }
+.properties-panel { --inspector-pad: 14px; font-size: 13px; }
+.properties-panel .panel-heading { height: 48px; padding: 0 14px; }
+.properties-panel .panel-heading h2 { font-size: 14px; }
+.properties-panel .no-constraints { color: #92959d; }
+.properties-panel .inspector-context,
+.properties-panel .inspector-context.has-selection { font-size: 12px; }
+.properties-panel > .keyline-node-inspector { margin: 0; padding: 0 14px 14px; border: 0; }
+.keyline-node-inspector { display: flex; flex-direction: column; gap: 14px; }
+.keyline-field-block { display: flex; flex-direction: column; gap: 6px; }
+.keyline-field-label { color: #8a8d95; font-size: 12px; }
+.keyline-position-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.keyline-position-grid .coordinate-field {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: #17181a;
+  border: 1px solid #2e3036;
+  border-radius: 8px;
+}
+.keyline-position-grid .coordinate-field > span { color: #8a8d95; }
+.keyline-position-grid .coordinate-field input { width: 100%; min-width: 0; padding: 0; color: #ececee; text-align: right; background: transparent; border: 0; font: 13px 'Geist Mono', monospace; }
+.keyline-corner-control { display: flex; padding: 3px; background: #17181a; border: 1px solid #2e3036; border-radius: 9px; }
+.keyline-corner-control button { flex: 1; height: 28px; color: #ececee; background: transparent; border: 0; border-radius: 7px; }
+.keyline-corner-control button.is-active { background: #2c2e33; font-weight: 500; }
+.keyline-suggestion {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #d6e6f7;
+  background: #12233a;
+  border: 1px solid #25507f;
+  border-radius: 10px;
+}
+.keyline-suggestion-heading { display: flex; align-items: center; gap: 8px; color: #0d99ff; font-weight: 600; }
+.keyline-suggestion-heading svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.keyline-suggestion p { margin: 0; line-height: 1.45; }
+.keyline-suggestion-actions { display: flex; gap: 8px; }
+.keyline-suggestion-actions button { height: 30px; padding: 0 14px; color: #a9c4e3; background: transparent; border: 0; border-radius: 8px; }
+.keyline-suggestion-actions .is-primary { color: #fff; background: #0871c7; font-weight: 600; }
+.keyline-suggestion-actions .is-primary:hover { background: #0b7bd6; }
+.keyline-locked-rules { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: #c9cbd1; border: 1px solid #2e3036; border-radius: 10px; }
+.keyline-locked-rules output { color: #8a8d95; font: 12px 'Geist Mono', monospace; }
+.properties-panel:has(.keyline-node-inspector) > :not(.panel-heading):not(.keyline-node-inspector):not(.panel-help) { display: none; }
+.properties-panel:has(.keyline-node-inspector) .panel-help { display: none; }
+
+/* Editing controls */
+.vector-edit-toolbar { left: calc(50% + 32px); }
+.vector-edit-toolbar-more {
+  position: absolute !important;
+  top: 2px;
+  right: 2px;
+  width: 2px;
+  height: 2px;
+  overflow: visible;
+  opacity: 0;
+}
+.vector-edit-toolbar-more > button { width: 2px; min-width: 0; height: 2px; padding: 0; overflow: hidden; }
+.vector-edit-toolbar-divider { display: none !important; }
+.vector-edit-toolbar-done kbd { color: #fff; opacity: 1; }
+.canvas-hint { left: calc(50% + 32px); }
+.canvas-hint .hint-separator { color: #5c5f67; }
+
+/* Reference canvas and artboard presentation. */
+.vector-canvas { background: #e4e4e0; }
+.canvas-wrap { background: #e4e4e0; }
+.canvas-artboard-name-input { font-family: 'Geist', sans-serif; }
+
+.app-shell:has(.empty-start-overlay) .export-button svg { display: none; }
+.app-shell:has(.empty-start-overlay) .status-right .save-state,
+.app-shell:has(.empty-start-overlay) .status-right > i { display: none; }
+
+/* Source-board box model. The supplied HTML uses content-box sizing for its
+   52px header, 64px rail, 300px inspector, and 28px footer; these border-box
+   equivalents preserve the same rendered outer dimensions. */
+.app-shell { grid-template-rows: 53px minmax(0, 1fr) auto 29px; }
+.toolbar { height: 53px; }
+.status-bar { height: 29px; }
+.workspace { grid-template-columns: minmax(0, 1fr) calc(var(--sidebar-width, 300px) + 1px); }
+.canvas-tool-rail { width: 65px; }
+.vector-canvas,
+.webgl-canvas { left: 65px; width: calc(100% - 65px); }
+.isolation-banner { margin-left: 65px; }
+.share-button { width: 66px; min-width: 66px; }
+.empty-start-overlay { inset: 0 calc(var(--sidebar-width, 300px) + 1px) 0 65px; }
+.vector-edit-toolbar { left: calc(50% + 32.5px); }
+.canvas-rail-group:nth-child(2) .canvas-tool-flyout { width: 226px; }
+.canvas-hint { left: calc(50% + 32.5px); width: 442px; font-size: 13px; }
+.properties-panel .panel-heading h2 { width: 46px; }
+
+/* Match the compact Layers section and the inspector's source-board rhythm. */
+.right-sidebar.mode-split { grid-template-rows: 144px minmax(0, 1fr); }
+.layers-panel { grid-template-rows: 39px minmax(0, 1fr); }
+.layers-panel-heading {
+  height: 39px;
+  align-items: flex-start;
+  padding: 12px 14px 10px;
+}
+.layer-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 14px 8px;
+}
+.layer-row { height: 30px; min-height: 30px; }
+.properties-panel .panel-heading { height: 47px; }
+.properties-panel .panel-heading > * { transform: translateY(-0.5px); }
+.properties-panel .panel-heading h2 { font-size: 13px; }
+.keyline-position-grid .coordinate-field { height: 34px; }
+
+@media (max-width: 900px) {
+  .brand h1, .topbar-divider, .document-status { display: flex; }
+}

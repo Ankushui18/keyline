@@ -1,0 +1,333 @@
+/* Contextual inspector refresh — progressive, compact, and direct. */
+.right-sidebar {
+  background: #1b1b1d;
+  border-left-color: #343438;
+  box-shadow: -10px 0 28px rgba(0, 0, 0, .08);
+}
+
+.sidebar-panel-tabs {
+  height: 42px;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #1b1b1d;
+  border-bottom: 1px solid #303034;
+}
+.sidebar-panel-tabs button {
+  height: 28px;
+  padding: 0 11px;
+  color: #8e8e93;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 590;
+}
+.sidebar-panel-tabs button:hover { color: #d6d6da; background: #252528; }
+.sidebar-panel-tabs button[aria-pressed='true'] {
+  color: #f2f2f4;
+  background: #2a2a2e;
+  border-color: #3a3a3f;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .18);
+}
+.sidebar-panel-tabs .sidebar-split-button,
+.sidebar-panel-tabs button:last-child { color: #85858b; }
+.sidebar-panel-tabs .sidebar-split-button[aria-pressed='true'] { color: #d7e5ff; background: #273248; border-color: #3b4c69; }
+
+.properties-panel {
+  --inspector-pad: 12px;
+  padding: 0 0 10px;
+  background: #1b1b1d;
+  scrollbar-color: #45454a transparent;
+}
+.properties-panel .panel-heading {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  height: 42px;
+  margin: 0;
+  padding: 0 10px 0 12px;
+  background: rgba(27, 27, 29, .94);
+  border-bottom: 1px solid #303034;
+  backdrop-filter: blur(14px);
+}
+.properties-panel .panel-heading .eyebrow { display: none; }
+.properties-panel .panel-heading h2 {
+  margin: 0;
+  color: #e8e8eb;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -.01em;
+}
+.properties-panel .inspector-context {
+  max-width: 152px;
+  padding: 4px 7px;
+  color: #aaaab0;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 580;
+}
+.properties-panel .inspector-context.has-selection {
+  color: #dce8ff;
+  background: #26334a;
+  border-color: #384b6c;
+}
+
+/* Sections read as one calm stack instead of a wall of separators. */
+.properties-panel > .panel-section,
+.properties-panel > .inspector-section,
+.properties-panel > fieldset > .panel-section,
+.properties-panel > fieldset > .inspector-section,
+.properties-panel > .empty-inspector,
+.properties-panel > fieldset > .multi-summary {
+  margin: 8px 8px 0;
+  padding: 11px;
+  background: #222225;
+  border: 1px solid #323237;
+  border-radius: 8px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .12);
+}
+.properties-panel > .inspector-section,
+.properties-panel > fieldset > .inspector-section { padding: 0; overflow: hidden; }
+.properties-panel > fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.properties-panel .panel-section { border-bottom-color: transparent; }
+
+.properties-panel .inspector-section > summary {
+  min-height: 39px;
+  padding: 0 11px;
+  color: #d5d5d9;
+  border-radius: 7px;
+  font-size: 10.5px;
+  font-weight: 620;
+}
+.properties-panel .inspector-section > summary:hover { color: #fff; background: #29292d; }
+.properties-panel .inspector-section > summary::before { color: #77777e; font-size: 14px; }
+.properties-panel .inspector-section > summary output {
+  margin-left: auto;
+  color: #a0a0a7;
+  font-size: 9px;
+  font-weight: 560;
+}
+.properties-panel .inspector-section-body { gap: 8px; padding: 1px 11px 11px; }
+
+.properties-panel .section-label {
+  color: #898990;
+  font-size: 8px;
+  font-weight: 690;
+  letter-spacing: .09em;
+}
+
+/* Selection identity is actionable: rename, identify, and enter edit in one row. */
+.properties-panel .object-selection-summary {
+  min-height: 60px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  background: linear-gradient(180deg, #24262b 0%, #222328 100%);
+  border-color: #363b44;
+}
+.properties-panel .object-glyph {
+  width: 28px;
+  height: 28px;
+  background: #28344a;
+  border-color: #3e526f;
+  border-radius: 7px;
+}
+.properties-panel .object-name-field {
+  width: 100%;
+  height: 23px;
+  padding: 0 4px;
+  color: #f0f0f2;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 630;
+}
+.properties-panel .object-name-field:hover { background: #2b2c31; }
+.properties-panel .object-name-field:focus { background: #191a1e; box-shadow: 0 0 0 1px #65789a; }
+.properties-panel .object-summary div span { padding-left: 4px; color: #8d8d95; font-size: 8.5px; }
+.properties-panel .edit-network-button {
+  min-height: 29px;
+  padding: 0 10px;
+  color: #e3ecff;
+  background: #2d5fba;
+  border: 1px solid #3c73d4;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.properties-panel .edit-network-button:hover { color: #fff; background: #3970cf; border-color: #4b82e2; }
+
+/* Inputs share one low-noise system; focus is visible without doubled outlines. */
+.properties-panel .numeric-field,
+.properties-panel .frame-preset-field,
+.properties-panel .appearance-color-row,
+.properties-panel .drawing-fill-row {
+  min-height: 32px;
+  background: #1b1b1e;
+  border-color: #38383d;
+  border-radius: 6px;
+}
+.properties-panel .numeric-field:hover,
+.properties-panel .frame-preset-field:hover,
+.properties-panel .appearance-color-row:hover { background: #202024; border-color: #47474d; }
+.properties-panel .numeric-field:focus-within,
+.properties-panel .frame-preset-field:focus-within,
+.properties-panel .appearance-color-row:focus-within {
+  background: #1d1e22;
+  border-color: #65738b;
+  box-shadow: 0 0 0 1px #65738b;
+}
+.properties-panel .numeric-field > span,
+.properties-panel .frame-preset-field > span { color: #8e8e95; }
+.properties-panel .numeric-field input,
+.properties-panel .frame-preset-field select,
+.properties-panel .appearance-select-grid select { color: #e1e1e4; font-size: 10px; }
+.properties-panel .appearance-color-row { padding: 0 7px; }
+.properties-panel .appearance-color-row code { color: #aaaab0; }
+
+/* Secondary values exist on demand rather than competing with primary work. */
+.inline-disclosure {
+  overflow: hidden;
+  background: #1e1e21;
+  border: 1px solid #35353a;
+  border-radius: 6px;
+}
+.inline-disclosure > summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  color: #9999a0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 9px;
+  font-weight: 590;
+}
+.inline-disclosure > summary::-webkit-details-marker { display: none; }
+.inline-disclosure > summary::before { content: '›'; color: #73737a; font-size: 13px; transition: transform 120ms ease; }
+.inline-disclosure[open] > summary::before { transform: rotate(90deg); }
+.inline-disclosure > summary:hover { color: #d7d7dc; background: #26262a; }
+.inline-disclosure > summary output { margin-left: auto; color: #a0a0a7; text-transform: capitalize; }
+.inline-disclosure > .appearance-select-grid { padding: 0 8px 8px; }
+
+.properties-panel .stroke-alignment-control { gap: 6px; }
+.properties-panel .stroke-alignment-control > span { color: #909097; font-size: 8.5px; }
+.properties-panel .segmented-control {
+  padding: 2px;
+  background: #1b1b1e;
+  border: 1px solid #36363b;
+  border-radius: 7px;
+}
+.properties-panel .segmented-control button { min-height: 25px; border-radius: 5px; }
+.properties-panel .segmented-control button[aria-pressed='true'],
+.properties-panel .segmented-control button.is-active {
+  color: #f1f1f3;
+  background: #34343a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .28);
+}
+.properties-panel .remove-paint-button {
+  min-height: 29px;
+  color: #aa8e8e;
+  background: transparent;
+  border-color: #403638;
+  border-radius: 6px;
+}
+.properties-panel .remove-paint-button:hover { color: #edb0b0; background: #322629; border-color: #62444a; }
+
+/* Context summaries preserve confidence without exposing implementation IDs by default. */
+.properties-panel .property-list { gap: 8px; }
+.properties-panel .property-row { min-height: 19px; }
+.properties-panel .node-details-body,
+.properties-panel .constraint-inspector-body { padding-top: 1px; }
+.properties-panel .handle-details { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid #343439; }
+.properties-panel .segment-primary-details { gap: 7px; }
+
+.properties-panel .constraint-inspector > summary output {
+  min-width: 18px;
+  padding: 2px 6px;
+  text-align: center;
+  background: #2d2d31;
+  border-radius: 10px;
+}
+.properties-panel .no-constraints { margin: 1px 0 2px; color: #85858c; font-size: 9px; line-height: 1.45; }
+.properties-panel .constraint-suggestions { margin: 0; }
+
+.properties-panel .network-edit-summary h3 { margin: 5px 0 4px; font-size: 12px; }
+.properties-panel .network-edit-summary p { color: #909097; line-height: 1.45; }
+.properties-panel .network-edit-summary button { min-height: 29px; border-radius: 6px; }
+.properties-panel .field-help { margin-bottom: 0; color: #7f7f86; font-size: 8.5px; line-height: 1.4; }
+
+.properties-panel .artboard-frame-section > summary { min-height: 42px; padding: 0 11px; }
+.properties-panel .frame-inspector-body { padding: 0 11px 11px; }
+.properties-panel .artboard-action-row { gap: 7px; }
+.properties-panel .duplicate-artboard-button,
+.properties-panel .delete-artboard-button { min-height: 30px; border-radius: 6px; }
+
+.properties-panel .empty-inspector {
+  min-height: 78px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  padding: 12px;
+}
+.properties-panel .empty-visual { transform: scale(.86); transform-origin: left center; }
+.properties-panel .panel-help { margin-top: 8px; background: transparent; border-color: transparent; box-shadow: none; }
+.properties-panel .panel-help > summary { color: #98989f; }
+
+/* The canvas toolbar keeps frequent work visible and puts specialist tools one level deeper. */
+.vector-edit-toolbar {
+  top: 14px;
+  gap: 2px;
+  min-height: 40px;
+  padding: 4px;
+  background: rgba(27, 27, 29, .96);
+  border-color: #3a3a3f;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .26), 0 1px 2px rgba(0, 0, 0, .3);
+  backdrop-filter: blur(14px);
+}
+.vector-edit-toolbar-label { padding: 0 7px; color: #7f7f86; font-size: 9px; letter-spacing: .06em; }
+.vector-edit-toolbar button { min-width: 42px; border-radius: 6px; }
+.vector-edit-toolbar button.is-active { color: #fff; background: #34353a; border-color: #4a4b52; }
+.vector-edit-toolbar-more { position: relative; }
+.vector-edit-toolbar-more > button { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.vector-edit-toolbar-more > button span { color: #7f7f86; font-size: 9px; }
+.vector-edit-toolbar-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 150px;
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  background: #202024;
+  border: 1px solid #3b3b41;
+  border-radius: 9px;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .36);
+}
+.vector-edit-toolbar .vector-edit-toolbar-menu button {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 9px;
+  text-align: left;
+}
+
+@media (min-width: 1500px) {
+  .properties-panel { --inspector-pad: 13px; }
+  .properties-panel > .panel-section,
+  .properties-panel > .inspector-section,
+  .properties-panel > fieldset > .panel-section,
+  .properties-panel > fieldset > .inspector-section { margin-left: 9px; margin-right: 9px; }
+}
