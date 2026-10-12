@@ -1,0 +1,16 @@
+{
+  "name": "vector-solver",
+  "type": "module",
+  "description": "Deterministic geometric constraint solver for Vector Studio",
+  "version": "0.1.0",
+  "files": [
+    "vector_solver_bg.wasm",
+    "vector_solver.js",
+    "vector_solver.d.ts"
+  ],
+  "main": "vector_solver.js",
+  "types": "vector_solver.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
