@@ -2,7 +2,7 @@ import { createEntityId } from './ids';
 import type { VectorDocument } from './document';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from './object-geometry';
 import type { OperationInput } from './operations';
-import type { EntityId, LayerNode, NetworkObject } from './types';
+import type { EntityId, LayerNode, NetworkObject, Point } from './types';
 
 export interface DuplicateTopologyMap {
   nodeMap: Record<EntityId, EntityId>;
@@ -235,6 +235,49 @@ export function prepareFlipObjects(
     },
   }));
   return { axis, objectIds: objects.map((object) => object.id), operations };
+}
+
+export interface NudgeObjectsPlan {
+  delta: Point;
+  objectIds: EntityId[];
+  operations: OperationInput[];
+}
+
+/**
+ * Arrow-key nudge. Moving an object is an ordinary transform update, so the same
+ * operation is reused here as for a pointer drag; the caller wraps the returned
+ * operations in one transaction, which keeps a burst of key presses individually
+ * undoable. Returns null when nothing can move, so the caller can let the key
+ * press through instead of swallowing it.
+ */
+export function prepareNudgeObjects(
+  document: VectorDocument,
+  objectIds: Iterable<EntityId>,
+  delta: Point,
+): NudgeObjectsPlan | null {
+  if (delta.x === 0 && delta.y === 0) return null;
+  const objects = [...new Set(objectIds)]
+    .map((id) => document.getObject(id))
+    .filter((object): object is NetworkObject => Boolean(object))
+    .filter((object) => !document.isObjectLocked(object.id));
+  if (objects.length === 0) return null;
+  return {
+    delta,
+    objectIds: objects.map((object) => object.id),
+    operations: objects.map((object) => ({
+      type: 'UPDATE_OBJECT',
+      payload: {
+        objectId: object.id,
+        updates: {
+          transform: {
+            ...object.transform,
+            x: object.transform.x + delta.x,
+            y: object.transform.y + delta.y,
+          },
+        },
+      },
+    })),
+  };
 }
 
 export function prepareDeleteObject(document: VectorDocument, objectId: EntityId): DeleteObjectPlan | null {

@@ -7,6 +7,8 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- `docs/EDITING-AUDIT.md` — a line-by-line audit of the interaction model (selection, transform
+  handles, group entry, nudge, typography, gradients) with the smallest change set for each gap.
 - **Recovery restore.** `.keyline.json` backups downloaded after a save failure can now be
   imported from the dashboard. Files are validated, opened as a new drawing named
   `<name> (restored)`, and never overwrite the original document.
@@ -20,6 +22,13 @@ and the project uses semantic versioning once it publishes releases.
 - `.gitattributes` for consistent line endings and binary handling.
 
 ### Changed
+
+- Arrow keys now nudge selected objects (1 px, `Shift` 10 px) as one undoable step, not only
+  points in edit mode.
+- The wheel pans the canvas (plain scroll, `Shift` for horizontal) while `Ctrl/⌘` + wheel or a
+  pinch zooms at the pointer; `Ctrl/⌘ +` and `Ctrl/⌘ -` step the zoom.
+- The top bar, status bar and inspector share one docked-chrome surface, so the right panel no
+  longer sits one ramp step away from the bars beside it.
 
 - README rewritten as a landing page: what it is, quick start, feature map, documentation index,
   repository map, quality gates and an honest limitations list.

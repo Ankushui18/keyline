@@ -389,7 +389,7 @@ Modifier is `Ctrl` on Windows/Linux and `⌘` on macOS.
 | Flip horizontal / vertical | `⇧ H` / `⇧ V` |
 | Copy / cut / paste | `Ctrl/⌘ C` / `X` / `V` |
 | Undo / redo | `Ctrl/⌘ Z` / `Ctrl/⌘ ⇧ Z` |
-| Nudge points | Arrow keys (1 px), `Shift` + arrows (10 px) |
+| Nudge objects or points | Arrow keys (1 px), `Shift` + arrows (10 px) |
 | Delete selection or point | `Delete` / `Backspace` |
 | Pan | Wheel or two-finger scroll, `Shift` + wheel (horizontal), middle-drag, `Space` + drag |
 | Zoom | `Ctrl/⌘` + wheel or pinch, `Ctrl/⌘ +` / `Ctrl/⌘ -` |

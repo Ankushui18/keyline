@@ -26,7 +26,7 @@ import { copyTextToClipboard } from './core/browser-clipboard';
 import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
-import { prepareDeleteObject, prepareFlipObjects } from './core/object-operations';
+import { prepareDeleteObject, prepareFlipObjects, prepareNudgeObjects } from './core/object-operations';
 import { DEFAULT_DOCUMENT_NAME, DocumentPersistence, listDocuments, loadDocumentById, markStoredDocumentImported, saveDocument, type SaveStatus } from './core/store';
 import type {
   Appearance,
@@ -1827,9 +1827,31 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
         }
         return;
       }
-      const nudgeDirection = !modifier && !event.altKey && selection.mode === 'network'
+      const arrowDirection = !modifier && !event.altKey
         ? ({ ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } } as const)[event.key as 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown']
         : undefined;
+      if (arrowDirection && selection.mode === 'object' && selection.objectIds.size > 0) {
+        // Arrow keys move whole objects too, one pixel or ten with Shift, and the
+        // whole nudge is one undoable step.
+        const distance = event.shiftKey ? 10 : 1;
+        const plan = prepareNudgeObjects(document, selection.objectIds, {
+          x: arrowDirection.x * distance,
+          y: arrowDirection.y * distance,
+        });
+        if (plan) {
+          event.preventDefault();
+          manager.beginTransaction(distance === 10 ? 'Nudge objects 10' : 'Nudge objects');
+          try {
+            plan.operations.forEach((operation) => manager.execute(operation));
+            manager.commitTransaction();
+          } catch (error) {
+            manager.rollbackTransaction();
+            console.warn('Nudge rejected by constraint pre-validation.', error);
+          }
+        }
+        return;
+      }
+      const nudgeDirection = selection.mode === 'network' ? arrowDirection : undefined;
       if (nudgeDirection && selection.nodeIds.size > 0) {
         const distance = event.shiftKey ? 10 : 1;
         const positions = [...selection.nodeIds]

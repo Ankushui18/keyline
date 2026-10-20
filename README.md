@@ -9,7 +9,7 @@ and export production-ready SVG, PNG, React and CSS — from your browser, with 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/Ankushui18/keyline/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
-  <img src="https://img.shields.io/badge/tests-322%20passing-brightgreen" alt="322 tests passing">
+  <img src="https://img.shields.io/badge/tests-324%20passing-brightgreen" alt="324 tests passing">
   <img src="https://img.shields.io/badge/node-20.19%2B%20%7C%2022.12%2B-339933" alt="Node 20.19+ or 22.12+">
   <img src="https://img.shields.io/badge/storage-on%20this%20device-6b7686" alt="Stored on this device">
 </p>
@@ -32,7 +32,7 @@ Keyline is a **web app you run locally**, not a hosted service. Pick the path th
 | **See what's missing** (honest list) | [Known limits](#known-limits) |
 | **Read the security/audit record** | [SECURITY.md](SECURITY.md) · [docs/AUDIT.md](docs/AUDIT.md) |
 
-> **Status: v0.1.0, source release.** Covers the icon workflow described below, verified by 322
+> **Status: v0.1.0, source release.** Covers the icon workflow described below, verified by 324
 > automated tests. It is not a hosted product and has no user accounts.
 
 ---
@@ -128,6 +128,7 @@ Full walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
 | [docs/COLLABORATION.md](docs/COLLABORATION.md) | Yjs model, relay limits, deployment boundary, revocation reality. |
 | [docs/FAQ.md](docs/FAQ.md) | Storage, privacy, offline use, compatibility, common confusions. |
 | [docs/AUDIT.md](docs/AUDIT.md) | The full audit-and-remediation record with evidence. |
+| [docs/EDITING-AUDIT.md](docs/EDITING-AUDIT.md) | How selection and editing behave today, against what a conventional vector editor does, and the smallest change set that closes the gap. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CHANGELOG.md](CHANGELOG.md) | How to contribute, how to report a vulnerability, what changed. |
 | [solver/README.md](solver/README.md) · [src/constraints/README.md](src/constraints/README.md) | Wasm boundary and the two-solver contract. |
 
@@ -178,7 +179,7 @@ keyline/
 ```bash
 npm ci
 npm run check      # design gate + build + tests + Wasm smoke + relay + doc links
-npm test           # 322 tests across 57 test files
+npm test           # 324 tests across 57 test files
 npm run test:solver
 npm run test:collaboration
 npm run check:docs # every relative doc link resolves
@@ -191,7 +192,7 @@ npm run proof:design # render the design system to design-proof/index.html
 Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 
 - **Strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`) and a production Vite build.
-- **322 tests / 57 files** covering geometry, native arcs, regions, constraints, transactions,
+- **324 tests / 57 files** covering geometry, native arcs, regions, constraints, transactions,
   persistence, export fidelity and escaping, collaboration replay, and performance budgets.
 - **A real Wasm smoke test** that loads the committed artifact and checks native-arc solving —
   not a mock of the boundary.
