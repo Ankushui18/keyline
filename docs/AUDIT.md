@@ -197,7 +197,7 @@ checked in CI.
 | Check | Result |
 |---|---|
 | Strict TypeScript + production build | Passed (`tsc -b`, `vite build`) |
-| Unit/integration suite | **351 tests / 59 files passed** |
+| Unit/integration suite | **354 tests / 59 files passed** |
 | Wasm smoke test | Passed against the committed artifact |
 | WebSocket relay integration | **9 / 9 passed** |
 | Rust tests | Not run in this sandbox (no Rust toolchain); CI job added |

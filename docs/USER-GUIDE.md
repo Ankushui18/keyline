@@ -99,6 +99,8 @@ rotate handle: as in Figma, move the pointer just outside a corner and it become
   snaps to 15° steps. The `Rotation` field and the 90° button in Design do the same thing by
   number, about the same centre, so a shape never leaves its artboard when you type an angle.
 - Dragging anywhere else inside the frame moves the object, so `Alt`-drag still duplicates.
+- Clicking picks the shape painted on top, following layer order in the Layers panel. To reach a shape
+  behind another, `Ctrl/⌘`-click: each click walks down the stack under the pointer and wraps.
 - Several selected objects share one axis-aligned frame; resizing and rotating there apply to the
   whole selection at once.
 
@@ -407,6 +409,7 @@ Modifier is `Ctrl` on Windows/Linux and `⌘` on macOS.
 | Flip horizontal / vertical | `⇧ H` / `⇧ V` |
 | Copy / cut / paste | `Ctrl/⌘ C` / `X` / `V` |
 | Undo / redo | `Ctrl/⌘ Z` / `Ctrl/⌘ ⇧ Z` |
+| Select the shape behind another | `Ctrl/⌘` + click (cycles the stack, wrapping) |
 | Nudge objects or points | Arrow keys (1 px), `Shift` + arrows (10 px) |
 | Delete selection or point | `Delete` / `Backspace` |
 | Pan | Wheel or two-finger scroll, `Shift` + wheel (horizontal), middle-drag, `Space` + drag |

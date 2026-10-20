@@ -84,33 +84,75 @@ export function hitTestSegment(
   return null;
 }
 
-export function hitTestObject(document: VectorDocument, point: Point, tolerance: number): ObjectHitResult | null {
-  const geometryHit = hitTest(document, point, tolerance);
-  if (geometryHit) {
-    const object = geometryHit.kind === 'node'
-      ? document.getObjectForNode(geometryHit.id)
-      : document.getObjectForSegment(geometryHit.id);
-    if (object) return { kind: 'object', id: object.id, geometryHit };
-  }
+/** Every object on the active page in paint order: back to front, exactly as drawn. */
+export function objectsInPaintOrder(document: VectorDocument): EntityId[] {
+  return document.activePage.artboardIds.flatMap((artboardId) =>
+    document.objectsForArtboard(artboardId).map((object) => object.id));
+}
 
-  // Object mode treats the visible selection bounds as the draggable target.
-  // This makes hollow, unfilled, and heavily stroked vectors movable from their
-  // middle rather than requiring users to reacquire a thin path edge.
-  const objects = [...document.objects.values()];
-  for (let index = objects.length - 1; index >= 0; index -= 1) {
-    const object = objects[index];
-    if (!document.isObjectVisible(object.id) || document.isObjectLocked(object.id)) continue;
-    const layer = document.getLayerForObject(object.id);
-    const artboard = layer ? document.getArtboard(layer.artboardId) : undefined;
-    if (!artboard || artboard.pageId !== document.activePageId) continue;
-    const bounds = objectBounds(document, object.id, INTERACTION_BOUNDS_POLICY);
+/**
+ * Every object whose bounds contain the point, topmost first, in paint order.
+ * Reordering a layer repaints it, so the stack has to follow layer order rather
+ * than insertion order or the topmost click would disagree with the picture.
+ */
+export function objectsUnderPoint(document: VectorDocument, point: Point, tolerance: number): EntityId[] {
+  const painted = objectsInPaintOrder(document);
+  const hits: EntityId[] = [];
+  for (let index = painted.length - 1; index >= 0; index -= 1) {
+    const objectId = painted[index];
+    if (!document.isObjectVisible(objectId) || document.isObjectLocked(objectId)) continue;
+    const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
     if (bounds.width <= 1e-6 && bounds.height <= 1e-6) continue;
     if (point.x >= bounds.minX - tolerance && point.x <= bounds.maxX + tolerance &&
         point.y >= bounds.minY - tolerance && point.y <= bounds.maxY + tolerance) {
-      return { kind: 'object', id: object.id };
+      hits.push(objectId);
     }
   }
-  return null;
+  return hits;
+}
+
+/** The next object under the pointer after the current one, wrapping around. */
+export function nextObjectUnderPoint(
+  document: VectorDocument,
+  point: Point,
+  tolerance: number,
+  selected: Iterable<EntityId>,
+): ObjectHitResult | null {
+  const stack = objectsUnderPoint(document, point, tolerance);
+  if (stack.length === 0) return null;
+  const current = [...selected];
+  const found = stack.reduce((deepest, objectId, index) => (current.includes(objectId) ? Math.max(deepest, index) : deepest), -1);
+  return { kind: 'object', id: stack[(found + 1) % stack.length] };
+}
+
+export function hitTestObject(document: VectorDocument, point: Point, tolerance: number): ObjectHitResult | null {
+  // Object mode treats the visible selection bounds as the draggable target.
+  // This makes hollow, unfilled, and heavily stroked vectors movable from their
+  // middle rather than requiring users to reacquire a thin path edge.
+  const stack = objectsUnderPoint(document, point, tolerance);
+  const topOfStack = stack[0];
+
+  // Infinite construction lines are clickable outside their own bounds, so a raw
+  // geometry hit can name an object the bounds stack does not contain. Paint order
+  // still decides: a shape above the line wins, the line wins when it is on top.
+  const geometryHit = hitTest(document, point, tolerance);
+  const geometryOwner = geometryHit
+    ? (geometryHit.kind === 'node'
+        ? document.getObjectForNode(geometryHit.id)?.id
+        : document.getObjectForSegment(geometryHit.id)?.id)
+    : undefined;
+  if (geometryHit && geometryOwner) {
+    const painted = objectsInPaintOrder(document);
+    const ownerIndex = painted.lastIndexOf(geometryOwner);
+    const topIndex = topOfStack ? painted.lastIndexOf(topOfStack) : -1;
+    if (ownerIndex >= topIndex && document.isObjectVisible(geometryOwner) && !document.isObjectLocked(geometryOwner)) {
+      return { kind: 'object', id: geometryOwner, geometryHit };
+    }
+  }
+
+  if (!topOfStack) return null;
+  const ownGeometry = hitTest(document, point, tolerance, topOfStack);
+  return { kind: 'object', id: topOfStack, geometryHit: ownGeometry ?? undefined };
 }
 
 export function selectionForObjectHit(

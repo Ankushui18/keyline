@@ -2,7 +2,7 @@
 
 What is verified, how to run it, and what the suites do **not** prove.
 
-Current suite: **351 tests across 59 test files**, plus a real Wasm smoke test, nine WebSocket
+Current suite: **354 tests across 59 test files**, plus a real Wasm smoke test, nine WebSocket
 integration checks, Rust unit tests, and optional browser suites.
 
 - [Run everything](#run-everything)

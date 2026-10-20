@@ -30,6 +30,8 @@ import {
   hitTest,
   hitTestObject,
   hitTestSegment,
+  nextObjectUnderPoint,
+  objectsUnderPoint,
   selectionForHit,
   selectionForObjectHit,
 } from '../tools/select-tool';
@@ -1196,6 +1198,20 @@ export function VectorCanvas({
     }
 
     if (selectionRef.current.mode === 'object') {
+      // Ctrl/⌘-click walks down the stack under the pointer, so the shape you can
+      // see behind another one is reachable without a trip to the Layers panel.
+      const stack = (event.ctrlKey || event.metaKey)
+        ? objectsUnderPoint(manager.document, world, 7 / viewport.scale)
+        : [];
+      if (stack.length > 1) {
+        const next = nextObjectUnderPoint(manager.document, world, 7 / viewport.scale, selectionRef.current.objectIds);
+        if (next) {
+          onArtboardSelectionChange(new Set());
+          onSelectionChange({ mode: 'object', objectIds: new Set([next.id]), nodeIds: new Set(), segmentIds: new Set() });
+          event.preventDefault();
+          return;
+        }
+      }
       const objectHit = hitTestObject(manager.document, world, 7 / viewport.scale);
       if (objectHit || !event.shiftKey) onArtboardSelectionChange(new Set());
       if (objectHit && isDirectDoubleClick) {

@@ -4,7 +4,7 @@ import { createEntityId } from '../core/ids';
 import { OperationManager } from '../core/operations';
 import type { Segment, VectorNode, VectorPath } from '../core/types';
 import { preparePrimitiveObject } from './primitive-tool';
-import { hitTest, hitTestObject } from './select-tool';
+import { hitTest, hitTestObject, nextObjectUnderPoint, objectsUnderPoint } from './select-tool';
 
 function constructionFixture(extent: 'finite' | 'infinite') {
   const document = VectorDocument.createEmpty();
@@ -118,5 +118,59 @@ describe('construction hit testing', () => {
     fixture.manager.undo();
     fixture.manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: layer.id, updates: { visible: false } } });
     expect(hitTest(fixture.document, { x: 50, y: 0 }, 1)).toBeNull();
+  });
+});
+
+function stackedScene() {
+  const document = VectorDocument.createEmpty();
+  const manager = new OperationManager(document);
+  const draw = (x: number, y: number, size: number) => {
+    const plan = preparePrimitiveObject(document, 'rectangle', { x, y }, { x: x + size, y: y + size })!;
+    manager.beginTransaction('Stack fixture rectangle');
+    plan.operations.forEach((operation) => manager.execute(operation));
+    manager.commitTransaction();
+    return plan;
+  };
+  const back = draw(0, 0, 100);
+  const middle = draw(10, 10, 80);
+  const front = draw(20, 20, 40);
+  return { document, manager, back, middle, front };
+}
+
+describe('paint-order selection', () => {
+  it('follows layer order after a layer is moved, not insertion order', () => {
+    const { document, manager, middle, front } = stackedScene();
+    const point = { x: 30, y: 30 };
+    expect(hitTestObject(document, point, 2)?.id).toBe(front.objectId);
+    manager.execute({
+      type: 'MOVE_LAYER',
+      payload: { layerId: front.layerId, parentId: undefined, artboardId: document.activeArtboardId, index: 0 },
+    });
+    // Moving the newest rectangle to the back of the layer list repaints it first,
+    // so the rectangle that was in the middle becomes the topmost hit.
+    expect(hitTestObject(document, point, 2)?.id).toBe(middle.objectId);
+    expect(objectsUnderPoint(document, point, 2)[0]).toBe(middle.objectId);
+  });
+
+  it('lists the stack topmost first and wraps when cycling', () => {
+    const { document, back, middle, front } = stackedScene();
+    const point = { x: 30, y: 30 };
+    expect(objectsUnderPoint(document, point, 2)).toEqual([front.objectId, middle.objectId, back.objectId]);
+    expect(nextObjectUnderPoint(document, point, 2, [])?.id).toBe(front.objectId);
+    expect(nextObjectUnderPoint(document, point, 2, [front.objectId])?.id).toBe(middle.objectId);
+    expect(nextObjectUnderPoint(document, point, 2, [middle.objectId])?.id).toBe(back.objectId);
+    expect(nextObjectUnderPoint(document, point, 2, [back.objectId])?.id).toBe(front.objectId);
+    expect(nextObjectUnderPoint(document, { x: 400, y: 400 }, 2, [])).toBeNull();
+  });
+
+  it('skips hidden and locked layers, and reports geometry only for the chosen object', () => {
+    const { document, manager, back, middle, front } = stackedScene();
+    manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: document.getLayerForObject(front.objectId)!.id, updates: { visible: false } } });
+    manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: document.getLayerForObject(middle.objectId)!.id, updates: { locked: true } } });
+    const point = { x: 30, y: 30 };
+    expect(objectsUnderPoint(document, point, 2)).toEqual([back.objectId]);
+    const hit = hitTestObject(document, point, 2);
+    expect(hit?.id).toBe(back.objectId);
+    expect(hit?.geometryHit).toBeUndefined();
   });
 });

@@ -7,6 +7,12 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Fixed
 
+- Clicking now selects the shape that is actually painted on top. Hit testing walked objects in
+  insertion order while the renderer paints in layer order, so after reordering a layer the click and
+  the picture disagreed. Both now resolve through one paint order.
+- `Ctrl/⌘`-click cycles down through every shape under the pointer (and wraps), so an object hidden
+  behind another no longer requires a trip to the Layers panel.
+
 - Inspector controls that could never run now say why in their tooltip (frame rotation, frame flips,
   frame corner radius, `Clip content`, distribution with fewer than three layers, arrangement with
   fewer than two) instead of reading as broken buttons.
@@ -22,6 +28,8 @@ and the project uses semantic versioning once it publishes releases.
   typed angle could throw a shape out of its artboard.
 ### Added
 
+- `docs/PRODUCT-AUDIT.md` — the product measured against the full P0–P5 plan: a feature matrix with
+  source evidence, the gap report in dependency order, and the recommended next milestone.
 - `docs/EDITING-AUDIT.md` — a line-by-line audit of the interaction model (selection, transform
   handles, group entry, nudge, typography, gradients) with the smallest change set for each gap.
 - **Recovery restore.** `.keyline.json` backups downloaded after a save failure can now be
