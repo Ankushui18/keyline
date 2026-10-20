@@ -1,25 +1,30 @@
+import {
+  DEFAULT_DRAWING_INK,
+  DEFAULT_FILL_COLOR,
+  DEFAULT_STROKE_COLOR,
+} from '../design-system/document-defaults';
 import type { Appearance, DrawingStyle, EntityId } from './types';
 
 const LEGACY_DEFAULT_DRAWING_STYLE: DrawingStyle = {
   strokeEnabled: true,
-  strokeColor: '#c8ced9',
+  strokeColor: DEFAULT_STROKE_COLOR,
   strokeWidth: 1.25,
   strokeCap: 'round',
   strokeJoin: 'round',
   strokeAlignment: 'center',
   fillEnabled: false,
-  fillColor: '#8b6cf6',
+  fillColor: DEFAULT_FILL_COLOR,
 };
 
 export const DEFAULT_DRAWING_STYLE: DrawingStyle = {
   strokeEnabled: true,
-  strokeColor: '#000000',
+  strokeColor: DEFAULT_DRAWING_INK,
   strokeWidth: 1,
   strokeCap: 'butt',
   strokeJoin: 'round',
   strokeAlignment: 'center',
   fillEnabled: false,
-  fillColor: '#8b6cf6',
+  fillColor: DEFAULT_FILL_COLOR,
 };
 
 export function appearanceFromDrawingStyle(id: EntityId, style: DrawingStyle): Appearance {

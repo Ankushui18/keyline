@@ -13,6 +13,9 @@ import type {
   VectorNode,
   VectorPath,
 } from '../core/types';
+import {
+  CONSTRUCTION_GUIDE_COLOR,
+} from '../design-system/document-defaults';
 
 export interface ConstructionLinePlan {
   objectId: EntityId;
@@ -70,7 +73,7 @@ export function prepareConstructionLineObject(
     id: appearanceId,
     fills: [],
     stroke: {
-      color: '#bdbdbd',
+      color: CONSTRUCTION_GUIDE_COLOR,
       width: 1.25,
       cap: 'round',
       join: 'round',

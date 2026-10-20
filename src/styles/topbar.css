@@ -8,63 +8,63 @@
   height: 52px;
   padding: 0 16px;
   font: 13px/1.4 'Geist', system-ui, sans-serif;
-  color: #ececee;
-  background: #17181a;
-  border-bottom: 1px solid #2e3036;
+  color: var(--text-primary);
+  background: var(--surface-canvas);
+  border-bottom: 1px solid var(--border-default);
 }
 .topbar button { font: inherit; font-size: inherit; color: inherit; cursor: pointer; }
-.topbar button:focus-visible, .topbar input:focus-visible { outline: 2px solid #0d99ff; outline-offset: 2px; }
+.topbar button:focus-visible, .topbar input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topbar-left { flex: 1 1 auto; }
 .topbar-right { flex: 0 0 auto; }
 .topbar-brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 0; border: 0; background: transparent; border-radius: 8px; }
 .topbar-brand svg { width: 28px; height: 28px; }
 .topbar-brand strong { font-size: 14px; font-weight: 600; }
-.topbar-brand:hover strong { color: #fff; }
-.topbar-divider { width: 1px; height: 20px; flex: none; background: #2e3036; }
+.topbar-brand:hover strong { color: var(--text-inverse); }
+.topbar-divider { width: 1px; height: 20px; flex: none; background: var(--border-default); }
 .topbar-name { max-width: 240px; padding: 5px 8px; border: 0; border-radius: 6px; background: transparent; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.topbar-name:hover { background: #26272b; }
-.topbar-name-input { width: 200px; height: 28px; padding: 0 8px; border: 1px solid #0d99ff; border-radius: 6px; background: #1f2023; color: #ececee; font: 500 13px 'Geist', sans-serif; outline: none; }
-.topbar-save { display: flex; align-items: center; gap: 6px; color: #8a8d95; font-size: 12px; white-space: nowrap; }
-.topbar-save i { width: 6px; height: 6px; border-radius: 50%; background: #0d99ff; }
+.topbar-name:hover { background: var(--surface-raised); }
+.topbar-name-input { width: 200px; height: 28px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--surface-panel); color: var(--text-primary); font: 500 13px 'Geist', sans-serif; outline: none; }
+.topbar-save { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.topbar-save i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 .topbar-save.is-saving i { animation: pulse 700ms ease-in-out infinite alternate; }
-.topbar-save.is-error { color: #e38a91; }
-.topbar-save.is-error i { background: #ef747c; }
+.topbar-save.is-error { color: var(--text-danger); }
+.topbar-save.is-error i { background: var(--text-danger); }
 .topbar-group { display: flex; gap: 2px; }
-.topbar-icon { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; color: #a7a9b0; background: transparent; border: 0; border-radius: 6px; }
-.topbar-icon:hover:not(:disabled) { color: #ececee; background: #2c2e33; }
-.topbar-icon:disabled { color: #4d5058; cursor: default; }
+.topbar-icon { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; color: var(--text-secondary); background: transparent; border: 0; border-radius: 6px; }
+.topbar-icon:hover:not(:disabled) { color: var(--text-primary); background: var(--surface-active); }
+.topbar-icon:disabled { color: var(--graphite-600); cursor: default; }
 /* Octicons are already filled silhouettes; stroking their contours doubles their weight. */
 .topbar .topbar-icon svg.octicon { display: block; width: 16px; height: 16px; fill: currentColor; stroke: none; stroke-width: 0; }
-.topbar-text-button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; color: #c9cbd1; background: transparent; border: 0; border-radius: 6px; }
-.topbar-text-button:hover:not(:disabled) { color: #fff; background: #2c2e33; }
-.topbar-text-button:disabled, .topbar-export:disabled { color: #5c5f67; cursor: default; }
+.topbar-text-button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; color: var(--graphite-300); background: transparent; border: 0; border-radius: 6px; }
+.topbar-text-button:hover:not(:disabled) { color: var(--text-inverse); background: var(--surface-active); }
+.topbar-text-button:disabled, .topbar-export:disabled { color: var(--text-disabled); cursor: default; }
 .topbar-text-button svg { fill: currentColor; }
 .topbar-frame { position: relative; }
-.topbar-frame-menu { position: absolute; z-index: 40; top: 38px; left: 0; width: 220px; padding: 4px; background: #26272b; border: 1px solid #3a3c42; border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
+.topbar-frame-menu { position: absolute; z-index: 40; top: 38px; left: 0; width: 220px; padding: 4px; background: var(--surface-raised); border: 1px solid var(--graphite-650); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
 .topbar-frame-menu > button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; text-align: left; }
-.topbar-frame-menu > button:hover { background: #2f3036; }
-.topbar-frame-menu span { color: #a0a3ab; font-size: 12px; }
+.topbar-frame-menu > button:hover { background: var(--border-default); }
+.topbar-frame-menu span { color: var(--text-secondary); font-size: 12px; }
 .topbar-frame-custom { display: flex; gap: 6px; align-items: end; padding: 6px 10px 8px; }
-.topbar-frame-custom label { display: flex; flex-direction: column; gap: 2px; color: #a0a3ab; font-size: 11px; flex: 1; }
-.topbar-frame-custom input { width: 100%; height: 28px; padding: 0 6px; border: 1px solid #3a3c42; border-radius: 6px; background: #17181a; color: #ececee; }
-.topbar-frame-custom button { height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: #0b7bd6; color: #fff; font-weight: 600; }
-.topbar-command { display: inline-flex; align-items: center; gap: 8px; height: 32px; min-width: 190px; padding: 0 8px 0 10px; color: #8a8d95; background: #1f2023; border: 1px solid #2e3036; border-radius: 8px; }
-.topbar-command:hover { color: #c9cbd1; border-color: #3a3c42; }
+.topbar-frame-custom label { display: flex; flex-direction: column; gap: 2px; color: var(--text-secondary); font-size: 11px; flex: 1; }
+.topbar-frame-custom input { width: 100%; height: 28px; padding: 0 6px; border: 1px solid var(--graphite-650); border-radius: 6px; background: var(--surface-canvas); color: var(--text-primary); }
+.topbar-frame-custom button { height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--accent-pressed); color: var(--text-inverse); font-weight: 600; }
+.topbar-command { display: inline-flex; align-items: center; gap: 8px; height: 32px; min-width: 190px; padding: 0 8px 0 10px; color: var(--text-muted); background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: 8px; }
+.topbar-command:hover { color: var(--graphite-300); border-color: var(--graphite-650); }
 .topbar-command svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.topbar-command kbd { margin-left: auto; padding: 1px 6px; font: 11px 'Geist', system-ui, sans-serif; background: #26272b; border-radius: 4px; }
+.topbar-command kbd { margin-left: auto; padding: 1px 6px; font: 11px 'Geist', system-ui, sans-serif; background: var(--surface-raised); border-radius: 4px; }
 .topbar-people { display: flex; padding-left: 2px; }
-.topbar-people span { display: grid; place-items: center; width: 28px; height: 28px; margin-left: -6px; color: #fff; font-size: 11px; font-weight: 600; border: 2px solid #17181a; border-radius: 50%; }
+.topbar-people span { display: grid; place-items: center; width: 28px; height: 28px; margin-left: -6px; color: var(--text-inverse); font-size: 11px; font-weight: 600; border: 2px solid var(--surface-canvas); border-radius: 50%; }
 .topbar-people span:first-child { margin-left: 0; }
-.topbar-share { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; background: transparent; border: 1px solid #3a3c42; border-radius: 8px; text-transform: capitalize; }
-.topbar-share:hover { background: #26272b; }
-.topbar-share i { display: none; width: 7px; height: 7px; border-radius: 50%; background: #7fd1a0; }
+.topbar-share { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; background: transparent; border: 1px solid var(--graphite-650); border-radius: 8px; text-transform: capitalize; }
+.topbar-share:hover { background: var(--surface-raised); }
+.topbar-share i { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--text-success); }
 .topbar-share.status-synced i { display: block; }
-.topbar-share.status-connecting i, .topbar-share.status-offline i { display: block; background: #e8a33d; }
-.topbar-share.status-error i { display: block; background: #ef747c; }
-.topbar-export { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; color: #fff; background: #0868b6; border: 0; border-radius: 8px; font-weight: 600; }
-.topbar-export:hover:not(:disabled) { background: #096fbe; }
-.topbar-export:disabled { background: #26272b; }
+.topbar-share.status-connecting i, .topbar-share.status-offline i { display: block; background: var(--text-warning); }
+.topbar-share.status-error i { display: block; background: var(--text-danger); }
+.topbar-export { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; color: var(--text-inverse); background: var(--blue-700); border: 0; border-radius: 8px; font-weight: 600; }
+.topbar-export:hover:not(:disabled) { background: var(--blue-700); }
+.topbar-export:disabled { background: var(--surface-raised); }
 .topbar-export svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 1180px) { .topbar-command { min-width: 0; } .topbar-command kbd { display: none; } .topbar-save { display: none; } }
 @media (max-width: 980px) { .topbar-text-button:not(.topbar-frame .topbar-text-button) { display: none; } .topbar-command { display: none; } }

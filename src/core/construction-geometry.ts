@@ -1,3 +1,9 @@
+import {
+  CONSTRUCTION_ACTIVE_COLOR,
+  CONSTRUCTION_ACTIVE_HALO,
+  CONSTRUCTION_STROKE_COLOR,
+} from '../design-system/document-defaults';
+import { palette } from '../design-system/tokens';
 import type { VectorDocument } from './document';
 import { objectTransformMatrix, transformPoint } from './transforms';
 import type { EntityId, Point, Segment } from './types';
@@ -26,15 +32,15 @@ export interface ConstructionProjection {
 /** Shared screen-space styling consumed by both Canvas 2D and WebGL. */
 export const CONSTRUCTION_VISUAL_STYLE = {
   base: {
-    color: '#777777',
+    color: CONSTRUCTION_STROKE_COLOR,
     opacity: 0.82,
     widthPx: 1,
     dashPx: [4, 4] as const,
     cap: 'butt' as const,
   },
   hover: {
-    color: '#f2b968',
-    haloColor: '#f0b35b',
+    color: CONSTRUCTION_ACTIVE_COLOR,
+    haloColor: CONSTRUCTION_ACTIVE_HALO,
     haloOpacity: 0.3,
     widthPx: 1.75,
     haloWidthPx: 7,
@@ -42,8 +48,8 @@ export const CONSTRUCTION_VISUAL_STYLE = {
     cap: 'butt' as const,
   },
   selected: {
-    color: '#ffffff',
-    haloColor: '#ffffff',
+    color: palette.white,
+    haloColor: palette.white,
     haloOpacity: 0.3,
     widthPx: 1.75,
     haloWidthPx: 7,

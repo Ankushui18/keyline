@@ -64,7 +64,9 @@ npm run collab      # relay only (no app)
 | `npm run test:solver` | Loads the real Wasm artifact and checks native-arc solving. |
 | `npm run test:collaboration` | Nine WebSocket integration checks against a real relay. |
 | `npm run check:docs` | Validates relative doc links and required files. |
-| `npm run check` | Build + tests + solver + relay + docs. The full local gate. |
+| `npm run check:design` | Design-system gate: tokens, CSS↔TS parity, literal-colour ratchet, contrast. |
+| `npm run migrate:colors` | Codemod that replaces literal hex with design tokens (dry run with `--report`). |
+| `npm run check` | Design gate + build + tests + solver + relay + docs. The full local gate. |
 | `npm run build:solver` | Rebuilds `solver/pkg/` with `wasm-pack`. |
 | `npm run test:browser` | End-to-end + accessibility suite (needs a running app and Playwright CLI). |
 | `npm run test:design` | Sidebar layout/resizing/accessibility suite. |

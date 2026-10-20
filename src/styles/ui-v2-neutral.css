@@ -1,50 +1,8 @@
-/* Neutral UI V2 palette sampled directly from the supplied reference image.
-   Functional tokens keep every editor surface on the same graphite scale. */
-:root {
-  color: #e7e7e7;
-  background: #1f1f1f;
-  --bgColor-default: #1f1f1f;
-  --bgColor-inset: #0e0e0e;
-  --bgColor-muted: #252525;
-  --bgColor-emphasis: #535353;
-  --bgColor-neutral-muted: #292929;
-  --bgColor-accent-muted: #353535;
-  --bgColor-accent-emphasis: #353535;
-  --borderColor-default: #353535;
-  --borderColor-muted: #292929;
-  --borderColor-accent-emphasis: #5a5a5a;
-  --fgColor-default: #e7e7e7;
-  --fgColor-muted: #bdbdbd;
-  --fgColor-subtle: #7d7d7d;
-  --fgColor-onEmphasis: #ffffff;
-  --fgColor-accent: #e7e7e7;
-  --fgColor-success: #62c88a;
-  --fgColor-danger: #ef6b73;
-  --focus-outlineColor: #bdbdbd;
-  --shadow-resting-small: 0 1px 0 rgba(255,255,255,.04), 0 1px 3px rgba(0,0,0,.35);
-  --shadow-floating-small: 0 8px 24px rgba(0,0,0,.45);
-
-  /* Existing application token aliases. */
-  --bg: var(--bgColor-default);
-  --surface: var(--bgColor-muted);
-  --surface-2: #292929;
-  --border: var(--borderColor-default);
-  --border-light: #484848;
-  --text: var(--fgColor-default);
-  --muted: var(--fgColor-muted);
-  --subtle: var(--fgColor-subtle);
-  --blue: var(--fgColor-accent);
-  --blue-strong: #ffffff;
-  --blue-wash: var(--bgColor-accent-muted);
-  --green: var(--fgColor-success);
-}
+/* Neutral UI V2 surfaces. The palette itself lives in system/tokens.css; this
+   file only describes components. */
 
 body, .app-shell { background: var(--bgColor-default); color: var(--fgColor-default); }
 button, input, select, textarea { color-scheme: dark; }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 1px solid var(--focus-outlineColor) !important;
-  outline-offset: -1px;
-}
 
 .app-shell { grid-template-rows: 56px minmax(0, 1fr) auto 32px; }
 .toolbar {
@@ -61,9 +19,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand-mark {
   width: 32px;
   height: 32px;
-  color: #fff;
+  color: var(--text-inverse);
   background: var(--bgColor-accent-emphasis);
-  border: 1px solid #535353;
+  border: 1px solid var(--graphite-600);
   border-radius: 7px;
   box-shadow: var(--shadow-resting-small);
 }
@@ -87,7 +45,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius: 6px;
 }
 .icon-button:hover:not(:disabled) { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); border-color: transparent; }
-.icon-button:disabled { color: #5a5a5a; }
+.icon-button:disabled { color: var(--text-disabled); }
 
 .share-button, .family-button, .export-button, .constraints-button, .renderer-button {
   height: 32px;
@@ -99,22 +57,22 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .share-button {
   color: var(--fgColor-default);
-  background: #292929;
+  background: var(--surface-raised);
 }
-.share-button:hover { color: var(--fgColor-default); background: #353535; border-color: #5a5a5a; }
+.share-button:hover { color: var(--fgColor-default); background: var(--border-strong); border-color: var(--text-disabled); }
 .share-status-dot { width: 6px; height: 6px; background: var(--fgColor-subtle); }
 .share-button.status-synced .share-status-dot { background: var(--fgColor-success); box-shadow: none; }
 .renderer-button { height: 28px; color: var(--fgColor-muted); background: transparent; border-color: transparent; box-shadow: none; }
 .renderer-button:hover { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); }
-.renderer-button.is-webgl { color: var(--fgColor-default); background: var(--bgColor-accent-muted); border-color: #535353; box-shadow: none; }
-.family-button { color: var(--fgColor-default); background: #292929; }
-.family-button:hover { color: #fff; background: #383838; border-color: #5d5d5d; }
+.renderer-button.is-webgl { color: var(--fgColor-default); background: var(--bgColor-accent-muted); border-color: var(--graphite-600); box-shadow: none; }
+.family-button { color: var(--fgColor-default); background: var(--surface-raised); }
+.family-button:hover { color: var(--text-inverse); background: var(--border-strong); border-color: var(--text-disabled); }
 .export-button {
   color: var(--fgColor-onEmphasis);
   background: var(--bgColor-accent-emphasis);
-  border-color: #535353;
+  border-color: var(--graphite-600);
 }
-.export-button:hover { color: #fff; background: #444444; border-color: #6a6a6a; }
+.export-button:hover { color: var(--text-inverse); background: var(--graphite-650); border-color: var(--text-subtle); }
 .constraints-button { color: var(--fgColor-muted); background: transparent; border-color: transparent; box-shadow: none; }
 .constraints-button:hover, .constraints-button.is-active { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); border-color: transparent; }
 .constraints-button b, .constraint-section-heading b {
@@ -145,7 +103,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: var(--bgColor-default);
   border-color: var(--borderColor-default);
   box-shadow: none;
-  scrollbar-color: #535353 transparent;
+  scrollbar-color: var(--graphite-600) transparent;
   scrollbar-width: thin;
 }
 .layers-panel {
@@ -230,7 +188,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .location-actions button:hover:not(:disabled) { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); }
 .location-actions button:disabled { opacity: .3; cursor: default; }
-.layer-tree { min-height: 0; overflow: auto; padding: 5px 0 8px; scrollbar-color: #535353 transparent; scrollbar-width: thin; }
+.layer-tree { min-height: 0; overflow: auto; padding: 5px 0 8px; scrollbar-color: var(--graphite-600) transparent; scrollbar-width: thin; }
 .empty-layer-tree { margin: 18px; color: var(--fgColor-muted); font-size: 11px; text-align: center; }
 .layer-row {
   --layer-depth: 0;
@@ -334,14 +292,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   min-height: 28px;
   padding: 0 9px;
   color: var(--fgColor-default);
-  background: #292929;
+  background: var(--surface-raised);
   border: 1px solid var(--borderColor-default);
   border-radius: 6px;
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
 }
-.edit-network-button:hover, .network-edit-summary button:hover { background: #353535; border-color: #5a5a5a; }
+.edit-network-button:hover, .network-edit-summary button:hover { background: var(--border-strong); border-color: var(--text-disabled); }
 .object-transform-inspector, .object-appearance-inspector { display: flex; flex-direction: column; gap: 10px; }
 .numeric-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .transform-secondary-grid { grid-template-columns: repeat(3, 1fr); }
@@ -382,7 +340,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-size: 9px;
 }
 .fill-actions span { display: flex; align-items: center; gap: 4px; }
-.fill-actions input { accent-color: #8b6cf6; }
+.fill-actions input { accent-color: var(--overlay-shape); }
 .fill-actions button {
   color: var(--fgColor-muted);
   background: transparent;
@@ -390,7 +348,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-size: 9px;
   cursor: pointer;
 }
-.fill-actions button:hover { color: #ff8585; }
+.fill-actions button:hover { color: var(--text-danger); }
 .add-fill-button {
   height: 28px;
   color: var(--fgColor-default);
@@ -400,7 +358,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-size: 10px;
   cursor: pointer;
 }
-.add-fill-button:hover { background: #353535; border-color: #5a5a5a; }
+.add-fill-button:hover { background: var(--border-strong); border-color: var(--text-disabled); }
 .appearance-select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .appearance-select-grid label { display: flex; flex-direction: column; gap: 4px; color: var(--fgColor-muted); font-size: 9px; }
 .appearance-select-grid select { height: 28px; padding: 0 7px; color: var(--fgColor-default); background: var(--bgColor-muted); border: 1px solid var(--borderColor-default); border-radius: 5px; font-size: 10px; }
@@ -410,16 +368,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .panel-heading { height: 64px; padding: 0 16px; border-color: var(--borderColor-default); }
 .panel-heading h2 { margin-top: 3px; font-size: 16px; font-weight: 600; }
 .eyebrow, .section-label { color: var(--fgColor-muted); font-size: 10px; font-weight: 600; letter-spacing: .08em; }
-.selection-count { color: var(--fgColor-default); background: var(--bgColor-accent-muted); border-color: #535353; }
+.selection-count { color: var(--fgColor-default); background: var(--bgColor-accent-muted); border-color: var(--graphite-600); }
 .panel-section { padding: 16px; border-color: var(--borderColor-default); }
 .empty-inspector { padding: 42px 24px 32px; border-color: var(--borderColor-default); }
 .empty-inspector h3, .multi-summary h3 { color: var(--fgColor-default); font-size: 13px; }
 .empty-inspector p, .multi-summary p { max-width: 235px; color: var(--fgColor-muted); font-size: 12px; line-height: 1.5; }
-.empty-visual span { background: var(--bgColor-neutral-muted); border-color: #535353; }
-.empty-visual::before { border-color: #535353; }
+.empty-visual span { background: var(--bgColor-neutral-muted); border-color: var(--graphite-600); }
+.empty-visual::before { border-color: var(--graphite-600); }
 .object-summary strong { font-size: 13px; }
 .object-summary div span { color: var(--fgColor-muted); font-size: 10px; }
-.object-glyph { background: var(--bgColor-accent-muted); border-color: #535353; }
+.object-glyph { background: var(--bgColor-accent-muted); border-color: var(--graphite-600); }
 .property-row, .point-row { font-size: 12px; }
 .property-row > span, .point-row { color: var(--fgColor-muted); }
 .property-row strong { color: var(--fgColor-default); }
@@ -432,7 +390,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .field-help { color: var(--fgColor-subtle); }
 .segmented-control button { color: var(--fgColor-muted); font-size: 11px; }
 .segmented-control button:hover { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); }
-.segmented-control button.is-active { color: var(--fgColor-default); background: var(--bgColor-accent-muted); border-color: #535353; }
+.segmented-control button.is-active { color: var(--fgColor-default); background: var(--bgColor-accent-muted); border-color: var(--graphite-600); }
 .bend-options p, .region-summary p, .no-constraints { color: var(--fgColor-muted); font-size: 11px; line-height: 1.5; }
 .shortcut-row { color: var(--fgColor-muted); font-size: 11px; }
 .shortcut-row kbd, .no-constraints kbd, .canvas-hint kbd {
@@ -451,11 +409,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .constraint-suggestions button {
   min-height: 28px;
   color: var(--fgColor-default);
-  background: #292929;
+  background: var(--surface-raised);
   border-color: var(--borderColor-default);
   font-size: 10px;
 }
-.constraint-suggestions button:hover { color: #fff; background: #353535; border-color: #5a5a5a; }
+.constraint-suggestions button:hover { color: var(--text-inverse); background: var(--border-strong); border-color: var(--text-disabled); }
 .constraint-suggestions button i, .constraint-card-heading > span { color: var(--fgColor-accent); }
 .bulk-constraint-parameter strong, .constraint-card-heading strong { color: var(--fgColor-default); font-size: 11px; }
 .bulk-constraint-parameter input, .constraint-card-controls select, .constraint-card-controls input {
@@ -519,16 +477,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   cursor: pointer;
 }
 .vector-edit-toolbar button:hover:not(:disabled) { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); }
-.vector-edit-toolbar button.is-active { color: #fff; background: var(--bgColor-accent-muted); border-color: #5a5a5a; }
+.vector-edit-toolbar button.is-active { color: var(--text-inverse); background: var(--bgColor-accent-muted); border-color: var(--text-disabled); }
 .vector-edit-toolbar button:disabled { opacity: .42; cursor: not-allowed; }
 .vector-edit-toolbar-divider { width: 1px; height: 20px; margin: 0 3px; background: var(--borderColor-default); }
 .vector-edit-toolbar .vector-edit-toolbar-done {
-  color: #fff;
-  background: #3b3b3b;
-  border-color: #5a5a5a;
+  color: var(--text-inverse);
+  background: var(--border-strong);
+  border-color: var(--text-disabled);
   font-weight: 600;
 }
-.vector-edit-toolbar .vector-edit-toolbar-done:hover { background: #474747; }
+.vector-edit-toolbar .vector-edit-toolbar-done:hover { background: var(--graphite-600); }
 
 .canvas-tool-rail {
   position: absolute;
@@ -569,7 +527,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   cursor: pointer;
 }
 .canvas-tool-rail button:hover { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); }
-.canvas-tool-rail button.is-active { color: #ffffff; background: var(--bgColor-accent-muted); border-color: #5a5a5a; }
+.canvas-tool-rail button.is-active { color: var(--text-inverse); background: var(--bgColor-accent-muted); border-color: var(--text-disabled); }
 .canvas-tool-icon { display: grid; place-items: center; width: 18px; height: 18px; }
 .canvas-tool-rail svg { width: 18px; height: 18px; fill: currentColor; stroke: none; }
 .canvas-tool-rail-divider { flex: 0 0 auto; width: 24px; height: 1px; margin: 3px 0; background: var(--borderColor-default); }
@@ -585,7 +543,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   visibility: hidden;
   opacity: 0;
   color: var(--fgColor-default);
-  background: #292929;
+  background: var(--surface-raised);
   border: 1px solid var(--borderColor-default);
   border-radius: 6px;
   box-shadow: var(--shadow-floating-small);
@@ -611,7 +569,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .status-group i { background: var(--borderColor-default); }
 
 .constraint-palette, .constraint-context-menu, .export-dialog {
-  background: #252525;
+  background: var(--surface-panel);
   border-color: var(--borderColor-default);
   box-shadow: 0 16px 48px rgba(0,0,0,.55);
 }
@@ -621,13 +579,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-color: var(--borderColor-default);
 }
 .constraint-actions button:hover:not(:disabled), .export-preset-grid button:hover {
-  color: #fff;
-  background: #353535;
-  border-color: #5a5a5a;
+  color: var(--text-inverse);
+  background: var(--border-strong);
+  border-color: var(--text-disabled);
 }
 .constraint-parameters, .export-tabs { background: var(--bgColor-muted); border-color: var(--borderColor-default); }
 .export-tabs button { color: var(--fgColor-muted); }
-.export-tabs button.is-active { color: #ffffff; background: var(--bgColor-accent-muted); border-color: #5a5a5a; }
+.export-tabs button.is-active { color: var(--text-inverse); background: var(--bgColor-accent-muted); border-color: var(--text-disabled); }
 .export-preview, .export-preview textarea { background: var(--bgColor-inset); }
 
 @media (max-width: 1050px) {

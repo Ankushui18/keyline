@@ -1,6 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+// Design system first: tokens, then element defaults, then shared primitives.
+// Feature stylesheets follow in load order and may refine, never redefine, tokens.
+import './styles/system/tokens.css';
+import './styles/system/base.css';
+import './styles/system/components/ui.css';
 import './styles/global.css';
 import './styles/phase4.css';
 import './styles/phase5.css';

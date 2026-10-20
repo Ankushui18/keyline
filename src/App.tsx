@@ -63,7 +63,12 @@ import { analyzeTidy, applyTidy, type TidyAnalysis, type TidyRuleId } from './im
 import { placeImportedPayload } from './import/import-preview';
 import type { SvgImportResult } from './import/svg-import';
 import { DEFAULT_MOTION_SETTINGS, buildAnimatedSvg, clampMotionSettings, type MotionSettings } from './export/motion-export';
+import { palette, presenceColors } from './design-system/tokens';
 import { MODIFIER_LABEL } from './ui/Toolbar';
+import {
+  DEFAULT_FILL_COLOR,
+  STARTER_ARTWORK_STROKE,
+} from './design-system/document-defaults';
 
 const LayersPanel = lazy(async () => {
   const module = await import('./ui/LayersPanel');
@@ -236,7 +241,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   const [revision, setRevision] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [bendMode, setBendMode] = useState<HandleMirrorMode>('mirror');
-  const [paintColor, setPaintColor] = useState('#8b6cf6');
+  const [paintColor, setPaintColor] = useState(DEFAULT_FILL_COLOR);
   const [drawingStyle, setDrawingStyle] = useState<DrawingStyle>(() => {
     try {
       const stored = readPreference('vector-studio-drawing-style');
@@ -1046,7 +1051,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           appearanceId: triangleAppearance.id,
           updates: {
             fills: [],
-            stroke: { ...triangleAppearance.stroke!, color: '#14181F', width: 0.7, cap: 'round', join: 'round', visible: true },
+            stroke: { ...triangleAppearance.stroke!, color: STARTER_ARTWORK_STROKE, width: 0.7, cap: 'round', join: 'round', visible: true },
           },
         },
       });
@@ -2485,7 +2490,7 @@ function applyAppearanceUpdates(
   let stroke = appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined;
   if (updates.strokeVisible === true && !stroke) {
     stroke = {
-      color: '#c8ced9',
+      color: palette.graphite300,
       width: 1.25,
       cap: 'round',
       join: 'round',
@@ -2529,7 +2534,7 @@ function collaborationIdentity(): { id: string; name: string; color: string } {
       }
     } catch { /* Regenerate malformed or outdated preferences. */ }
   }
-  const colors = ['#68a0ff', '#9b7cff', '#56c9a5', '#f0a85b', '#ef7181'];
+  const colors = presenceColors;
   const id = createEntityId();
   const identity = {
     id,

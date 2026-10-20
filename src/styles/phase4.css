@@ -7,13 +7,13 @@
 .paint-color-field input[type='color'] {
   width: 42px;
   height: 30px;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--graphite-650);
   border-radius: 6px;
-  background: #1a1e25;
+  background: var(--surface-panel);
   padding: 2px;
 }
 .paint-color-field code {
-  color: #c7d3ec;
+  color: var(--tint-info-ink-strong);
   font-size: 12px;
 }
 .offset-distance-field {
@@ -22,15 +22,15 @@
   align-items: center;
   gap: 7px;
   margin: 8px 0;
-  color: #99a5b9;
+  color: var(--text-secondary);
   font-size: 11px;
 }
 .offset-distance-field input {
   width: 100%;
-  border: 1px solid #3a4354;
+  border: 1px solid var(--graphite-650);
   border-radius: 5px;
-  background: #191e27;
-  color: #d5ddec;
+  background: var(--border-subtle);
+  color: var(--graphite-300);
   padding: 5px 6px;
 }
 .parametric-button-grid {
@@ -40,17 +40,17 @@
   margin: 8px 0;
 }
 .parametric-button-grid button {
-  border: 1px solid #3a4354;
+  border: 1px solid var(--graphite-650);
   border-radius: 6px;
-  background: #202632;
-  color: #cbd5e8;
+  background: var(--graphite-775);
+  color: var(--tint-info-ink-strong);
   padding: 7px 6px;
   font: 600 11px inherit;
   cursor: pointer;
 }
 .parametric-button-grid button:hover {
-  border-color: #668fe8;
-  background: #273248;
+  border-color: var(--blue-300);
+  background: var(--surface-selected);
 }
 .parametric-group-row {
   display: grid;
@@ -58,33 +58,33 @@
   align-items: center;
   gap: 6px;
   margin-top: 5px;
-  color: #aeb9cc;
+  color: var(--graphite-350);
   font-size: 11px;
 }
-.parametric-group-row code { color: #6f7c91; font-size: 9px; }
+.parametric-group-row code { color: var(--slate-600); font-size: 9px; }
 .repeat-count-field { display: flex; align-items: center; gap: 5px; }
 .repeat-count-field input {
   width: 44px;
-  border: 1px solid #3a4354;
+  border: 1px solid var(--graphite-650);
   border-radius: 4px;
-  background: #191e27;
-  color: #d5ddec;
+  background: var(--border-subtle);
+  color: var(--graphite-300);
   padding: 3px 4px;
 }
 .parametric-group-row button {
   border: 0;
   background: transparent;
-  color: #8390a5;
+  color: var(--slate-500);
   cursor: pointer;
   font-size: 16px;
 }
-.parametric-group-row button:hover { color: #ef7c83; }
+.parametric-group-row button:hover { color: var(--text-danger); }
 .parametric-group-editor {
   margin-top: 8px;
   padding: 8px;
-  border: 1px solid #303640;
+  border: 1px solid var(--border-strong);
   border-radius: 7px;
-  background: #171a1f;
+  background: var(--graphite-950);
 }
 .parametric-group-editor .parametric-group-row { margin: 0 0 7px; }
 .parametric-group-editor .numeric-field-grid { margin-top: 7px; }
@@ -94,24 +94,24 @@
   justify-content: space-between;
   gap: 7px;
   margin-bottom: 7px;
-  color: #8b949e;
+  color: var(--text-muted);
   font-size: 10px;
 }
 .parametric-source-row button {
-  border: 1px solid #3b424c;
+  border: 1px solid var(--graphite-650);
   border-radius: 5px;
-  background: #20242b;
-  color: #c9d1d9;
+  background: var(--border-subtle);
+  color: var(--graphite-300);
   padding: 4px 6px;
   font: 600 10px inherit;
   cursor: pointer;
 }
-.parametric-source-row button:hover { background: #292e36; border-color: #57606a; }
+.parametric-source-row button:hover { background: var(--border-default); border-color: var(--text-disabled); }
 .parametric-reference-field {
   display: grid;
   gap: 4px;
   margin: 6px 0;
-  color: #8b949e;
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: .02em;
@@ -119,15 +119,15 @@
 .parametric-reference-field select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #3b424c;
+  border: 1px solid var(--graphite-650);
   border-radius: 5px;
-  background: #20242b;
-  color: #d0d7de;
+  background: var(--border-subtle);
+  color: var(--graphite-300);
   padding: 6px 7px;
   font: 11px inherit;
 }
 .parametric-reference-field select:focus-visible {
-  outline: 2px solid #8b949e;
+  outline: 2px solid var(--text-muted);
   outline-offset: 1px;
 }
 .parametric-reference-error {
@@ -140,7 +140,7 @@
   align-items: center;
   gap: 7px;
   margin-top: 8px;
-  color: #b1bac4;
+  color: var(--graphite-350);
   font-size: 11px;
 }
 @media (max-width: 1700px) {

@@ -342,10 +342,15 @@ are lazily imported so the initial chunk stays small.
 The right sidebar keeps **Layers above Design**, with independently scrolling panels and a
 draggable, keyboard-accessible divider. Width and split height persist per device.
 
-CSS is intentionally layered by delivery slice (`src/styles/*.css`, imported in order by
-`main.tsx`). Later files refine earlier ones. When changing a control, search the latest slice
+CSS is layered in two parts. `src/styles/system/` holds the design system — `tokens.css` (the only
+file that names a colour), `base.css` (fonts, reset, focus ring, shell grid) and
+`components/ui.css` (the shared `.ui-*` primitives) — and `main.tsx` imports it first. The 24
+feature stylesheets follow in delivery-slice order and refine those primitives without redefining
+tokens; `npm run check:design` fails the build on a `:root` block or a new literal colour.
+
+When changing a control, prefer an existing `.ui-*` primitive; otherwise search the latest slice
 (`keyline-reference-final.css`, `design-sidebar.css`, `dashboard.css`) before adding a new file.
-Consolidating these layers is tracked as maintenance work; see [AUDIT.md](AUDIT.md).
+See [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) for the token map and the ratchet policy.
 
 ---
 

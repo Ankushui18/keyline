@@ -12,6 +12,7 @@ import {
   type MotionPresetId,
   type MotionSettings,
 } from '../export/motion-export';
+import { BrandMark } from '../design-system/BrandMark';
 
 const FPS = 60;
 const kb = (text: string) => `${(new Blob([text]).size / 1024).toFixed(1)} KB`;
@@ -117,7 +118,7 @@ export function MotionWorkspace({ fileName, svg, settings, onSettingsChange, onD
   return (
     <div ref={modalRef} className="mw" role="dialog" aria-modal="true" aria-labelledby="mw-title">
       <header className="mw-top">
-        <div className="mw-brand"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#26272b" /><rect x="14" y="14" width="36" height="36" fill="none" stroke="#ececee" strokeWidth="3.5" /><circle cx="32" cy="32" r="18" fill="none" stroke="#ececee" strokeWidth="3.5" /><rect x="44" y="8" width="12" height="12" fill="#0d99ff" /></svg><strong id="mw-title">{fileName}</strong></div>
+        <div className="mw-brand"><BrandMark size={28} /><strong id="mw-title">{fileName}</strong></div>
         <div className="mw-mode" role="group" aria-label="Mode"><button type="button" onClick={onClose}>Design</button><button type="button" aria-pressed="true" className="is-active">Motion</button></div>
         <span className="mw-grow" />
         <button type="button" className="mw-ghost" aria-pressed={pair} onClick={() => setPair((value) => !value)}>Check at 16 and 24 px</button>

@@ -35,6 +35,14 @@ import type {
   ToolId,
   VectorNode,
 } from '../core/types';
+import {
+  DEFAULT_ARTBOARD_BACKGROUND,
+  DEFAULT_FILL_COLOR,
+  DEFAULT_FIRST_FILL,
+  DEFAULT_STROKE_COLOR,
+  DEFAULT_STROKE_WIDTH,
+} from '../design-system/document-defaults';
+import { palette } from '../design-system/tokens';
 
 interface PropertiesPanelProps {
   document: VectorDocument;
@@ -1248,7 +1256,7 @@ function ArtboardFrameInspector({
     .filter((object) => (document.getNetwork(object.networkId)?.nodeIds.length ?? 0) > 0)
     .map((object) => object.id);
   const background = /^#([a-f0-9]{6})([a-f0-9]{2})?$/i.exec(artboard.background);
-  const backgroundColor = background ? `#${background[1]}` : '#ffffff';
+  const backgroundColor = background ? `#${background[1]}` : DEFAULT_ARTBOARD_BACKGROUND;
   const backgroundOpacity = background?.[2] ? Number.parseInt(background[2], 16) / 255 : 1;
   const setBackground = (color: string, opacity = backgroundOpacity) => {
     const alpha = Math.round(Math.min(1, Math.max(0, opacity)) * 255);
@@ -1518,7 +1526,7 @@ function ObjectInspector({
         {cornerNote && <p className="di-note" role="note">{cornerNote}</p>}
       </section>}
       {appearance && <section className="di-section di-fill-section">
-        <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add fill" disabled={constructionOnly} onClick={() => setFills([...fills, { type: 'solid', color: fills.length ? '#c8ced9' : '#8b6cf6', opacity: 1, visible: true }])} /></DesignSectionHead>
+        <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add fill" disabled={constructionOnly} onClick={() => setFills([...fills, { type: 'solid', color: fills.length ? DEFAULT_FIRST_FILL : DEFAULT_FILL_COLOR, opacity: 1, visible: true }])} /></DesignSectionHead>
         {constructionOnly ? <p className="di-note">Fill is unavailable for construction geometry.</p> : fills.length === 0 ? <p className="di-note">No fill</p> : fills.map((fill, index) => <PaintRow key={index} label="Fill" color={fill.color} opacity={fill.opacity ?? 1} visible={fill.visible} onColor={(color) => patchFill(index, { color })} onOpacity={(opacity) => patchFill(index, { opacity })} onToggle={() => patchFill(index, { visible: !fill.visible })} onRemove={() => setFills(fills.filter((_item, i) => i !== index))} />)}
       </section>}
       {appearance && (
@@ -1529,7 +1537,7 @@ function ObjectInspector({
             onAdd={stroke?.visible ? undefined : () => onUpdateAppearance(appearance.id, {
               stroke: stroke
                 ? { ...stroke, visible: true }
-                : { color: '#c8ced9', width: 1.25, cap: 'round', join: 'round', alignment: 'center', opacity: 1, dash: [], visible: true },
+                : { color: DEFAULT_STROKE_COLOR, width: DEFAULT_STROKE_WIDTH, cap: 'round', join: 'round', alignment: 'center', opacity: 1, dash: [], visible: true },
             })}
           />
           {stroke?.visible ? (
@@ -2525,7 +2533,7 @@ function MultiObjectInspector({
         ) : (
           <label className="appearance-color-row">
             <span>Fill</span>
-            <input type="color" value={fillColor ?? '#808080'} aria-label={fillColor ? 'Fill color' : 'Mixed fill colors'} onChange={(event) => onUpdateAppearances(ids, { fillColor: event.target.value })} />
+            <input type="color" value={fillColor ?? palette.graphite500} aria-label={fillColor ? 'Fill color' : 'Mixed fill colors'} onChange={(event) => onUpdateAppearances(ids, { fillColor: event.target.value })} />
             <code>{fillColor?.toUpperCase() ?? 'MIXED'}</code>
           </label>
         )}

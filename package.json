@@ -23,8 +23,10 @@
     "test:solver": "node scripts/test-solver.mjs",
     "test:collaboration": "node scripts/test-collaboration.mjs",
     "typecheck": "tsc -b --pretty false",
-    "check": "npm run build && npm test && npm run test:solver && npm run test:collaboration && npm run check:docs",
+    "check": "npm run check:design && npm run build && npm test && npm run test:solver && npm run test:collaboration && npm run check:docs",
+    "check:design": "node scripts/design-system/check.mjs",
     "check:docs": "node scripts/check-docs.mjs",
+    "migrate:colors": "node scripts/design-system/migrate-colors.mjs",
     "test:browser": "node scripts/test-browser.mjs",
     "test:design": "node scripts/test-browser.mjs design",
     "test:review": "node scripts/test-browser.mjs review"

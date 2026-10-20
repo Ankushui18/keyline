@@ -9,6 +9,7 @@ import {
   renameStoredDocument,
   type DocumentSummary,
 } from '../core/store';
+import { BrandMark } from '../design-system/BrandMark';
 
 export type StartAction =
   | { kind: 'blank' }
@@ -183,7 +184,7 @@ export function Dashboard({
     >
       <header className="dashboard-header">
         <div className="dashboard-brand">
-          <svg viewBox="0 0 64 64" role="img" aria-label="Keyline"><rect width="64" height="64" rx="14" fill="#26272B" /><rect x="14" y="14" width="36" height="36" fill="none" stroke="#ECECEE" strokeWidth="3.5" /><circle cx="32" cy="32" r="18" fill="none" stroke="#ECECEE" strokeWidth="3.5" /><rect x="44" y="8" width="12" height="12" fill="#0D99FF" /></svg>
+          <BrandMark size={28} label="Keyline" />
           <strong>Keyline</strong>
         </div>
         <label className="dashboard-search">
@@ -225,9 +226,9 @@ export function Dashboard({
             </div>
           </div>
           {files === null ? <p className="dashboard-note" role="status">Loading your files…</p> : !hasFiles ? (
-            <div className="dashboard-empty"><strong>No files yet</strong><span>Start with an icon set or drop an SVG or backup anywhere on this page. Your work is saved here automatically.</span></div>
+            <div className="ui-empty ui-empty--framed"><strong>No files yet</strong><span>Start with an icon set or drop an SVG or backup anywhere on this page. Your work is saved here automatically.</span></div>
           ) : visible.length === 0 ? (
-            <div className="dashboard-empty"><strong>Nothing matches</strong><span>{query ? `No file name contains “${query}”.` : 'No files of this type yet.'}</span></div>
+            <div className="ui-empty"><strong>Nothing matches</strong><span>{query ? `No file name contains “${query}”.` : 'No files of this type yet.'}</span></div>
           ) : (
             <div className="dashboard-grid">
               {visible.map((file, index) => (

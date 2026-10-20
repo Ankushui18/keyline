@@ -28,6 +28,9 @@ import {
   downloadTextFile,
   exportDocumentToSvg,
 } from '../export/svg-export';
+import {
+  DEFAULT_STROKE_COLOR,
+} from '../design-system/document-defaults';
 
 type ExportTab = 'svg' | 'react' | 'css';
 
@@ -175,7 +178,7 @@ export function ExportDialog({
   const addVariable = (binding: ExportVariableBinding) => {
     const presets: Record<ExportVariableBinding, Omit<ExportVariable, 'id'>> = {
       strokeWidth: { name: 'strokeWidth', label: 'Stroke width', type: 'number', binding, value: 1.25, min: 0.25, max: 24 },
-      fillColor: { name: 'assetColor', label: 'Asset color', type: 'color', binding, value: '#c8ced9' },
+      fillColor: { name: 'assetColor', label: 'Asset color', type: 'color', binding, value: DEFAULT_STROKE_COLOR },
       scale: { name: 'scale', label: 'Scale', type: 'number', binding, value: 1, min: 0.25, max: 4 },
       opacity: { name: 'opacity', label: 'Opacity', type: 'number', binding, value: 1, min: 0, max: 1 },
     };

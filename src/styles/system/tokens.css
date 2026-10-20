@@ -1,0 +1,317 @@
+/* ============================================================================
+   Keyline design system — tokens
+   ----------------------------------------------------------------------------
+   The ONLY file in the project allowed to contain literal colours, radii,
+   spacing, type sizes, shadows or z-index values.
+
+   Structure
+     1. Palette      raw values. Never used directly by feature code.
+     2. Semantic     role names (surface/text/border/accent/status). Use these.
+     3. Scales       space, radius, type, elevation, motion, z-index, layout.
+     4. Legacy       aliases kept so existing selectors and app code keep working.
+
+   Rules for new work are in docs/DESIGN-SYSTEM.md. `npm run check:design`
+   enforces them, and mirrors the palette in src/design-system/tokens.ts so
+   canvas and DOM code cannot drift apart.
+   ========================================================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* ---------------------------------------------------------------- 1. palette */
+  /* Graphite ramp: the cool neutral the product has always been built on. */
+  --graphite-1000: #0e0f12;
+  --graphite-950: #111318;
+  --graphite-900: #141518;
+  --graphite-875: #17181a;
+  --graphite-850: #1f2023;
+  --graphite-825: #232529;
+  --graphite-800: #26272b;
+  --graphite-775: #2a2c31;
+  --graphite-750: #2e3036;
+  --graphite-700: #34363c;
+  --graphite-650: #3a3d44;
+  --graphite-600: #4a4d55;
+  --graphite-550: #5c5f67;
+  --graphite-500: #6b6e76;
+  --graphite-450: #8a8d95;
+  --graphite-400: #a0a3ab;
+  --graphite-350: #b4b8c0;
+  --graphite-300: #c9cbd1;
+  --graphite-200: #ececee;
+  --white: #ffffff;
+  --black: #000000;
+
+  /* Accent: one blue, used for selection, focus and primary actions. */
+  --blue-900: #12233a;
+  --blue-700: #0868b6;
+  --blue-600: #0b7bd6;
+  --blue-500: #0d99ff;
+  --blue-400: #4fb0ff;
+  --blue-300: #74a0ff;
+
+  /* Status. Use the semantic aliases below, not these directly. */
+  --red-900: #684148;
+  --red-500: #ef747c;
+  --green-600: #51c993;
+  --green-500: #7fd1a0;
+  --amber-600: #f5a623;
+  --amber-500: #e8a33d;
+  --cyan-500: #57c8d4;
+  --slate-600: #65738b;
+  --slate-500: #7183a1;
+  --violet-500: #a78bfa;
+
+  /* Editor overlays: transient tool affordances drawn on the canvas. Each one
+     names the tool it belongs to so previews stay recognisable everywhere. */
+  --overlay-shape: #8b6cf6;
+  --overlay-shape-add: #68a0ff;
+  --overlay-shape-subtract: #ef6b72;
+  --overlay-bend: #b28cff;
+  --overlay-bend-fill: #1b1824;
+  --overlay-offset: #82aaff;
+  --overlay-lasso: #57c8d4;
+  --overlay-lasso-fill: #0e0e0e;
+  --overlay-width: #c8892f;
+  --overlay-guide: #a78bfa;
+  --overlay-guide-fill: #191622;
+  --overlay-import: #d8d8d8;
+  --overlay-import-fill: #d7d7d7;
+  --overlay-print: #1f6feb;
+  --overlay-measure: #f0b35b;
+  --overlay-construction: #777777;
+  --overlay-construction-strong: #f2b968;
+  --overlay-muted: #c8c8c8;
+  --overlay-bright: #b99cff;
+
+  /* Canvas (document) palette: the drawing surface is intentionally light. */
+  --canvas-paper: #e4e4e0;
+  --canvas-grid-minor: #efefec;
+  --canvas-grid-major: #deded9;
+  --canvas-axis: #b9b9b9;
+  --canvas-segment: #6d737d;
+
+  /* --------------------------------------------------------------- 2. semantic */
+  /* Surfaces, back to front. */
+  --surface-sunken: var(--graphite-1000);
+  --surface-canvas: var(--graphite-875);
+  --surface-inset: var(--graphite-900);
+  --surface-panel: var(--graphite-850);
+  --surface-raised: var(--graphite-800);
+  --surface-field: var(--graphite-900);
+  --surface-hover: var(--graphite-825);
+  --surface-active: var(--graphite-775);
+  --surface-selected: var(--blue-900);
+  --surface-scrim: rgba(9, 10, 12, 0.72);
+  --surface-glass: rgba(23, 24, 26, 0.94);
+
+  /* Borders. */
+  --border-subtle: var(--graphite-825);
+  --border-default: var(--graphite-750);
+  --border-strong: var(--graphite-700);
+  --border-accent: var(--blue-500);
+  --border-danger: var(--red-500);
+
+  /* Text. */
+  --text-primary: var(--graphite-200);
+  --text-secondary: var(--graphite-400);
+  --text-muted: var(--graphite-450);
+  --text-subtle: var(--graphite-500);
+  --text-disabled: var(--graphite-550);
+  --text-inverse: var(--white);
+  --text-accent: var(--blue-500);
+  --text-on-accent: var(--white);
+  --text-on-bright: var(--graphite-950);
+  --text-danger: var(--red-500);
+  --text-success: var(--green-500);
+  --text-warning: var(--amber-500);
+
+  /* Accent.
+     --accent is the bright selection/link blue (5.9:1 on the canvas).
+     Filled actions use --accent-solid: white text needs a darker blue to reach
+     WCAG AA, and the bright blue cannot carry white text (2.99:1). */
+  --accent: var(--blue-500);
+  --accent-hover: var(--blue-400);
+  --accent-pressed: var(--blue-700);
+  --accent-wash: var(--blue-900);
+  --accent-solid: var(--blue-700);
+  --accent-solid-hover: #096fbe;
+  --accent-solid-pressed: #07589c;
+  --accent-contrast: var(--white);
+
+  /* Interaction. */
+  --focus-ring: var(--blue-500);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --selection: var(--blue-500);
+  --selection-wash: var(--blue-900);
+  --danger-wash: var(--red-900);
+
+  /* -----------------------------------------------------------------------
+     State tints.
+     A tint is a low-chroma panel carrying one semantic hue (an inline
+     warning row, a conflict chip, a preflight summary) plus the ink that sits
+     on it. Feature CSS kept inventing near-identical values for these — a
+     dozen pale reds within ΔE 3 of each other — so they live here once.
+     ----------------------------------------------------------------------- */
+  --tint-info-surface: #293a56;
+  --tint-info-surface-hover: #2b4f87;
+  --tint-info-border: #3d5478;
+  --tint-info-border-strong: #5e84d8;
+  --tint-info-ink: #a9bbd6;
+  --tint-info-ink-strong: #dce9ff;
+  --tint-info-ink-soft: #aec4ff;
+
+  --tint-danger-surface: #3b2528;
+  --tint-danger-surface-hover: #482a2e;
+  --tint-danger-border: #4b3636;
+  --tint-danger-ink: #e6acac;
+  --tint-danger-ink-strong: #ffd4d4;
+  --tint-danger-ink-muted: #c89b9b;
+
+  --tint-success-surface: #1f3029;
+  --tint-success-border: #365a49;
+  --tint-success-ink: #bfe6d1;
+
+  --tint-warning-surface: #30291f;
+  --tint-warning-surface-hover: #49371e;
+  --tint-warning-border: #655331;
+  --tint-warning-ink: #ecd09b;
+
+  /* Mid-blue used by native controls (`accent-color`) and soft action fills. */
+  --accent-control: #4c87e8;
+  --accent-soft: #4b8df8;
+
+  /* Icon and illustration colours shared with the canvas renderers. */
+  --glyph-default: var(--graphite-400);
+  --glyph-strong: var(--graphite-200);
+  --glyph-accent: var(--blue-500);
+  --glyph-inverse: var(--white);
+
+  /* ---------------------------------------------------------------- 3. scales */
+  /* Spacing: 2px base unit. Use these, not arbitrary pixel gaps. */
+  --space-0: 0;
+  --space-05: 2px;
+  --space-1: 4px;
+  --space-15: 6px;
+  --space-2: 8px;
+  --space-25: 10px;
+  --space-3: 12px;
+  --space-35: 14px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radii. */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-pill: 999px;
+
+  /* Type. Geist is bundled; sizes below 12px are reserved for dense chrome. */
+  --font-sans: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-size-2xs: 9px;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-lg: 13px;
+  --font-size-xl: 14px;
+  --font-size-2xl: 16px;
+  --font-size-3xl: 18px;
+  --font-size-4xl: 20px;
+  --font-size-5xl: 24px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.45;
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-wide: 0.06em;
+
+  /* Elevation. Shadows compose over unknown surfaces, so alpha is intentional. */
+  --shadow-resting: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.32);
+  --shadow-floating: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-dialog: 0 24px 64px rgba(0, 0, 0, 0.45);
+  --shadow-inset-highlight: inset 0 1px rgba(255, 255, 255, 0.06);
+
+  /* Motion. */
+  --motion-fast: 90ms;
+  --motion-base: 140ms;
+  --motion-slow: 220ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Layering. */
+  --z-canvas: 0;
+  --z-overlay: 5;
+  --z-toolbar: 10;
+  --z-sidebar: 20;
+  --z-popover: 40;
+  --z-dialog: 60;
+  --z-toast: 80;
+
+  /* Layout metrics shared by shell, panels and dialogs. */
+  --layout-topbar: 52px;
+  --layout-statusbar: 28px;
+  --layout-rail: 48px;
+  --layout-sidebar-min: 240px;
+  --layout-sidebar-max: 560px;
+  --layout-sidebar-default: 300px;
+  --layout-control: 28px;
+  --layout-control-sm: 22px;
+  --inspector-pad: 12px;
+
+  /* ---------------------------------------------------------------- 4. legacy */
+  /* Aliases for selectors that predate the system. New code uses the names
+     above; these exist so the migration did not have to touch every rule. */
+  --bg: var(--surface-canvas);
+  --surface: var(--surface-panel);
+  --surface-2: var(--surface-raised);
+  --border: var(--border-default);
+  --border-light: var(--graphite-650);
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --subtle: var(--text-muted);
+  --blue: var(--accent);
+  --blue-strong: var(--accent-hover);
+  --blue-wash: var(--accent-wash);
+  --green: var(--green-500);
+
+  --bgColor-default: var(--surface-canvas);
+  --bgColor-inset: var(--surface-inset);
+  --bgColor-muted: var(--surface-panel);
+  --bgColor-emphasis: var(--surface-active);
+  --bgColor-neutral-muted: var(--surface-raised);
+  --bgColor-accent-muted: var(--surface-active);
+  --bgColor-accent-emphasis: var(--blue-600);
+  --borderColor-default: var(--border-default);
+  --borderColor-muted: var(--border-subtle);
+  --borderColor-accent-emphasis: var(--accent);
+  --fgColor-default: var(--text-primary);
+  --fgColor-muted: var(--text-secondary);
+  --fgColor-subtle: var(--text-muted);
+  --fgColor-onEmphasis: var(--text-on-accent);
+  --fgColor-accent: var(--accent);
+  --fgColor-success: var(--text-success);
+  --fgColor-danger: var(--text-danger);
+  --focus-outlineColor: var(--focus-ring);
+  --shadow-resting-small: var(--shadow-resting);
+  --shadow-floating-small: var(--shadow-floating);
+
+  --di-bg: var(--surface-panel);
+  --di-field: var(--surface-field);
+  --di-divider: var(--border-default);
+  --di-text: var(--text-primary);
+  --di-muted: var(--text-secondary);
+  --di-hover: var(--surface-active);
+  --di-accent: var(--accent);
+}

@@ -26,6 +26,7 @@ Keyline is a **web app you run locally**, not a hosted service. Pick the path th
 | **Learn the tools** before drawing | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) |
 | **Understand the code** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module map and data flow |
 | **Run tests / contribute** | [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/TESTING.md](docs/TESTING.md) |
+| **Change the look or add UI** | [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md) — tokens, primitives, the gate |
 | **Deploy or change collaboration** | [docs/COLLABORATION.md](docs/COLLABORATION.md) |
 | **Fix my environment** | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#troubleshooting) · [docs/FAQ.md](docs/FAQ.md) |
 | **See what's missing** (honest list) | [Known limits](#known-limits) |
@@ -70,6 +71,7 @@ their files.
 | **Your files** | A local dashboard with search, filters, rename, duplicate, delete (undoable) and thumbnails. Import SVG or restore a `.keyline.json` backup. Everything is stored in IndexedDB on this device. |
 | **Two renderers** | Canvas 2D for compatibility, batched WebGL2 for large drawings, switched in **Settings → Performance**, with automatic fallback. |
 | **Accessible by default** | Keyboard tools, labelled controls, modal focus containment, reduced-motion support, and automated WCAG A/AA checks in the browser suites. |
+| **One design system** | 235 tokens in a single source, mirrored for the canvas renderers, one shared primitive layer, WCAG-checked colour pairs, and a build gate that fails on drift. |
 
 ---
 
@@ -120,6 +122,7 @@ Full walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
 |---|---|
 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | Every tool, shortcut, panel, dialog and workflow. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, module map, data flow, transaction and solver pipeline, where to change what. |
+| [docs/DESIGN-SYSTEM.md](docs/DESIGN-SYSTEM.md) | Tokens, semantic roles, state tints, the primitive layer, canvas mirrors, and the rule that keeps them from drifting. |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup, scripts, environment variables, Rust/Wasm rebuild, troubleshooting. |
 | [docs/TESTING.md](docs/TESTING.md) | What each suite proves, how to run it, how to add coverage. |
 | [docs/COLLABORATION.md](docs/COLLABORATION.md) | Yjs model, relay limits, deployment boundary, revocation reality. |
@@ -136,7 +139,7 @@ Full walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
 keyline/
 ├── README.md                    ← you are here
 ├── docs/                        architecture, user guide, testing, FAQ, audit
-│   └── assets/                  banner + data-flow diagram (hand-authored SVG)
+│   └── assets/                  banner, data-flow and design-system diagrams (hand-authored SVG)
 ├── src/
 │   ├── App.tsx                  editor orchestration: tools, shortcuts, dialogs, autosave
 │   ├── main.tsx                 entry point; imports the layered stylesheets in order
@@ -150,13 +153,17 @@ keyline/
 │   ├── import/                  SVG parsing, import preview, tidy rules
 │   ├── collaboration/           Yjs session, snapshot replay, hashing
 │   ├── ui/                      dashboard, toolbar, layers, inspector, dialogs, command bar
-│   └── styles/                  layered CSS, grouped by feature slice
+│   ├── design-system/           tokens.ts (canvas mirror), document defaults, BrandMark
+│   └── styles/
+│       ├── system/              tokens.css (the only place a colour is named), base.css,
+│       │                        components/ui.css (shared primitives)
+│       └── *.css                feature stylesheets; refine component styles, never tokens
 ├── solver/                      Rust crate (`src/lib.rs`) + committed Wasm package (`pkg/`)
 ├── server/                      development collaboration relay
 ├── scripts/                     dev/preview runner, solver + WebSocket tests, browser suites,
-│                                documentation checker
-├── .github/workflows/ci.yml     build, unit/integration tests, solver smoke test, Rust tests,
-│                                documentation checks
+│                                documentation checker, design-system gate + colour codemod
+├── .github/workflows/ci.yml     design gate, build, unit/integration tests, solver smoke test,
+│                                Rust tests, documentation checks
 ├── CONTRIBUTING.md · SECURITY.md · CHANGELOG.md · LICENSE (MIT)
 └── .gitignore                   keeps caches, logs and audit output out of Git
 ```
@@ -170,11 +177,12 @@ keyline/
 
 ```bash
 npm ci
-npm run check      # build + unit/integration + Wasm smoke + WebSocket relay + doc links
+npm run check      # design gate + build + tests + Wasm smoke + relay + doc links
 npm test           # 318 tests across 57 test files
 npm run test:solver
 npm run test:collaboration
 npm run check:docs # every relative doc link resolves
+npm run check:design # tokens, CSS↔TS parity, literal-colour ratchet, contrast
 ```
 
 Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
@@ -187,6 +195,8 @@ Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 - **Nine real WebSocket checks** against the relay: origin and room-path validation, cross-room
   isolation, offline convergence, payload caps and idle-room expiry.
 - **Rust unit tests** for direct arc radius/endpoint solving and rejection of proxy geometry.
+- **A design-system gate** so one palette stays one palette: token integrity, CSS↔TS parity,
+  a literal-colour ratchet, no dangling `var(--x)`, and eleven WCAG contrast pairs.
 - **Documentation checks** so relative links cannot rot and the published test count cannot drift.
 
 Browser suites are available locally but are **not** in CI because they require a preinstalled
