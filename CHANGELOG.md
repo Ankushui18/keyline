@@ -23,6 +23,9 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Changed
 
+- Selected objects now show eight resize handles: drag a corner or edge to resize, `Shift` keeps
+  the aspect ratio, and each drag is one undoable step. Rotation stays a numeric field for now.
+
 - Arrow keys now nudge selected objects (1 px, `Shift` 10 px) as one undoable step, not only
   points in edit mode.
 - The wheel pans the canvas (plain scroll, `Shift` for horizontal) while `Ctrl/⌘` + wheel or a

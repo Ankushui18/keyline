@@ -76,8 +76,8 @@ or where it would have to be added.
 | Drag to move | yes, `Alt`-drag duplicates | `VectorCanvas.tsx:1704` | works |
 | Arrow-key nudge, objects | yes, 1 px / `Shift` 10 px, one undo step | `App.tsx:1843`, `core/object-operations.ts:253` | **added in this pass** |
 | Arrow-key nudge, points | yes | `App.tsx:1871` | works |
-| Drag a corner to **resize** an object | **no** — objects draw a plain box (`renderer.ts:1102`) and dragging a corner moves the shape instead | `VectorCanvas.tsx:1103` handles artboards only | **missing** |
-| Rotate handle | **no** — rotation is a numeric field | `ui/PropertiesPanel.tsx:1508` | **missing** |
+| Drag a corner to **resize** an object | yes — eight handles on the selection frame, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
+| Rotate handle | **no** — rotation is a numeric field | `ui/PropertiesPanel.tsx:1508` | **missing (next)** |
 | Double-click a shape | enters point editing (also `Enter`) | `VectorCanvas.tsx:621` | works |
 | Double-click **enters a group** | **no** — clicks resolve to the leaf object; groups are selectable only in the Layers panel | `ui/LayersPanel.tsx:452`, isolation at `core/document.ts:317` | **missing** |
 | `Ctrl/⌘ G` / ungroup | only when a layer row has focus | `ui/LayersPanel.tsx:452-500` | partial |
@@ -94,22 +94,28 @@ or where it would have to be added.
 
 ## 3. The four gaps that matter, in order
 
-### 3.1 Selection feedback without resize handles
+### 3.1 Object resize handles — done
 
-A selected object draws an axis-aligned rectangle (`renderer.ts:1102`) with no
-handles. The rectangle reads as "you can drag these corners", but a press on a
-corner starts a *move* gesture, because the hit test resolves to the object. This
-is the single most misleading interaction in the editor.
+A selected object used to draw a plain box (`renderer.ts:1102`) with no handles,
+so a press on a "corner" started a *move*: the box promised something the editor
+did not do.
 
-**Smallest change:** add a `resize-object` gesture next to the existing
-`resize-artboard` one. Both share a handle model already (`ArtboardResizeHandle`,
-`VectorCanvas.tsx:108`), and the commit path is `UPDATE_OBJECT` with a new
-`scaleX`/`scaleY`, which the operation vocabulary already supports. Draw 8
-handles in `drawObjectSelection`, hit-test them before the object bounds, and
-keep `Shift` for proportional scaling.
+Now the frame carries eight handles, drawn in the canvas at the same positions
+they are hit tested (`src/core/object-resize.ts`), with a `resize-object` gesture
+next to the existing artboard one. A drag commits ordinary `UPDATE_OBJECT`
+transforms inside one transaction, so it undoes, autosaves and collaborates like
+every other edit, and geometry is never rewritten.
 
-**Cost:** one gesture kind, one renderer change, one hit-test branch.
-**Tests:** handle hit priority; proportional scaling; single undo entry per drag.
+Two behaviours worth knowing:
+
+- **`Shift`** on a corner keeps the selection's aspect ratio.
+- **Rotated objects.** Scaling a rotated shape non-uniformly cannot be expressed
+  as `rotate × scale` — a world-axis squash would require shear. The transform is
+  therefore scaled in the object's own axes and translated so the selection still
+  tracks the pointer. Uniform scaling of a rotated object is exact; non-uniform
+  scaling of one is an approximation. That limit belongs to the transform model,
+  not to the gesture, and it is the reason a rotate handle and a local-frame
+  selection box are the next step.
 
 ### 3.2 Groups cannot be entered on the canvas
 
@@ -132,7 +138,9 @@ Rotation exists in the transform (`types.ts:257`) and as a number field
 (`PropertiesPanel.tsx:1508`), but there is no handle and no gesture.
 
 **Smallest change:** a rotation zone just outside the corner handles added in 3.1,
-snapping to 15° with `Shift`. Commit is `UPDATE_OBJECT` with `rotation`.
+snapping to 15° with `Shift`. Commit is `UPDATE_OBJECT` with `rotation`. Doing it
+together with a local-frame box (handles rotated with the object) also removes the
+non-uniform approximation described in 3.1.
 
 ### 3.4 Typography and gradients are absent, not weak
 
@@ -162,7 +170,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 
 | Step | Work | Unlocks |
 |---|---|---|
-| 1 | Object resize handles, then rotate (3.1, 3.3) | the editor stops contradicting its own selection UI |
+| 1 | ~~Object resize handles~~ (done), then rotate (3.3) | the editor stops contradicting its own selection UI |
 | 2 | Canvas group selection and one-level entry (3.2) | nested documents, real design files |
 | 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
 | 4 | Text and gradients (3.4) | typography and illustration, the two missing media |
@@ -175,8 +183,11 @@ quality gain, and it needs no new model concepts.
 
 ## 6. Shipped in this pass
 
-Two changes, both small and both verified by the existing gates:
+Three changes, all small and all verified by the existing gates:
 
+- **Object resize handles.** Eight handles on the selection frame; drag to resize,
+  `Shift` keeps the ratio, each drag is one transaction. New module
+  `src/core/object-resize.ts` with 8 unit tests.
 - **Object nudge.** Arrow keys move the selection (1 px, `Shift` 10 px) as one
   undoable transaction, through the new `prepareNudgeObjects` plan in
   `src/core/object-operations.ts`. Previously arrows only worked in point editing.
@@ -191,8 +202,8 @@ Everything else in sections 3 and 5 is proposed, not built.
 ## 7. How to check this audit
 
 - `npm test` — the interaction tests named in section 3 live next to the code they
-  cover (`src/tools/select-tool.test.ts`, `src/core/object-workflow.test.ts`,
-  `src/canvas/viewport.test.ts`).
+  cover (`src/tools/select-tool.test.ts`, `src/core/object-resize.test.ts`,
+  `src/core/object-workflow.test.ts`, `src/canvas/viewport.test.ts`).
 - `npm run test:conformance` — proves the shell the handles will be drawn over is
   internally consistent.
 - Read `src/canvas/VectorCanvas.tsx:651-1200` — the whole pointer-down decision

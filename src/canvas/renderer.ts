@@ -14,6 +14,7 @@ import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
+import { resizeHandlePoints } from '../core/object-resize';
 import {
   parametricGroupsForRegion,
   parametricInstanceMatrices,
@@ -1110,7 +1111,20 @@ function drawObjectSelection(
   context.lineWidth = 1 / scale;
   context.lineCap = 'butt';
   context.setLineDash([]);
+  // The frame is accumulated from the bounds this loop already computes, so
+  // drawing handles costs no extra geometry work per frame.
+  let frameMinX = Infinity;
+  let frameMinY = Infinity;
+  let frameMaxX = -Infinity;
+  let frameMaxY = -Infinity;
   for (const objectId of objectIds) {
+    const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
+    if (bounds.width > 0 || bounds.height > 0) {
+      frameMinX = Math.min(frameMinX, bounds.minX);
+      frameMinY = Math.min(frameMinY, bounds.minY);
+      frameMaxX = Math.max(frameMaxX, bounds.maxX);
+      frameMaxY = Math.max(frameMaxY, bounds.maxY);
+    }
     const line = straightLineSelectionPoints(document, objectId);
     if (line) {
       // A one-segment open line has no useful area to box. Trace its actual
@@ -1121,9 +1135,35 @@ function drawObjectSelection(
       context.stroke();
       continue;
     }
-    const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
     if (bounds.width <= 0 && bounds.height <= 0) continue;
     context.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
+  }
+
+  // The selection frame carries the resize handles, exactly where they are hit
+  // tested (core/object-resize). Drawn after the per-object boxes so a
+  // multi-selection still shows which shape is which.
+  if (frameMaxX > frameMinX || frameMaxY > frameMinY) {
+    const frame = {
+      minX: frameMinX,
+      minY: frameMinY,
+      maxX: frameMaxX,
+      maxY: frameMaxY,
+      width: frameMaxX - frameMinX,
+      height: frameMaxY - frameMinY,
+    };
+    for (const { point } of resizeHandlePoints(frame)) {
+      const radius = 3.5 / scale;
+      context.beginPath();
+      context.rect(point.x - radius, point.y - radius, radius * 2, radius * 2);
+      context.fillStyle = COLORS.inverse;
+      context.fill();
+      context.lineWidth = 2.5 / scale;
+      context.strokeStyle = COLORS.inverse;
+      context.stroke();
+      context.lineWidth = 1.25 / scale;
+      context.strokeStyle = COLORS.selected;
+      context.stroke();
+    }
   }
   context.restore();
 }
