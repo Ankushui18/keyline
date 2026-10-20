@@ -9,6 +9,7 @@ import {
   framePoint,
   prepareResizeObjects,
   prepareRotateObjects,
+  prepareRotateTo,
   selectionFrame,
   transformTargets,
   type SelectionFrame,
@@ -281,5 +282,40 @@ describe('readout orientation', () => {
     // Per-object size, not the axis-aligned bounding box: 100 x 50 stays 100 x 50.
     expect(width).toBeCloseTo(100);
     expect(height).toBeCloseTo(50);
+  });
+});
+
+describe('inspector rotation', () => {
+  const centreOf = (document: VectorDocument, objectId: EntityId) => {
+    const bounds = boundsOf(document, objectId);
+    return { x: bounds.minX + bounds.width / 2, y: bounds.minY + bounds.height / 2 };
+  };
+
+  it('turns about the frame centre, not the object origin', () => {
+    const { document, manager, objectId } = setup();
+    const centre = centreOf(document, objectId);
+    for (const degrees of [45, 90, 200, 45, 0]) {
+      const plan = prepareRotateTo(document, [objectId], degrees)!;
+      apply(manager, plan.operations);
+      expect(centreOf(document, objectId).x).toBeCloseTo(centre.x);
+      expect(centreOf(document, objectId).y).toBeCloseTo(centre.y);
+    }
+    // Setting the angle is reversible: back at 0 the shape is exactly where it was.
+    expect(boundsOf(document, objectId)).toMatchObject({ minX: expect.closeTo(0, 6), minY: expect.closeTo(0, 6) });
+  });
+
+  it('rotates a multi-selection about the shared centre', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    const first = addRectangle(document, manager);
+    const second = addRectangle(document, manager, 20, 20, 200);
+    const frame = frameOf(document, [first.id, second.id]);
+    const shared = frameCenter(frame);
+    const plan = prepareRotateTo(document, [first.id, second.id], 90)!;
+    apply(manager, plan.operations);
+    const after = frameOf(document, [first.id, second.id]);
+    expect(frameCenter(after).x).toBeCloseTo(shared.x);
+    expect(frameCenter(after).y).toBeCloseTo(shared.y);
+    expect(document.getObject(first.id)!.transform.rotation).toBeCloseTo(90);
   });
 });

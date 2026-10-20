@@ -79,6 +79,7 @@ or where it would have to be added.
 | Drag a corner to **resize** an object | yes — eight square handles on a frame drawn on the object's own axes, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
 | Size readout while selected | yes — `W × H` pill outside the frame, rotated with it but never upside down, hidden when the selection is too small to fit it | `drawSelectionSizeBadge` in `renderer.ts` | **shipped in this pass** |
 | Rotate | yes — hover just outside a corner for a rotate cursor, drag to turn, `Shift` snaps to 15° (no handle, as in Figma) | `frameHitTarget` / `prepareRotateObjects` in `src/core/object-resize.ts` | **shipped in this pass** |
+| Rotate by number | yes — the `Rotation` field and the 90° button turn about the frame centre, so typing an angle never moves the shape | `prepareRotateTo` in `src/core/object-resize.ts` | **fixed in this pass** |
 | Double-click a shape | enters point editing (also `Enter`) | `VectorCanvas.tsx:621` | works |
 | Double-click **enters a group** | **no** — clicks resolve to the leaf object; groups are selectable only in the Layers panel | `ui/LayersPanel.tsx:452`, isolation at `core/document.ts:317` | **missing** |
 | `Ctrl/⌘ G` / ungroup | only when a layer row has focus | `ui/LayersPanel.tsx:452-500` | partial |

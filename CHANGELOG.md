@@ -5,6 +5,12 @@ and the project uses semantic versioning once it publishes releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Rotating from the inspector (the `Rotation` field, the 90° button, or `R°` on a multi-selection)
+  now turns the selection about its centre. It used to write the angle straight into the
+  transform, which rotates about the object's local origin — usually a corner — so a single
+  typed angle could throw a shape out of its artboard.
 ### Added
 
 - `docs/EDITING-AUDIT.md` — a line-by-line audit of the interaction model (selection, transform

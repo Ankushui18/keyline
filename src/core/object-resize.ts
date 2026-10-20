@@ -338,8 +338,38 @@ export function prepareRotateObjects(
       ? Math.round((targets[0].transform.rotation + delta) / ROTATION_SNAP) * ROTATION_SNAP - targets[0].transform.rotation
       : Math.round(delta / ROTATION_SNAP) * ROTATION_SNAP;
   }
-  if (Math.abs(delta) < 1e-9) return null;
+  return rotateAboutCenter(targets, frame, delta);
+}
 
+/**
+ * Absolute rotation, for the inspector's numeric field and its 90° button.
+ * Setting `transform.rotation` alone turns the object about its own local origin,
+ * which for most shapes is a corner: the shape swings out of its artboard. This
+ * turns it about the frame centre instead, so typing 45° rotates in place and is
+ * the exact inverse of typing 0° again.
+ */
+export function prepareRotateTo(
+  document: VectorDocument,
+  objectIds: Iterable<EntityId>,
+  degrees: number,
+): TransformPlan | null {
+  const targets = transformTargets(document, objectIds);
+  if (targets.length === 0) return null;
+  const frame = selectionFrame(document, targets.map((target) => target.objectId));
+  if (!frame) return null;
+  if (!Number.isFinite(degrees)) return null;
+  const current = targets[0].transform.rotation;
+  return rotateAboutCenter(targets, frame, degrees - current);
+}
+
+function rotateAboutCenter(
+  targets: TransformTarget[],
+  frame: SelectionFrame,
+  delta: number,
+): TransformPlan | null {
+  if (targets.length === 0) return null;
+  if (!Number.isFinite(delta) || Math.abs(delta) < 1e-9) return null;
+  const center = frameCenter(frame);
   const rotation = rotationMatrix(delta * Math.PI / 180, center);
   const operations: OperationInput[] = [];
   for (const target of targets) {

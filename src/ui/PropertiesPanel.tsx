@@ -5,6 +5,7 @@ import { constraintActions, constraintDisplayName, constraintsForSelection } fro
 import type { VectorDocument } from '../core/document';
 import { applyCornerRadii, currentRadii, inspectCorners } from '../core/corner-radius';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
+import { prepareRotateTo } from '../core/object-resize';
 import {
   previewGeometryPropagation,
   type GeometryConflictResolution,
@@ -1457,6 +1458,23 @@ function ObjectInspector({
   const updateTransform = (updates: Partial<NetworkObject['transform']>) => onUpdate(object.id, {
     transform: { ...object.transform, ...updates },
   });
+  /**
+   * Rotation turns about the selection frame, never about the object's local
+   * origin. Writing `rotation` straight into the transform used to swing a shape
+   * out of its artboard on the first entry, because the local origin is a corner.
+   */
+  const rotateTo = (degrees: number) => {
+    const plan = prepareRotateTo(document, [object.id], degrees);
+    if (!plan) return;
+    manager.beginTransaction('Rotate object');
+    try {
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+    } catch (error) {
+      manager.rollbackTransaction();
+      throw error;
+    }
+  };
   const corners = inspectCorners(document, object.id);
   const [perCorner, setPerCorner] = useState(false);
   const [aspectLocked, setAspectLocked] = useState(false);
@@ -1505,8 +1523,8 @@ function ObjectInspector({
           <DesignNumberField label="Object Y position" prefix="Y" value={bounds.minY - frameOrigin.y} onCommit={(value) => updateTransform({ y: object.transform.y + value + frameOrigin.y - bounds.minY })} />
         </div></div>
         <div className="di-control-block"><span className="di-label">Rotation</span><div className="di-rotation-row">
-          <DesignNumberField label="Object rotation" icon="corner" suffix="°" value={object.transform.rotation} onCommit={(value) => updateTransform({ rotation: value })} />
-          <div className="di-segment-group"><DesignIconButton icon="rotate" label="Rotate 90 degrees" onClick={() => updateTransform({ rotation: (object.transform.rotation + 90) % 360 })} /><DesignIconButton icon="flip-x" label="Flip horizontal" onClick={() => onFlip('horizontal')} /><DesignIconButton icon="flip-y" label="Flip vertical" onClick={() => onFlip('vertical')} /></div>
+          <DesignNumberField label="Object rotation" icon="corner" suffix="°" value={object.transform.rotation} onCommit={(value) => rotateTo(value)} />
+          <div className="di-segment-group"><DesignIconButton icon="rotate" label="Rotate 90 degrees" onClick={() => rotateTo(object.transform.rotation + 90)} /><DesignIconButton icon="flip-x" label="Flip horizontal" onClick={() => onFlip('horizontal')} /><DesignIconButton icon="flip-y" label="Flip vertical" onClick={() => onFlip('vertical')} /></div>
         </div></div>
       </section>
       <section className="di-section di-layout-section">
@@ -2471,6 +2489,18 @@ function MultiObjectInspector({
     : undefined;
   const allLocked = objects.every((object) => document.isObjectLocked(object.id));
   const anyLocked = objects.some((object) => document.isObjectLocked(object.id));
+  const rotateTo = (degrees: number) => {
+    const plan = prepareRotateTo(document, ids, degrees);
+    if (!plan) return;
+    manager.beginTransaction('Rotate objects');
+    try {
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+    } catch (error) {
+      manager.rollbackTransaction();
+      console.warn('Rotating the selection failed.', error);
+    }
+  };
   const allVisible = objects.every((object) => document.isObjectVisible(object.id));
   const constructionOnly = objects.length > 0 && objects.every(
     (object) => objectConstructionComposition(document, object.id) === 'construction-only',
@@ -2489,7 +2519,7 @@ function MultiObjectInspector({
         <div className="numeric-field-grid">
           <MixedNumericField label="X" value={x} onCommit={(value) => onUpdateObjects(ids, { x: value })} />
           <MixedNumericField label="Y" value={y} onCommit={(value) => onUpdateObjects(ids, { y: value })} />
-          <MixedNumericField label="R°" value={rotation} onCommit={(value) => onUpdateObjects(ids, { rotation: value })} />
+          <MixedNumericField label="R°" value={rotation} onCommit={rotateTo} />
         </div>
       </div>
       <section className="di-section">

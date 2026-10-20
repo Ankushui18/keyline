@@ -96,7 +96,8 @@ rotate handle: as in Figma, move the pointer just outside a corner and it become
 
 - Drag a corner or edge handle to resize — `Shift` on a corner keeps the aspect ratio.
 - Drag just outside a corner, where the cursor turns into a rotate arrow, to rotate — `Shift`
-  snaps to 15° steps.
+  snaps to 15° steps. The `Rotation` field and the 90° button in Design do the same thing by
+  number, about the same centre, so a shape never leaves its artboard when you type an angle.
 - Dragging anywhere else inside the frame moves the object, so `Alt`-drag still duplicates.
 - Several selected objects share one axis-aligned frame; resizing and rotating there apply to the
   whole selection at once.
