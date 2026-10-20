@@ -208,6 +208,8 @@ npm run check:design -- --list      # nearest token for each surviving literal
 6. **No dangling variables** — every `var(--x)` in a stylesheet must be declared somewhere, or
    set from TypeScript at runtime (the shell sets `--sidebar-width`, `--layers-height`,
    `--lp-depth`). A typo'd custom property otherwise renders as nothing and fails silently.
+   The companion check `npm run test:conformance` goes further and proves every declaration
+   *resolves* end to end — see [Conformance](#conformance-does-it-actually-look-the-same).
 7. **Chrome is not canvas** — a feature stylesheet may not use an `--overlay-*` or `--canvas-*`
    token for UI paint. Those describe artwork and tool affordances; the only exceptions are
    preview backgrounds (`--canvas-paper`) and the two legends that deliberately mirror the canvas
@@ -337,6 +339,74 @@ claim.
 
 ---
 
+## Conformance: does it actually look the same?
+
+The gate checks the *source*. `npm run test:conformance` checks the *result*: it parses all 27
+stylesheets in the order `main.tsx` loads them, resolves every `var()` chain the way a browser
+would (including component-scoped properties such as `--ui-button-height` and `--di-divider`), and
+then asks what a designer would ask.
+
+```
+Design conformance
+
+  stylesheets in cascade        27
+  rules parsed                  2531
+  declarations resolved         9896/9896 (100.00%)
+  ink+background pairs checked  361 (361 pass AA)
+  ink-only rules checked        482
+  button classes measured       27 → 17 geometry signature(s)
+  control heights in use        22px ×1, 24px ×22, 28px ×46, 32px ×27, 36px ×11
+  ui-* primitives               18 base + 10 modifiers
+```
+
+It fails the build on:
+
+1. **Unresolvable declarations** — a `var()` that never resolves, or one that survives resolution.
+2. **Illegible pairs** — where a rule sets both ink and a background, the pair must clear 3:1
+   (4.5:1 is reported as a warning). Disabled controls are exempt, as WCAG 1.4.3 exempts them.
+3. **Unsupported ink** — a `color` that falls below 3:1 on the panel, the canvas *and* the light
+   paper surface. Paper is included because previews and artboard cards legitimately draw dark ink.
+4. **Primitives with no rule of their own.**
+
+### What the first run caught
+
+Real defects, not theory — every one was a live visual bug:
+
+| Where | Was | Now |
+|---|---|---|
+| `.figma-inspector .icon-button.is-active`, `.lp .lp-icon.is-on` (×2), `.di-icon-button[aria-pressed]` | `color: var(--accent)` on `background: var(--accent)` — **1.00:1**, the icon disappeared when active | `color: var(--text-on-bright)` — 6.40:1 |
+| `.di-frame-presets button[aria-pressed]`, `.stroke-alignment-control button[aria-pressed]` | `#ececee` on the bright accent — 2.54:1 | `var(--text-on-bright)` — 6.40:1 |
+| `.lp-menu button:hover` | white on the bright accent — 2.99:1 | `--accent-solid` — 5.73:1 |
+| `.ui-chip--danger` | `--text-danger` on `--danger-wash` — 3.06:1 | tint ink on tint surface — 7.33:1 |
+| `.brand-mark`, `.export-button` | white on `--blue-600` — 4.36:1 | `--accent-solid` — 5.73:1 |
+| `.diagnostic-copy code` | `#71545a` on the panel — 2.4:1 | `var(--text-danger)` — 5.79:1 |
+| `.status-bar`, `.tool-button kbd`, `.coordinate-field > span`, `.inspector-context`, `.family-button b` | 3.6–4.49:1 | `--text-muted` / `--text-secondary` — 5.6–6.1:1 |
+
+### Seeing it
+
+```bash
+npm run proof:design        # writes design-proof/index.html (self-contained, ~180 kB)
+```
+
+The proof sheet renders the palette, the 12 type sizes, every `.ui-*` primitive, the legacy control
+classes *next to* the primitives, the radius and spacing scales, and the measured contrast table.
+It inlines the product's own stylesheets and fonts, so it cannot drift from the app. Attach it to a
+review when a change is visual.
+
+### What "same everywhere" means today
+
+- **Colour, type, radius, spacing, layering, motion:** one scale, enforced, 100% tokenised
+  (37 frozen colour literals aside).
+- **Control height:** four tiers, and 27 button classes sit on them — but on **17 distinct
+  geometry signatures**, because a 28px inspector icon button and a 36px primary action are
+  genuinely different objects. The conformance run prints them, so a *new* shape shows up as a
+  number rather than as a surprise in the UI.
+- **Not unified:** the 24 legacy button classes still exist as classes (they share tokens, not
+  markup), and 50 `!important`s remain. Merging them is markup work that needs a browser to
+  verify; this environment has none.
+
+---
+
 ## Rules of thumb
 
 **Do**
@@ -360,9 +430,10 @@ claim.
 ## Known limits
 
 - **No screenshot diffing.** This sandbox has no Chromium, Playwright or SVG rasteriser, so the
-  migration was verified by token maths, role-checked substitution, typecheck and the gate — not by
-  pixel comparison. If you have a browser, `npm run test:design` covers sidebar layout and
-  accessibility.
+  migration was verified by token maths, role-checked substitution, a resolved-cascade conformance
+  run and the gate — not by pixel comparison. `npm run proof:design` produces a page you can open
+  in any browser to judge it by eye; `npm run test:design` covers layout and accessibility where a
+  browser exists.
 - **The chrome is dark-only.** Tokens describe one theme; there is no light-mode variant. The
   canvas is light because artwork is light, and that is a deliberate, separate surface.
 - **Legacy class names remain.** 24 feature stylesheets still carry their own selectors; they now

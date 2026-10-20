@@ -19,8 +19,8 @@ button, input, select, textarea { color-scheme: dark; }
 .brand-mark {
   width: 32px;
   height: 32px;
-  color: var(--text-inverse);
-  background: var(--bgColor-accent-emphasis);
+  color: var(--text-on-accent);
+  background: var(--accent-solid);
   border: 1px solid var(--graphite-600);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-resting-small);
@@ -68,8 +68,8 @@ button, input, select, textarea { color-scheme: dark; }
 .family-button { color: var(--fgColor-default); background: var(--surface-raised); }
 .family-button:hover { color: var(--text-inverse); background: var(--border-strong); border-color: var(--text-disabled); }
 .export-button {
-  color: var(--fgColor-onEmphasis);
-  background: var(--bgColor-accent-emphasis);
+  color: var(--text-on-accent);
+  background: var(--accent-solid);
   border-color: var(--graphite-600);
 }
 .export-button:hover { color: var(--text-inverse); background: var(--graphite-650); border-color: var(--text-subtle); }

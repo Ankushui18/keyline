@@ -37,6 +37,9 @@ jobs:
       - name: Design-system gate (tokens, parity, literal ratchet, contrast)
         run: npm run check:design
 
+      - name: Design conformance (resolved cascade, contrast, button geometry)
+        run: npm run test:conformance
+
       - name: Design consistency report
         run: npm run audit:design
 

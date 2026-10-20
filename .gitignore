@@ -36,3 +36,6 @@ solver/target/
 .env
 .env.local
 .env.*.local
+
+# Generated design-system proof sheet (npm run proof:design)
+design-proof/

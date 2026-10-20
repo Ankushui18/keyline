@@ -184,6 +184,8 @@ npm run test:collaboration
 npm run check:docs # every relative doc link resolves
 npm run check:design # tokens, CSS↔TS parity, colour/type/radius/z-index, contrast
 npm run audit:design # design-consistency report: how many values each dimension uses
+npm run test:conformance # resolve the cascade; check contrast + button geometry
+npm run proof:design # render the design system to design-proof/index.html
 ```
 
 Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
@@ -199,6 +201,9 @@ Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 - **A design-system gate** so one palette stays one palette: token integrity, CSS↔TS parity,
   a literal-colour ratchet, no dangling `var(--x)`, type/radius/spacing/z-index on scale, and
   eleven WCAG contrast pairs.
+- **A conformance run** that resolves the entire cascade and checks 361 ink/background pairs and
+  the geometry of 27 button classes — it caught four invisible-on-active icons and nine sub-AA
+  text pairs the source-level gate could not see.
 - **Documentation checks** so relative links cannot rot and the published test count cannot drift.
 
 Browser suites are available locally but are **not** in CI because they require a preinstalled

@@ -68,7 +68,9 @@ npm run collab      # relay only (no app)
 | `npm run migrate:colors` | Codemod that replaces literal hex with design tokens (dry run with `--report`). |
 | `npm run migrate:scales` | Codemod that puts type, radius, line-height and z-index on the scales. |
 | `npm run audit:design` | Measures design consistency: type, radius, layering, spacing, component vocabulary. |
-| `npm run check` | Design gate + build + tests + solver + relay + docs. The full local gate. |
+| `npm run test:conformance` | Resolves the whole cascade and checks contrast, button geometry and that every declaration resolves. |
+| `npm run proof:design` | Writes a self-contained `design-proof/index.html` rendering the system. |
+| `npm run check` | Design gate + conformance + build + tests + solver + relay + docs. The full local gate. |
 | `npm run build:solver` | Rebuilds `solver/pkg/` with `wasm-pack`. |
 | `npm run test:browser` | End-to-end + accessibility suite (needs a running app and Playwright CLI). |
 | `npm run test:design` | Sidebar layout/resizing/accessibility suite. |

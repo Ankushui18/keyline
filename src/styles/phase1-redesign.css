@@ -102,7 +102,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 .renderer-button:hover, .family-button:hover, .constraints-button:hover,
 .renderer-button.is-webgl, .constraints-button.is-active { color: var(--text-primary); background: var(--surface-active); border: 0; }
-.family-button b, .constraints-button b { color: var(--text-muted); background: var(--surface-raised); border: 0; }
+.family-button b, .constraints-button b { color: var(--text-secondary); background: var(--surface-raised); border: 0; }
 .solver-dot.is-ready { background: var(--accent); box-shadow: none; }
 .collaborator-avatars { flex-direction: row; padding-left: var(--space-05); }
 .collaborator-avatars span {

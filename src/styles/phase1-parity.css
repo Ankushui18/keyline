@@ -80,7 +80,7 @@
 .figma-section-head h4 { margin: 0; font-size: var(--font-size-sm); font-weight: 600; color: var(--text-primary); letter-spacing: .01em; }
 .figma-inspector .icon-button { width: 24px; height: var(--control-height-sm); display: inline-grid; place-items: center; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); cursor: pointer; padding: 0; }
 .figma-inspector .icon-button:hover { background: var(--graphite-775); color: var(--text-primary); }
-.figma-inspector .icon-button.is-active { background: var(--accent); color: var(--accent); }
+.figma-inspector .icon-button.is-active { background: var(--accent); color: var(--text-on-bright); }
 .paint-row { display: grid; grid-template-columns: 24px minmax(0,1fr) 52px 24px 24px; align-items: center; gap: var(--space-1); background: var(--surface-canvas); border-radius: var(--radius-md); padding: var(--space-05) var(--space-05) var(--space-05) var(--space-1); }
 .paint-row.is-hidden { opacity: .55; }
 .paint-swatch { position: relative; width: 20px; height: 20px; border-radius: var(--radius-sm); overflow: hidden; box-shadow: inset 0 0 0 1px var(--text-inverse); cursor: pointer; }
