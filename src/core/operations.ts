@@ -296,6 +296,11 @@ export class OperationManager {
   }
 
   get canUndo(): boolean { return this.undoStack.length > 0; }
+  /** Label of the most recent undoable step, when it is a labelled batch. */
+  get lastUndoLabel(): string | undefined {
+    const top = this.undoStack[this.undoStack.length - 1] as { type?: string; payload?: { label?: string } } | undefined;
+    return top?.type === 'BATCH' ? top.payload?.label : undefined;
+  }
   get canRedo(): boolean { return this.redoStack.length > 0; }
 
   replaceFromRemoteSnapshot(snapshot: DocumentSnapshot): void {

@@ -387,6 +387,6 @@ export class PenTool {
 
 function nextPenName(operations: OperationManager): string {
   const count = operations.document.objectsForArtboard(operations.document.activeArtboardId)
-    .filter((object) => /^Pen(?:\s|$)/.test(object.name)).length;
-  return `Pen ${count + 1}`;
+    .filter((object) => /^(?:Pen|Path)(?:\s|$)/.test(object.name)).length;
+  return `Path ${count + 1}`;
 }
