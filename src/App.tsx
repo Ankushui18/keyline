@@ -27,7 +27,7 @@ import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
 import { prepareDeleteObject, prepareFlipObjects } from './core/object-operations';
-import { DEFAULT_DOCUMENT_NAME, DocumentPersistence, listDocuments, loadDocumentById, markStoredDocumentImported, type SaveStatus } from './core/store';
+import { DEFAULT_DOCUMENT_NAME, DocumentPersistence, listDocuments, loadDocumentById, markStoredDocumentImported, saveDocument, type SaveStatus } from './core/store';
 import type {
   Appearance,
   AppearanceRule,
@@ -178,7 +178,16 @@ export default function App() {
     void openFromUrl(() => false);
   }, [openFromUrl]);
 
-  const startNew = useCallback((start: StartAction) => {
+  const startNew = useCallback(async (start: StartAction) => {
+    if (start.kind === 'backup') {
+      // A recovery backup always becomes a new local file, so restoring can never
+      // overwrite the document it was downloaded from.
+      const document = new VectorDocument({ ...start.snapshot, id: createEntityId() });
+      await saveDocument(document, start.name);
+      setDocParam(document.id, 'push');
+      setRoute({ kind: 'editor', runtime: { document, manager: new OperationManager(document) }, name: start.name, loadError: false });
+      return;
+    }
     const document = VectorDocument.createEmpty();
     setDocParam(document.id, 'push');
     setRoute({ kind: 'editor', runtime: { document, manager: new OperationManager(document) }, name: DEFAULT_DOCUMENT_NAME, start, loadError: false });
@@ -2427,7 +2436,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           anchor.download = `${documentNameRef.current.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'keyline'}.keyline.json`;
           anchor.click();
           window.setTimeout(() => URL.revokeObjectURL(url), 0);
-          announce('A copy was downloaded to this device.');
+          announce('Recovery copy downloaded. Import it from the dashboard to restore it.');
         }}
         selectionLabel={selection.mode === 'network'
           ? `${selection.nodeIds.size + selection.segmentIds.size || 'No'} point${selection.nodeIds.size + selection.segmentIds.size === 1 ? '' : 's'} selected${selection.editingObjectId ? ` on ${document.getObject(selection.editingObjectId)?.name ?? 'vector'}` : ''}`

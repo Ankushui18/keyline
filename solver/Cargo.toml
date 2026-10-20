@@ -2,7 +2,7 @@
 name = "vector-solver"
 version = "0.1.0"
 edition = "2021"
-description = "Deterministic geometric constraint solver for Vector Studio"
+description = "Deterministic geometric constraint solver for Keyline"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

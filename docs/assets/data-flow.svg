@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 640" width="1120" height="640" role="img" aria-labelledby="flow-title flow-desc">
+  <title id="flow-title">Keyline data flow</title>
+  <desc id="flow-desc">Tools and panels call OperationManager, which validates through the constraint solver and commits to the typed VectorDocument. Renderers, persistence, collaboration and export all read the committed document.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#6b7686"/>
+    </marker>
+  </defs>
+
+  <rect width="1120" height="640" fill="#111318"/>
+  <text x="40" y="48" fill="#f5f7fa" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="24" font-weight="700">Keyline · one mutation path, many consumers</text>
+  <text x="40" y="74" fill="#8d96a3" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13">Every edit goes through OperationManager. Nothing renders, saves, syncs or exports an uncommitted graph.</text>
+
+  <rect x="40" y="112" width="250" height="88" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="62" y="145" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">Tools &amp; panels</text>
+  <text x="62" y="169" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">pointer, keyboard, menus,</text>
+  <text x="62" y="187" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">command bar, dialogs</text>
+
+  <rect x="380" y="104" width="300" height="104" rx="10" fill="#132639" stroke="#0d99ff" stroke-width="1.75"/>
+  <text x="402" y="139" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">OperationManager</text>
+  <text x="402" y="163" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">the only commit boundary</text>
+  <text x="402" y="181" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">undo / redo · atomic batches</text>
+  <text x="402" y="199" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">pre-validate ⇢ commit ⇢ notify</text>
+
+  <rect x="770" y="104" width="310" height="104" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="792" y="139" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">VectorDocument · v6</text>
+  <text x="792" y="163" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">nodes · segments (line/bezier/arc)</text>
+  <text x="792" y="181" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">paths · regions · constraints</text>
+  <text x="792" y="199" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">objects · layers · artboards · pages</text>
+
+  <path d="M290 156 H372" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <path d="M680 156 H762" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="380" y="256" width="300" height="76" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="402" y="288" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="17" font-weight="600">Constraint solver · TypeScript</text>
+  <text x="402" y="311" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">synchronous hard-constraint preflight</text>
+
+  <rect x="380" y="364" width="300" height="76" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="402" y="396" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">Rust to WebAssembly worker</text>
+  <text x="402" y="419" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">independent verification, off-thread</text>
+
+  <path d="M530 208 V248" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <path d="M530 332 V356" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <rect x="40" y="476" width="240" height="112" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="62" y="509" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">Renderers</text>
+  <text x="62" y="533" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">Canvas 2D · WebGL2</text>
+  <text x="62" y="551" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">same document, same viewport</text>
+  <text x="62" y="569" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">falls back if no WebGL2</text>
+
+  <rect x="310" y="476" width="230" height="112" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="332" y="509" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">Persistence</text>
+  <text x="332" y="533" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">IndexedDB autosave</text>
+  <text x="332" y="551" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">serialized revisions</text>
+  <text x="332" y="569" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">v1–v6 snapshots</text>
+
+  <rect x="570" y="476" width="240" height="112" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="592" y="509" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">Collaboration</text>
+  <text x="592" y="533" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">Yjs operation log</text>
+  <text x="592" y="551" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">offline queue · presence</text>
+  <text x="592" y="569" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">canonical replay by hash</text>
+
+  <rect x="840" y="476" width="240" height="112" rx="10" fill="#1b1e24" stroke="#3a404b" stroke-width="1.5"/>
+  <text x="862" y="509" fill="#eef1f5" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600">Export</text>
+  <text x="862" y="533" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">SVG · PNG · ZIP</text>
+  <text x="862" y="551" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">React · CSS variables</text>
+  <text x="862" y="569" fill="#9aa3b0" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13.5">animated SVG</text>
+
+  <path d="M860 208 V440 H160 V468" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <path d="M880 208 V440 H425 V468" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <path d="M900 208 V440 H690 V468" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <path d="M920 208 V468" fill="none" stroke="#6b7686" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+  <text x="40" y="620" fill="#8d96a3" font-family="Segoe UI, -apple-system, Helvetica Neue, Arial, sans-serif" font-size="13">Regions and derived hit-test geometry are rebuilt after each commit, so fills follow topology instead of baked outlines.</text>
+</svg>

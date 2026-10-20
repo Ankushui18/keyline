@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VectorDocument } from './document';
+import { parseDocumentBackup } from './document-backup';
 import { createEntityId } from './ids';
 import { OperationManager } from './operations';
 import {
@@ -55,6 +56,26 @@ describe('IndexedDB document storage', () => {
     expect((await listDocuments()).some((item) => item.id === duplicateId)).toBe(true);
     await deleteStoredDocument(document.id); await deleteStoredDocument(duplicateId);
     expect(await loadDocumentById(document.id)).toBeNull();
+  });
+
+  it('restores a recovery backup as a new file and leaves the original intact', async () => {
+    const { document, addNode } = fixture(); addNode();
+    await saveDocument(document, 'Original');
+
+    const backup = parseDocumentBackup(JSON.stringify(document.toSnapshot()), 'original.keyline.json');
+    const restored = new VectorDocument({ ...backup.snapshot, id: createEntityId() });
+    await saveDocument(restored, backup.name);
+
+    const original = await loadDocumentById(document.id);
+    const recovered = await loadDocumentById(restored.id);
+    expect(original?.name).toBe('Original');
+    expect(original?.document.nodes.size).toBe(1);
+    expect(recovered?.name).toBe('original (restored)');
+    expect(recovered?.document.id).toBe(restored.id);
+    expect(recovered?.document.nodes.size).toBe(1);
+
+    await deleteStoredDocument(document.id);
+    await deleteStoredDocument(restored.id);
   });
 
   it('freezes geometry before awaiting IndexedDB or thumbnail generation', async () => {

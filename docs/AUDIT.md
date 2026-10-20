@@ -3,10 +3,11 @@
 - **Date:** 20 October 2026
 - **Repository:** https://github.com/Ankushui18/keyline
 - **Audited commit:** `1595d82e1242a30e5517a3bd256c6152c413f9d6`
-- **Workspace:** `/home/user/keyline`
-- **Status:** fixes applied locally; development preview running on port **5173**. No changes have been pushed to GitHub.
+- **Status:** delivered. Findings 1–14 are fixed, with regression coverage. The final sections record
+  the sidebar follow-up, the requested corrections, and the repository/documentation pass.
 
-> The initial audit results below are historical. The final section records the subsequent sidebar work and the latest user-requested corrections.
+> The results below are a historical record. Counts in each section are the counts at the time of
+> that run; the current suite is tracked in [TESTING.md](TESTING.md).
 
 ## Summary
 
@@ -136,7 +137,9 @@ Use the platform's Live Preview rather than trying to reach the sandbox's localh
 
 ## Delivery
 
-All fixes, tests, and documentation are in the workspace copy. The supplied source archive and patch can be reviewed/applied independently. The original GitHub repository has **not** been modified remotely.
+All fixes, tests, and documentation are committed to the repository. Evidence files produced by the
+browser suites are written to `audit/`, which is intentionally ignored by Git because it contains
+generated screenshots and logs; the results are summarised here.
 
 
 ## Follow-up: palette, icons and icon-start correction — 20 October 2026
@@ -163,4 +166,43 @@ Latest verification (not the initial audit counts above):
 
 Evidence: `audit/review-check.log`, `audit/review-results.json`, `audit/design-sidebar-results.json`, `audit/browser-results.json` and `audit/review-icon-start.png`. Automated checks are scoped regression coverage, not full accessibility certification.
 
-The current corrected source archive supersedes the earlier sidebar source archive. The earlier standalone audit patch predates this follow-up. All changes remain local; nothing has been pushed to GitHub.
+The corrected source supersedes the earlier standalone sidebar patch. The earlier patch predates
+this follow-up and should not be applied on top of the current tree.
+
+## Repository and documentation pass — 20 October 2026
+
+A follow-up pass addressed repository hygiene and documentation. No editing behaviour changed.
+
+### Fixed
+
+| # | Finding | Fix |
+|---|---|---|
+| 15 | The repository had **no `.gitignore`**, despite finding 14 claiming one was added. `node_modules/`, `dist/`, browser audit output and caches were only untracked by convention. | Added `.gitignore` covering dependencies, build output, audit artefacts, TypeScript caches, logs, Rust target output, environment files and OS/editor files. |
+| 16 | Generated `tsconfig.app.tsbuildinfo`, `tsconfig.node.tsbuildinfo` and `vite.log` were tracked. | Removed from Git and ignored; `.gitattributes` marks generated lockfiles/pkg as generated and keeps binary assets untouched. |
+| 17 | No license file, contribution guide, security policy or changelog existed. | Added MIT `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`. |
+| 18 | There was no CI workflow, so the documented "read-only GitHub Actions jobs" did not exist. | Added `.github/workflows/ci.yml`: lockfile install, strict TypeScript + build, unit/integration suite, Wasm smoke test, WebSocket suite, Rust tests, documentation check. |
+| 19 | README was a phase report rather than an entry point; deep detail was mixed with setup, and the product name alternated between "Vector Studio" and "Keyline". | Rebuilt README as a landing page (what/why, 2-minute start, feature map, repository map, doc index, quality gates, honest limits). Package metadata and solver descriptions now use Keyline; legacy storage keys are documented as intentional. |
+| 20 | The save-failure recovery action downloaded a `.keyline.json` snapshot that **nothing could import**, so the advertised backup was not restorable. | Added validated backup parsing (`src/core/document-backup.ts`), dashboard import for `.keyline.json`, and restore as a new file with a fresh ID so the original is never overwritten. Five new tests cover acceptance, round-trip, naming and malformed input. |
+| 21 | Documentation could drift silently: no link checking, and test counts were maintained by hand. | Added `scripts/check-docs.mjs` and `npm run check:docs`; CI compares the README badge and documented counts against a real Vitest JSON report. |
+
+### Documentation added
+
+`docs/ARCHITECTURE.md`, `docs/USER-GUIDE.md`, `docs/DEVELOPMENT.md`, `docs/TESTING.md`,
+`docs/COLLABORATION.md`, `docs/FAQ.md`, this audit record, plus hand-authored SVG assets
+(`docs/assets/banner.svg`, `docs/assets/data-flow.svg`). All relative links and required files are
+checked in CI.
+
+### Verification for this pass
+
+| Check | Result |
+|---|---|
+| Strict TypeScript + production build | Passed (`tsc -b`, `vite build`) |
+| Unit/integration suite | **318 tests / 57 files passed** |
+| Wasm smoke test | Passed against the committed artifact |
+| WebSocket relay integration | **9 / 9 passed** |
+| Rust tests | Not run in this sandbox (no Rust toolchain); CI job added |
+| Documentation check | Passed (links, required files, tracked artifacts, counts) |
+| Browser suites | Not re-run in this pass (no Playwright CLI session in the sandbox) |
+
+The six tests added by the backup-restore fix (five parser/round-trip cases plus one IndexedDB
+restore integration case) are the only change to the suite size in this pass.

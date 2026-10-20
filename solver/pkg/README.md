@@ -1,4 +1,4 @@
-# Vector Studio Wasm Constraint Solver
+# Keyline Wasm constraint solver
 
 Stateless deterministic `f64` projection solver compiled with `wasm-pack`.
 
