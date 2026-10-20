@@ -1160,27 +1160,17 @@ function drawObjectSelection(
     context.strokeStyle = COLORS.selected;
     context.stroke();
 
-    const handles = frameHandlePoints(frame, scale);
-    const rotate = handles.find((item) => item.handle === 'rotate');
-    if (rotate) {
-      // The rotate control sits outside the box on a short stem so it never
-      // competes with the corner handles for the same pixel.
-      const stem = handles.find((item) => item.handle === 'n')?.point ?? frame.corners[0];
-      context.beginPath();
-      context.moveTo(stem.x, stem.y);
-      context.lineTo(rotate.point.x, rotate.point.y);
-      context.lineWidth = 1 / scale;
-      context.strokeStyle = COLORS.selected;
-      context.stroke();
-    }
-    for (const { handle, point } of handles) {
-      const radius = (handle === 'rotate' ? 4 : 3.5) / scale;
+    // Only the eight resize handles are drawn. Rotation has no handle of its own:
+    // hovering just outside a corner turns the cursor into a rotate arrow, the way
+    // Figma does it, and frameHitTarget owns that zone.
+    for (const { point } of frameHandlePoints(frame)) {
+      const radius = 3.5 / scale;
       context.beginPath();
       context.arc(point.x, point.y, radius, 0, Math.PI * 2);
-      context.fillStyle = handle === 'rotate' ? COLORS.selected : COLORS.inverse;
+      context.fillStyle = COLORS.inverse;
       context.fill();
       context.lineWidth = 1.5 / scale;
-      context.strokeStyle = handle === 'rotate' ? COLORS.inverse : COLORS.selected;
+      context.strokeStyle = COLORS.selected;
       context.stroke();
     }
   }

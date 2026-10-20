@@ -52,7 +52,7 @@ import { closestPointOnSegment, pointInPolygon, segmentCurve } from '../core/geo
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
 import {
   frameCenter,
-  frameHandlePoints,
+  frameHitTarget,
   prepareResizeObjects,
   prepareRotateObjects,
   resizeCursor,
@@ -120,6 +120,10 @@ interface VectorCanvasProps {
 
 type ArtboardResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 type ArtboardHit = { artboardId: EntityId; part: 'title' | 'border' | ArtboardResizeHandle };
+
+// Figma shows no rotate handle; the cursor is the affordance. Same trick as the
+// pen cursor: an inline SVG with URL-encoded colours, so no literal reaches CSS.
+const ROTATE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 16.5A7 7 0 1 1 16.5 17' fill='none' stroke='%231f2328' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M7 16.5A7 7 0 1 1 16.5 17' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M4.4 11.6 7.2 17l5.2-2.9' fill='white' stroke='%231f2328' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, crosshair`;
 
 const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='m4 21 4.4-1.1L20 8.3 15.7 4 4.1 15.6 4 21Z' fill='white' stroke='%231f2328' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='m13.8 6 4.2 4.2M5 19.8l4-4' fill='none' stroke='%231f2328' stroke-width='1.4'/%3E%3C/svg%3E") 4 21, crosshair`;
 
@@ -1086,7 +1090,6 @@ export function VectorCanvas({
             manager.document,
             selectionRef.current.objectIds,
             world,
-            8 / viewport.scale,
             viewport.scale,
           )
         : undefined;
@@ -2191,11 +2194,11 @@ export function VectorCanvas({
     const canvas = canvasRef.current;
     if (canvas && toolRef.current === 'select' && selectionRef.current.mode === 'object') {
       const objectHandle = selectedArtboardIdsRef.current.size === 0
-        ? hitTestObjectFrameHandle(manager.document, selectionRef.current.objectIds, world, 8 / viewportRef.current.scale, viewportRef.current.scale)
+        ? hitTestObjectFrameHandle(manager.document, selectionRef.current.objectIds, world, viewportRef.current.scale)
         : undefined;
       const artboardHit = hitTestArtboard(manager.document, world, viewportRef.current.scale, selectedArtboardIdsRef.current);
       canvas.style.cursor = objectHandle === 'rotate'
-        ? 'grab'
+        ? ROTATE_CURSOR
         : objectHandle
           ? resizeCursor(objectHandle)
         : artboardHit
@@ -2863,16 +2866,13 @@ function hitTestObjectFrameHandle(
   document: VectorDocument,
   objectIds: ReadonlySet<EntityId>,
   point: Point,
-  tolerance: number,
   scale: number,
 ): FrameHandle | undefined {
   // Locked objects show no handles: a grabbed handle that cannot move anything
   // would be a dead zone over the shape.
   const frame = selectionFrame(document, transformTargets(document, objectIds).map((target) => target.objectId));
   if (!frame) return undefined;
-  return frameHandlePoints(frame, scale)
-    .find((item) => Math.abs(point.x - item.point.x) <= tolerance && Math.abs(point.y - item.point.y) <= tolerance)
-    ?.handle;
+  return frameHitTarget(frame, point, { scale });
 }
 
 function hitTestArtboard(

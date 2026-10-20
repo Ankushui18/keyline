@@ -77,7 +77,7 @@ or where it would have to be added.
 | Arrow-key nudge, objects | yes, 1 px / `Shift` 10 px, one undo step | `App.tsx:1843`, `core/object-operations.ts:253` | **added in this pass** |
 | Arrow-key nudge, points | yes | `App.tsx:1871` | works |
 | Drag a corner to **resize** an object | yes — eight handles on a frame drawn on the object's own axes, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
-| Rotate handle | yes — stem handle above the frame, `Shift` snaps to 15° | `src/core/object-resize.ts` (`prepareRotateObjects`) | **shipped in this pass** |
+| Rotate | yes — hover just outside a corner for a rotate cursor, drag to turn, `Shift` snaps to 15° (no handle, as in Figma) | `frameHitTarget` / `prepareRotateObjects` in `src/core/object-resize.ts` | **shipped in this pass** |
 | Double-click a shape | enters point editing (also `Enter`) | `VectorCanvas.tsx:621` | works |
 | Double-click **enters a group** | **no** — clicks resolve to the leaf object; groups are selectable only in the Layers panel | `ui/LayersPanel.tsx:452`, isolation at `core/document.ts:317` | **missing** |
 | `Ctrl/⌘ G` / ungroup | only when a layer row has focus | `ui/LayersPanel.tsx:452-500` | partial |
@@ -128,9 +128,16 @@ renderer outline, move/resize on a group, layer-panel sync.
 ### 3.3 Rotation — done
 
 Rotation lived only in the transform (`types.ts:257`) and a number field
-(`PropertiesPanel.tsx:1508`). It is now a gesture: a round control on a stem above
-the frame, dragging turns the selection about the frame centre, and `Shift` snaps
-to 15°.
+(`PropertiesPanel.tsx:1508`). It is now a gesture with **no handle**: as in Figma,
+moving the pointer just outside a corner past the resize square turns it into a
+rotate arrow, and dragging turns the selection about the frame centre. `Shift`
+snaps to 15°.
+
+That choice is deliberate. A drawn rotate control has to live somewhere — it was
+tried above the top edge — and it either competes with the corner handles for
+space or drifts off small shapes. The hover zone costs no pixels, works at any
+zoom because it is measured in screen distance, and is the interaction designers
+already know.
 
 Snapping differs by selection on purpose. One object snaps its *absolute* rotation
 onto the grid, so "make this 45°" is reachable by dragging. A multi-selection snaps
@@ -170,7 +177,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 
 | Step | Work | Unlocks |
 |---|---|---|
-| 1 | ~~Object resize handles and the rotate control~~ (done) | the editor stops contradicting its own selection UI |
+| 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | Canvas group selection and one-level entry (3.2) | nested documents, real design files |
 | 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
 | 4 | Text and gradients (3.4) | typography and illustration, the two missing media |
@@ -186,9 +193,9 @@ quality gain, and it needs no new model concepts.
 Three changes, all small and all verified by the existing gates:
 
 - **Resize and rotate.** A quad frame on the object's own axes with eight resize
-  handles and a rotate stem; `Shift` keeps the ratio when resizing and snaps to 15°
-  when rotating; each gesture is one transaction. New module
-  `src/core/object-resize.ts` with 14 unit tests.
+  handles and a rotate zone just outside each corner; `Shift` keeps the ratio when
+  resizing and snaps to 15° when rotating; each gesture is one transaction. New
+  module `src/core/object-resize.ts` with 15 unit tests.
 - **Object nudge.** Arrow keys move the selection (1 px, `Shift` 10 px) as one
   undoable transaction, through the new `prepareNudgeObjects` plan in
   `src/core/object-operations.ts`. Previously arrows only worked in point editing.

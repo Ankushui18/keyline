@@ -28,8 +28,11 @@ import { objectTransformMatrix, rotationMatrix, transformPoint } from './transfo
 import type { OperationInput } from './operations';
 import type { EntityId, ObjectTransform, Point } from './types';
 
-/** World-space offset of the rotate control above the frame, at 100% zoom. */
-const ROTATE_HANDLE_OFFSET = 26;
+/** Pixels outside a corner where the pointer becomes a rotate control. */
+const ROTATE_ZONE = 16;
+
+/** Half-size of the square that grabs a resize handle, in pixels. */
+const HANDLE_TOLERANCE = 8;
 
 /** Smallest span a resize may collapse a selection to, in document units. */
 const MIN_SPAN = 0.5;
@@ -137,8 +140,8 @@ export function selectionFrame(document: VectorDocument, objectIds: Iterable<Ent
  * Handle positions in world space, shared by the renderer and hit testing, so a
  * handle is always drawn exactly where it can be grabbed.
  */
-export function frameHandlePoints(frame: SelectionFrame, scale = 1): Array<{ handle: FrameHandle; point: Point }> {
-  const handles: Array<{ handle: FrameHandle; point: Point }> = [
+export function frameHandlePoints(frame: SelectionFrame): Array<{ handle: ResizeHandle; point: Point }> {
+  return [
     { handle: 'nw', point: framePoint(frame, 0, 0) },
     { handle: 'n', point: framePoint(frame, 0.5, 0) },
     { handle: 'ne', point: framePoint(frame, 1, 0) },
@@ -148,10 +151,42 @@ export function frameHandlePoints(frame: SelectionFrame, scale = 1): Array<{ han
     { handle: 'sw', point: framePoint(frame, 0, 1) },
     { handle: 'w', point: framePoint(frame, 0, 0.5) },
   ];
-  const edge = Math.hypot(frame.corners[3].x - frame.corners[0].x, frame.corners[3].y - frame.corners[0].y);
-  const vUnits = edge > 1e-6 ? ROTATE_HANDLE_OFFSET / Math.max(scale, 1e-9) / edge : 0.2;
-  handles.push({ handle: 'rotate', point: framePoint(frame, 0.5, -vUnits) });
-  return handles;
+}
+
+export interface FrameHitOptions {
+  /** Canvas zoom, so tolerances stay the same size on screen at any magnification. */
+  scale?: number;
+  handleTolerance?: number;
+  rotateZone?: number;
+}
+
+/**
+ * What the pointer is over: one of the eight resize handles, the rotate zone just
+ * outside a corner, or nothing.
+ *
+ * There is no drawn rotate handle. Like Figma, the control is invisible until the
+ * pointer leaves the box diagonally past a corner, where the cursor becomes a
+ * rotate arrow. Handle squares win over the band, so grabbing a corner still
+ * resizes rather than spinning the selection.
+ */
+export function frameHitTarget(frame: SelectionFrame, point: Point, options: FrameHitOptions = {}): FrameHandle | undefined {
+  const scale = Math.max(options.scale ?? 1, 1e-9);
+  const handleTolerance = (options.handleTolerance ?? HANDLE_TOLERANCE) / scale;
+  for (const { handle, point: handlePoint } of frameHandlePoints(frame)) {
+    if (Math.abs(point.x - handlePoint.x) <= handleTolerance && Math.abs(point.y - handlePoint.y) <= handleTolerance) {
+      return handle;
+    }
+  }
+  const { u, v } = projectToFrame(frame, point);
+  if (u >= 0 && u <= 1 && v >= 0 && v <= 1) return undefined;
+  const width = Math.hypot(frame.corners[1].x - frame.corners[0].x, frame.corners[1].y - frame.corners[0].y);
+  const height = Math.hypot(frame.corners[3].x - frame.corners[0].x, frame.corners[3].y - frame.corners[0].y);
+  const zone = (options.rotateZone ?? ROTATE_ZONE) / scale;
+  for (const [cornerU, cornerV] of [[0, 0], [1, 0], [1, 1], [0, 1]] as const) {
+    const distance = Math.hypot((u - cornerU) * width, (v - cornerV) * height);
+    if (distance <= zone) return 'rotate';
+  }
+  return undefined;
 }
 
 /** One object's starting state, captured when a gesture begins. */

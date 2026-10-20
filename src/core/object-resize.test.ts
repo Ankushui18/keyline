@@ -5,6 +5,7 @@ import type { GeometryBounds } from './object-geometry';
 import {
   frameCenter,
   frameHandlePoints,
+  frameHitTarget,
   framePoint,
   prepareResizeObjects,
   prepareRotateObjects,
@@ -87,11 +88,24 @@ describe('selection frame', () => {
     expect(framePoint(frame, 0, 0)).toEqual({ x: 0, y: 0 });
     expect(framePoint(frame, 1, 0.5)).toEqual({ x: 100, y: 25 });
     expect(frameCenter(frame)).toEqual({ x: 50, y: 25 });
-    const handles = frameHandlePoints(frame, 1);
-    expect(handles.map((item) => item.handle)).toEqual(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'rotate']);
+    const handles = frameHandlePoints(frame);
+    expect(handles.map((item) => item.handle)).toEqual(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']);
     expect(handles.find((item) => item.handle === 'e')?.point).toEqual({ x: 100, y: 25 });
-    // The rotate control sits outside the box, above the top edge.
-    expect(handles.find((item) => item.handle === 'rotate')!.point.y).toBeLessThan(0);
+  });
+
+  it('turns the corner zone outside the box into a rotate target', () => {
+    const { frame } = setup();
+    // On a handle: resize wins.
+    expect(frameHitTarget(frame, { x: 100, y: 0 }, { scale: 1 })).toBe('ne');
+    // Just outside the corner, past the handle square: rotate, like Figma.
+    expect(frameHitTarget(frame, { x: 110, y: -10 }, { scale: 1 })).toBe('rotate');
+    // Inside the box: nothing, so dragging still moves the object.
+    expect(frameHitTarget(frame, { x: 90, y: 10 }, { scale: 1 })).toBeUndefined();
+    // Outside, but past the zone: nothing.
+    expect(frameHitTarget(frame, { x: 160, y: -60 }, { scale: 1 })).toBeUndefined();
+    // The zone is screen sized, so it shrinks in world units when zoomed in.
+    expect(frameHitTarget(frame, { x: 110, y: -10 }, { scale: 4 })).toBeUndefined();
+    expect(frameHitTarget(frame, { x: 103, y: -2 }, { scale: 4 })).toBe('rotate');
   });
 
   it('follows a single object’s own axes and records its rotation', () => {
