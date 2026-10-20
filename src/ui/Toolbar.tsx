@@ -2,6 +2,7 @@ import { contrastTextColor } from './contrast-color';
 import { useEffect, useRef, useState } from 'react';
 import { RedoIcon } from '@primer/octicons-react/RedoIcon';
 import { UndoIcon } from '@primer/octicons-react/UndoIcon';
+import { BrandMark } from '../design-system/BrandMark';
 
 interface ToolbarProps {
   canUndo: boolean;
@@ -102,12 +103,7 @@ export function Toolbar({
     <header className="topbar">
       <div className="topbar-left">
         <button type="button" className="topbar-brand" aria-label="Back to all files" title="All files" onClick={onHome}>
-          <svg viewBox="0 0 64 64" role="img" aria-hidden="true">
-            <rect width="64" height="64" rx="14" fill="#26272b" />
-            <rect x="14" y="14" width="36" height="36" fill="none" stroke="#ececee" strokeWidth="3.5" />
-            <circle cx="32" cy="32" r="18" fill="none" stroke="#ececee" strokeWidth="3.5" />
-            <rect x="44" y="8" width="12" height="12" fill="#0d99ff" />
-          </svg>
+          <BrandMark size={28} />
           <strong>Keyline</strong>
         </button>
         <span className="topbar-divider" aria-hidden="true" />

@@ -14,6 +14,9 @@ import {
 } from '../core/transforms';
 import type { EntityId, Point, Region, Segment } from '../core/types';
 import { sampleWidthProfile } from '../tools/width-tool';
+import {
+  DEFAULT_STROKE_COLOR,
+} from '../design-system/document-defaults';
 
 export type ExportBoundsMode = 'artboard' | 'artwork';
 
@@ -52,7 +55,7 @@ export function exportDocumentToSvg(document: VectorDocument, options: SvgExport
   const padding = options.padding ?? 8;
   const boundsMode = options.exportBoundsMode ?? 'artboard';
   const includeMetadata = options.includeMetadata ?? false;
-  const strokeColor = options.strokeColor ?? '#c8ced9';
+  const strokeColor = options.strokeColor ?? DEFAULT_STROKE_COLOR;
   const strokeWidth = options.strokeWidth ?? 1.25;
   const artboard = options.artboardId
     ? document.getArtboard(options.artboardId)

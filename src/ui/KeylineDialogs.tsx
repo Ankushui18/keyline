@@ -8,6 +8,7 @@ import { applyTidy, type TidyAnalysis, type TidyRuleId } from '../import/tidy';
 import type { SvgImportResult } from '../import/svg-import';
 import { MODIFIER_LABEL } from './Toolbar';
 import { useModalFocus } from './use-modal-focus';
+import { palette } from '../design-system/tokens';
 
 interface CommonDialogProps { onClose: () => void }
 
@@ -77,7 +78,7 @@ export function ShareDialog({
       <section className="kd-dialog kd-share" role="dialog" aria-modal="true" aria-labelledby="share-title">
         <header><h2 id="share-title">Share “{documentName}”</h2><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
         <div className="kd-people" aria-label="People in this drawing">
-          <div><span className="kd-avatar" style={{ background: '#0868b6' }}>YO</span><span><strong>You</strong><small>This device</small></span><em>Can edit</em></div>
+          <div><span className="kd-avatar" style={{ background: palette.blue700 }}>YO</span><span><strong>You</strong><small>This device</small></span><em>Can edit</em></div>
           {people.filter((person) => !/\(you\)$/i.test(person.name)).map((person) => (
             <div key={person.id}><span className="kd-avatar" style={{ background: person.color, color: contrastTextColor(person.color) }}>{initials(person.name)}</span><span><strong>{person.name}</strong><small className="is-good">{person.detail}</small></span><em>Can edit</em></div>
           ))}

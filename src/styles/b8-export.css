@@ -1,11 +1,11 @@
 /* Phase 4 Gate B8 — explicit export exclusion feedback. */
 .export-construction-notice {
   border: 1px dashed var(--borderColor-muted);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  line-height: 1.4;
-  margin: 0 0 2px;
-  padding: 7px 8px;
+  line-height: var(--line-height-normal);
+  margin: 0 0 var(--space-05);
+  padding: var(--space-15) var(--space-2);
 }

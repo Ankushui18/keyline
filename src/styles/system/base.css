@@ -1,0 +1,152 @@
+/* ============================================================================
+   Keyline design system — base
+   ----------------------------------------------------------------------------
+   Element defaults, typography, focus behaviour, scrollbars and the shared
+   reduced-motion escape hatch. Loaded once, before feature stylesheets, which
+   may refine but must not restate these values.
+   ========================================================================= */
+
+/* Geist is bundled locally, so the app never requests a web font. */
+@font-face {
+  font-family: 'Geist';
+  src: url('../../assets/geist.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('../../assets/geist-mono.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  background: var(--surface-canvas);
+  -webkit-font-smoothing: antialiased;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  /* Windows-class chrome only needs a minimum, not a hard desktop lock. */
+  min-width: 760px;
+}
+
+body {
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font: var(--font-weight-regular) var(--font-size-md) / var(--line-height-normal) var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  font-family: var(--font-sans);
+}
+
+button { color: inherit; cursor: pointer; }
+
+h1, h2, h3, h4, h5, h6 { margin: 0; letter-spacing: var(--letter-spacing-tight); }
+
+a { color: var(--text-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Numbers line up in every numeric surface; the second font is never needed. */
+input,
+kbd,
+code,
+output,
+samp,
+pre,
+[class*='number'],
+[class*='numeric'] { font-variant-numeric: tabular-nums; }
+
+code,
+kbd,
+samp,
+pre { font-family: var(--font-mono); }
+
+/* Focus is a system concern: one ring, one offset, always visible. */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Text fields draw focus on the field edge instead of a detached ring. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 0;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+::selection { background: var(--selection-wash); color: var(--text-primary); }
+
+::placeholder { color: var(--text-subtle); }
+
+/* Scrollbars follow the palette instead of the operating system default. */
+* { scrollbar-color: var(--graphite-600) transparent; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--graphite-600);
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--graphite-550); background-clip: content-box; }
+
+/* Keep the escape hatch structural: motion is a token, not a per-component choice. */
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* The app shell: one grid, one set of row heights from the layout tokens. */
+.app-shell {
+  display: grid;
+  grid-template-rows: var(--layout-topbar) minmax(0, 1fr) auto var(--layout-statusbar);
+  height: 100%;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

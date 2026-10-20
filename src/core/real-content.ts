@@ -1,5 +1,10 @@
 import type { VectorDocument } from './document';
 import type { Artboard, NetworkObject } from './types';
+import {
+  DEFAULT_ARTBOARD_BACKGROUND,
+  DEFAULT_STROKE_COLOR,
+  DEFAULT_STROKE_WIDTH,
+} from '../design-system/document-defaults';
 
 /** An object with no points is the empty placeholder a new frame starts with, not something the person drew. */
 export function isDrawnObject(document: VectorDocument, object: NetworkObject): boolean {
@@ -19,7 +24,7 @@ export function realArtboards(document: VectorDocument): Artboard[] {
 /** Recognize the untouched, automatically migrated starter, never merely an empty or similarly named frame. */
 export function isUnusedStarterArtboard(document: VectorDocument, artboard: Artboard): boolean {
   if (artboard.id !== `${document.id}:artboard:1` || artboard.name !== 'Artboard 1' ||
-    artboard.isCanvasRoot || artboard.clipContent || artboard.background !== '#ffffff' ||
+    artboard.isCanvasRoot || artboard.clipContent || artboard.background !== DEFAULT_ARTBOARD_BACKGROUND ||
     artboard.frame.x !== -512 || artboard.frame.y !== -384 ||
     artboard.frame.width !== 1024 || artboard.frame.height !== 768) return false;
   const objects = document.objectsForArtboard(artboard.id);
@@ -36,7 +41,7 @@ export function isUnusedStarterArtboard(document: VectorDocument, artboard: Artb
     object.transform.x === 0 && object.transform.y === 0 && object.transform.rotation === 0 &&
     object.transform.scaleX === 1 && object.transform.scaleY === 1 &&
     appearance?.fills.length === 0 && appearance.opacity === 1 &&
-    appearance.stroke?.color === '#c8ced9' && appearance.stroke.width === 1.25 &&
+    appearance.stroke?.color === DEFAULT_STROKE_COLOR && appearance.stroke.width === DEFAULT_STROKE_WIDTH &&
     appearance.stroke.visible && appearance.stroke.opacity === 1 && appearance.stroke.dash.length === 0 &&
     appearance.stroke.cap === 'round' && appearance.stroke.join === 'round' && appearance.stroke.alignment === 'center' &&
     layer?.id === `${network.id}:object-layer` && layer.name === 'Vector Network 1' &&

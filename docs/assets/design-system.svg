@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="520" viewBox="0 0 1000 520" role="img" aria-labelledby="dsTitle dsDesc">
+  <title id="dsTitle">Keyline design system: one token source, two runtimes, one gate</title>
+  <desc id="dsDesc">tokens.css is the single source of truth. Tokens are mirrored into tokens.ts for the canvas and WebGL renderers, composed into base and component stylesheets for the DOM, and checked by npm run check:design, which fails the build on drift.</desc>
+
+  <rect width="1000" height="520" fill="#17181a"/>
+  <text x="40" y="46" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="17" font-weight="600">One palette, three consumers, one gate</text>
+  <text x="40" y="70" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="12">src/styles/system/tokens.css is the only file allowed to name a colour.</text>
+
+  <!-- source of truth -->
+  <rect x="40" y="100" width="280" height="120" rx="10" fill="#1f2023" stroke="#0d99ff" stroke-width="1.5"/>
+  <text x="60" y="128" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="13" font-weight="600">tokens.css</text>
+  <text x="60" y="150" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">253 tokens · palette, semantic</text>
+  <text x="60" y="168" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">roles, scales, layout metrics</text>
+  <text x="60" y="196" fill="#74a0ff" font-family="Geist Mono, ui-monospace, monospace" font-size="10">--accent: #0d99ff;</text>
+
+  <!-- consumers -->
+  <rect x="380" y="96" width="250" height="76" rx="10" fill="#1f2023" stroke="#2e3036"/>
+  <text x="398" y="122" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">DOM</text>
+  <text x="398" y="142" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">base.css · components/ui.css</text>
+  <text x="398" y="158" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">24 feature stylesheets</text>
+
+  <rect x="380" y="184" width="250" height="76" rx="10" fill="#1f2023" stroke="#2e3036"/>
+  <text x="398" y="210" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">tokens.ts</text>
+  <text x="398" y="230" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">61 resolved values mirrored</text>
+  <text x="398" y="246" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">for Canvas 2D and WebGL2</text>
+
+  <rect x="380" y="272" width="250" height="76" rx="10" fill="#1f2023" stroke="#2e3036"/>
+  <text x="398" y="298" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">document-defaults.ts</text>
+  <text x="398" y="318" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">ink and paper written into</text>
+  <text x="398" y="334" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">documents, not into chrome</text>
+
+  <!-- gate -->
+  <rect x="700" y="96" width="260" height="284" rx="10" fill="#12233a" stroke="#0868b6"/>
+  <text x="720" y="124" fill="#dce9ff" font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">npm run check:design</text>
+  <text x="720" y="150" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">1 token integrity</text>
+  <text x="720" y="170" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">2 palette parity (CSS ↔ TS)</text>
+  <text x="720" y="190" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">3 literal-colour ratchet</text>
+  <text x="720" y="210" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">4 no :root redefinitions</text>
+  <text x="720" y="230" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">5 WCAG contrast pairs</text>
+  <text x="720" y="248" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">6 no dangling var(--x)</text>
+  <text x="720" y="266" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">7 chrome is not canvas</text>
+  <text x="720" y="284" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">8–10 type, radius, layering</text>
+  <text x="720" y="308" fill="#7fd1a0" font-family="Geist, system-ui, sans-serif" font-size="11">fails the build on drift</text>
+  <text x="720" y="342" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">runs first in CI and in</text>
+  <text x="720" y="342" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">npm run check</text>
+  <text x="720" y="360" fill="#8a8d95" font-family="Geist Mono, ui-monospace, monospace" font-size="10">37 legacy literals ratcheted</text>
+
+  <!-- arrows -->
+  <g stroke="#3a3d44" stroke-width="1.5" fill="none">
+    <path d="M320 140 C 350 140, 350 134, 378 134"/>
+    <path d="M320 160 C 348 160, 350 222, 378 222"/>
+    <path d="M320 180 C 348 180, 350 310, 378 310"/>
+    <path d="M630 134 C 664 134, 668 200, 698 200"/>
+    <path d="M630 222 C 664 222, 668 220, 698 220"/>
+    <path d="M630 310 C 664 310, 668 280, 698 280"/>
+  </g>
+  <g fill="#3a3d44">
+    <path d="M372 134 l-8 -4 v8 z"/>
+    <path d="M372 222 l-8 -4 v8 z"/>
+    <path d="M372 310 l-8 -4 v8 z"/>
+    <path d="M692 200 l-8 -4 v8 z"/>
+    <path d="M692 220 l-8 -4 v8 z"/>
+    <path d="M692 280 l-8 -4 v8 z"/>
+  </g>
+
+  <!-- migration strip -->
+  <rect x="40" y="392" width="920" height="88" rx="10" fill="#1f2023" stroke="#2e3036"/>
+  <text x="60" y="418" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">The migration that got here</text>
+  <text x="60" y="440" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">2,064 literal colours → 37, and 20 font sizes → 12, 15 radii → 8, 36 z-index values → tiers. Each codemod prints every change.</text>
+  <text x="60" y="460" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">A hex moves only when a role-compatible token is within ΔE 6; type, radius and layering snap to the nearest scale step.</text>
+</svg>

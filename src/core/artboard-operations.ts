@@ -13,6 +13,12 @@ import type {
   Segment,
   VectorNode,
 } from './types';
+import {
+  DEFAULT_ARTBOARD_BACKGROUND,
+  DEFAULT_STROKE_COLOR,
+  DEFAULT_STROKE_WIDTH,
+  STARTER_ARTBOARD_BACKGROUND,
+} from '../design-system/document-defaults';
 
 const ARTBOARD_GAP = 40;
 
@@ -62,14 +68,14 @@ export function prepareCreateIconArtboard(
     name: nextIconName(document, width, height),
     frame,
     layerIds: [],
-    background: '#ffffff',
+    background: DEFAULT_ARTBOARD_BACKGROUND,
     clipContent: false,
   };
   const appearance: Appearance = {
     id: appearanceId,
     fills: [],
     stroke: {
-      color: '#c8ced9', width: 1.25, cap: 'round', join: 'round', alignment: 'center',
+      color: DEFAULT_STROKE_COLOR, width: DEFAULT_STROKE_WIDTH, cap: 'round', join: 'round', alignment: 'center',
       opacity: 1, dash: [], visible: true,
     },
     opacity: 1,
@@ -341,7 +347,7 @@ export function prepareArtboardPlacement(document: VectorDocument, point: { x: n
     name: 'Canvas',
     frame: { x: 0, y: 0, width: 1, height: 1 },
     layerIds: [],
-    background: '#e5e5e5',
+    background: STARTER_ARTBOARD_BACKGROUND,
     clipContent: false,
     isCanvasRoot: true,
   };
@@ -378,7 +384,7 @@ export function deleteArtboardsTransactional(
         name: 'Canvas',
         frame: { x: 0, y: 0, width: 1, height: 1 },
         layerIds: [],
-        background: '#e5e5e5',
+        background: STARTER_ARTBOARD_BACKGROUND,
         clipContent: false,
         isCanvasRoot: true,
       };

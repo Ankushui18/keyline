@@ -27,6 +27,11 @@ import type {
   VectorNode,
   VectorPath,
 } from './types';
+import {
+  DEFAULT_ARTBOARD_BACKGROUND,
+  DEFAULT_FILL_COLOR,
+  DEFAULT_STROKE_COLOR,
+} from '../design-system/document-defaults';
 
 /** Rejects malformed segment states before they can enter the authoritative graph. */
 export function validateSegmentGeometry(segment: Segment): void {
@@ -1105,7 +1110,7 @@ function cloneRegion(region: Region): Region {
     // The pre-Gate-C union advertised gradients without a gradient model. Migrate
     // any such stored record deterministically to the implemented solid color.
     fill: region.fill
-      ? { type: 'solid', color: typeof region.fill.color === 'string' ? region.fill.color : '#8b6cf6' }
+      ? { type: 'solid', color: typeof region.fill.color === 'string' ? region.fill.color : DEFAULT_FILL_COLOR }
       : undefined,
   };
 }
@@ -1333,7 +1338,7 @@ function createMigratedStructure(documentId: EntityId, networks: VectorNetwork[]
       id: appearanceId,
       fills: [],
       stroke: {
-        color: '#c8ced9',
+        color: DEFAULT_STROKE_COLOR,
         width: 1.25,
         cap: 'round',
         join: 'round',
@@ -1381,7 +1386,7 @@ function createMigratedStructure(documentId: EntityId, networks: VectorNetwork[]
     name: 'Artboard 1',
     frame: { x: -512, y: -384, width: 1024, height: 768 },
     layerIds: [rootLayerId],
-    background: '#ffffff',
+    background: DEFAULT_ARTBOARD_BACKGROUND,
     clipContent: false,
   }]]);
   return {

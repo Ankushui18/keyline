@@ -8,6 +8,9 @@ import type {
   VectorNode,
   VectorPath,
 } from '../core/types';
+import {
+  DEFAULT_IMPORT_INK,
+} from '../design-system/document-defaults';
 
 type Matrix = [number, number, number, number, number, number];
 interface TempNode { position: Point; handleIn?: Point; handleOut?: Point }
@@ -39,7 +42,7 @@ export interface SvgImportResult {
 
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
 const DEFAULT_STYLE: SvgStyle = {
-  fill: '#000000', stroke: 'none', color: '#000000', strokeWidth: 1,
+  fill: DEFAULT_IMPORT_INK, stroke: 'none', color: DEFAULT_IMPORT_INK, strokeWidth: 1,
   strokeLinecap: 'butt', strokeLinejoin: 'miter', strokeDasharray: [],
   fillOpacity: 1, strokeOpacity: 1, opacity: 1, display: 'inline', visibility: 'visible',
 };
@@ -147,7 +150,7 @@ function clipboardObject(name: string, paths: ParsedSubpath[], style: SvgStyle, 
     id: appearanceId,
     fills: fill && hasClosedPath ? [{ type: 'solid', color: fill, opacity: clamp01(style.fillOpacity), visible: true }] : [],
     stroke: {
-      color: stroke ?? '#000000', width: Math.max(0, style.strokeWidth * strokeScale),
+      color: stroke ?? DEFAULT_IMPORT_INK, width: Math.max(0, style.strokeWidth * strokeScale),
       cap: style.strokeLinecap, join: style.strokeLinejoin, alignment: 'center',
       opacity: clamp01(style.strokeOpacity), dash: style.strokeDasharray.map((value) => value * strokeScale),
       visible: Boolean(stroke) && style.strokeWidth > 0,

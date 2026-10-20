@@ -4,6 +4,9 @@ import { DEFAULT_DRAWING_STYLE, appearanceFromDrawingStyle } from '../core/drawi
 import { createEntityId } from '../core/ids';
 import type { OperationInput } from '../core/operations';
 import type { Appearance, DrawingStyle, EntityId, LayerNode, NetworkObject, Point, Segment, VectorNode, VectorPath } from '../core/types';
+import {
+  DEFAULT_FILL_COLOR,
+} from '../design-system/document-defaults';
 
 export type PrimitiveKind = 'rectangle' | 'rounded-rectangle' | 'ellipse' | 'polygon' | 'star' | 'line' | 'arc';
 
@@ -37,7 +40,7 @@ export function preparePrimitiveObject(
     ? { ...appearanceFromDrawingStyle(appearanceId, options.style), fills: geometry.isClosed ? appearanceFromDrawingStyle(appearanceId, options.style).fills : [] }
     : {
         id: appearanceId,
-        fills: geometry.isClosed ? [{ type: 'solid', color: '#8b6cf6', opacity: 0.18, visible: true }] : [],
+        fills: geometry.isClosed ? [{ type: 'solid', color: DEFAULT_FILL_COLOR, opacity: 0.18, visible: true }] : [],
         stroke: {
           color: DEFAULT_DRAWING_STYLE.strokeColor,
           width: DEFAULT_DRAWING_STYLE.strokeWidth,

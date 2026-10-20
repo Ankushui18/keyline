@@ -83,6 +83,8 @@ const required = [
   'docs/COLLABORATION.md',
   'docs/FAQ.md',
   'docs/AUDIT.md',
+  'docs/DESIGN-SYSTEM.md',
+  'docs/assets/design-system.svg',
   'docs/assets/banner.svg',
   'docs/assets/data-flow.svg',
   'server/collaboration-server.mjs',

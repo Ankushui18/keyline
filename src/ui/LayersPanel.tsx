@@ -8,6 +8,9 @@ import type { OperationManager } from '../core/operations';
 import { realArtboards } from '../core/real-content';
 import { objectConstructionComposition } from '../core/segment-semantics';
 import type { EntityId, LayerNode } from '../core/types';
+import {
+  DEFAULT_ARTBOARD_BACKGROUND,
+} from '../design-system/document-defaults';
 
 interface LayersPanelProps {
   document: VectorDocument;
@@ -221,7 +224,7 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
         width: baseFrame.width,
         height: baseFrame.height,
       },
-      background: reference?.background ?? '#ffffff',
+      background: reference?.background ?? DEFAULT_ARTBOARD_BACKGROUND,
       clipContent: reference?.clipContent ?? false,
       layerIds: [],
     };

@@ -1,3 +1,4 @@
+import { canvasColors, editorColors } from '../design-system/tokens';
 import {
   constructionLineGeometry,
   constructionStrokePlan,
@@ -123,7 +124,7 @@ export function renderWebGLScene(canvas: HTMLCanvasElement, options: WebGLRender
     const object = item.objectId ? options.document.getObject(item.objectId) : undefined;
     const appearance = object ? options.document.getAppearance(object.appearanceId) : undefined;
     const stroke = appearance?.stroke;
-    const lineColor = stroke?.color ?? '#6d737d';
+    const lineColor = stroke?.color ?? editorColors.segment;
     const opacity = (appearance?.opacity ?? 1) * (stroke?.opacity ?? 0.88);
     const artworkVisible = !appearance || Boolean(stroke?.visible && opacity > 0);
     if (!artworkVisible && !selected) continue;
@@ -143,7 +144,7 @@ export function renderWebGLScene(canvas: HTMLCanvasElement, options: WebGLRender
         appendStrokeTriangles(
           triangles,
           item,
-          '#0d99ff',
+          editorColors.selection,
           1,
           selectionWidth,
           'round',
@@ -185,7 +186,7 @@ export function renderWebGLScene(canvas: HTMLCanvasElement, options: WebGLRender
         appendStrokeTriangles(
           triangles,
           item,
-          '#0d99ff',
+          editorColors.selection,
           1,
           selectionWidth,
           stroke?.cap ?? 'round',
@@ -388,7 +389,7 @@ function drawNodes(state: GLState, nodeIds: EntityId[], options: WebGLRenderOpti
       ? transformPoint(node.position, objectTransformMatrix(object.transform))
       : node.position;
     const selected = options.selection.nodeIds.has(nodeId);
-    const [r, g, b] = rgb('#ffffff');
+    const [r, g, b] = rgb(editorColors.node);
     instances.push(position.x, position.y, r, g, b, 1, selected ? 3.5 : 3);
   }
   gl.useProgram(nodeProgram);
@@ -434,10 +435,10 @@ function appendGrid(output: number[], view: Bounds, scale: number): void {
   const firstX = Math.floor(view.minX);
   const firstY = Math.floor(view.minY);
   for (let x = firstX; x <= view.maxX; x += 1) {
-    appendLine(output, { x, y: view.minY }, { x, y: view.maxY }, x % 10 === 0 ? '#c9c9c9' : '#d9d9d9', 1);
+    appendLine(output, { x, y: view.minY }, { x, y: view.maxY }, x % 10 === 0 ? canvasColors.gridMajor : canvasColors.gridMinor, 1);
   }
   for (let y = firstY; y <= view.maxY; y += 1) {
-    appendLine(output, { x: view.minX, y }, { x: view.maxX, y }, y % 10 === 0 ? '#c9c9c9' : '#d9d9d9', 1);
+    appendLine(output, { x: view.minX, y }, { x: view.maxX, y }, y % 10 === 0 ? canvasColors.gridMajor : canvasColors.gridMinor, 1);
   }
 }
 
@@ -456,7 +457,7 @@ function appendArtboards(triangles: number[], lines: number[], document: VectorD
     for (const point of [points[0], points[1], points[2], points[0], points[2], points[3]]) {
       appendVertex(triangles, point, artboard.background, 1);
     }
-    const border = active ? '#777d86' : '#a5aab2';
+    const border = active ? editorColors.artboardBorder : editorColors.artboardBorderIdle;
     for (let index = 0; index < points.length; index += 1) {
       appendLine(lines, points[index], points[(index + 1) % points.length], border, 1);
     }
@@ -547,7 +548,7 @@ export function webGLStrokeVertexData(
   scale = 1,
 ): number[] {
   const output: number[] = [];
-  appendStrokeTriangles(output, item, '#ffffff', 1, width, cap, dash, scale);
+  appendStrokeTriangles(output, item, editorColors.node, 1, width, cap, dash, scale);
   return output;
 }
 

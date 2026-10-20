@@ -34,6 +34,12 @@ jobs:
       - name: Strict TypeScript
         run: npm run typecheck
 
+      - name: Design-system gate (tokens, parity, literal ratchet, contrast)
+        run: npm run check:design
+
+      - name: Design consistency report
+        run: npm run audit:design
+
       - name: Production build
         run: npm run build
 

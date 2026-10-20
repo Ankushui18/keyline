@@ -1,147 +1,147 @@
 .paint-color-field {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 8px 0;
+  gap: var(--space-25);
+  margin: var(--space-2) 0;
 }
 .paint-color-field input[type='color'] {
   width: 42px;
   height: 30px;
-  border: 1px solid #3a4150;
-  border-radius: 6px;
-  background: #1a1e25;
-  padding: 2px;
+  border: 1px solid var(--graphite-650);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+  padding: var(--space-05);
 }
 .paint-color-field code {
-  color: #c7d3ec;
-  font-size: 12px;
+  color: var(--tint-info-ink-strong);
+  font-size: var(--font-size-md);
 }
 .offset-distance-field {
   display: grid;
   grid-template-columns: 1fr 72px auto;
   align-items: center;
-  gap: 7px;
-  margin: 8px 0;
-  color: #99a5b9;
-  font-size: 11px;
+  gap: var(--space-15);
+  margin: var(--space-2) 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
 }
 .offset-distance-field input {
   width: 100%;
-  border: 1px solid #3a4354;
-  border-radius: 5px;
-  background: #191e27;
-  color: #d5ddec;
-  padding: 5px 6px;
+  border: 1px solid var(--graphite-650);
+  border-radius: var(--radius-sm);
+  background: var(--border-subtle);
+  color: var(--graphite-300);
+  padding: var(--space-1) var(--space-15);
 }
 .parametric-button-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin: 8px 0;
+  gap: var(--space-15);
+  margin: var(--space-2) 0;
 }
 .parametric-button-grid button {
-  border: 1px solid #3a4354;
-  border-radius: 6px;
-  background: #202632;
-  color: #cbd5e8;
-  padding: 7px 6px;
+  border: 1px solid var(--graphite-650);
+  border-radius: var(--radius-md);
+  background: var(--graphite-775);
+  color: var(--tint-info-ink-strong);
+  padding: var(--space-15) var(--space-15);
   font: 600 11px inherit;
   cursor: pointer;
 }
 .parametric-button-grid button:hover {
-  border-color: #668fe8;
-  background: #273248;
+  border-color: var(--blue-300);
+  background: var(--surface-selected);
 }
 .parametric-group-row {
   display: grid;
   grid-template-columns: 1fr auto 22px;
   align-items: center;
-  gap: 6px;
-  margin-top: 5px;
-  color: #aeb9cc;
-  font-size: 11px;
+  gap: var(--space-15);
+  margin-top: var(--space-1);
+  color: var(--graphite-350);
+  font-size: var(--font-size-sm);
 }
-.parametric-group-row code { color: #6f7c91; font-size: 9px; }
-.repeat-count-field { display: flex; align-items: center; gap: 5px; }
+.parametric-group-row code { color: var(--slate-600); font-size: var(--font-size-2xs); }
+.repeat-count-field { display: flex; align-items: center; gap: var(--space-1); }
 .repeat-count-field input {
   width: 44px;
-  border: 1px solid #3a4354;
-  border-radius: 4px;
-  background: #191e27;
-  color: #d5ddec;
-  padding: 3px 4px;
+  border: 1px solid var(--graphite-650);
+  border-radius: var(--radius-sm);
+  background: var(--border-subtle);
+  color: var(--graphite-300);
+  padding: var(--space-05) var(--space-1);
 }
 .parametric-group-row button {
   border: 0;
   background: transparent;
-  color: #8390a5;
+  color: var(--slate-500);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--font-size-2xl);
 }
-.parametric-group-row button:hover { color: #ef7c83; }
+.parametric-group-row button:hover { color: var(--text-danger); }
 .parametric-group-editor {
-  margin-top: 8px;
-  padding: 8px;
-  border: 1px solid #303640;
-  border-radius: 7px;
-  background: #171a1f;
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--graphite-950);
 }
-.parametric-group-editor .parametric-group-row { margin: 0 0 7px; }
-.parametric-group-editor .numeric-field-grid { margin-top: 7px; }
+.parametric-group-editor .parametric-group-row { margin: 0 0 var(--space-15); }
+.parametric-group-editor .numeric-field-grid { margin-top: var(--space-15); }
 .parametric-source-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 7px;
-  margin-bottom: 7px;
-  color: #8b949e;
-  font-size: 10px;
+  gap: var(--space-15);
+  margin-bottom: var(--space-15);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
 }
 .parametric-source-row button {
-  border: 1px solid #3b424c;
-  border-radius: 5px;
-  background: #20242b;
-  color: #c9d1d9;
-  padding: 4px 6px;
+  border: 1px solid var(--graphite-650);
+  border-radius: var(--radius-sm);
+  background: var(--border-subtle);
+  color: var(--graphite-300);
+  padding: var(--space-1) var(--space-15);
   font: 600 10px inherit;
   cursor: pointer;
 }
-.parametric-source-row button:hover { background: #292e36; border-color: #57606a; }
+.parametric-source-row button:hover { background: var(--border-default); border-color: var(--text-disabled); }
 .parametric-reference-field {
   display: grid;
-  gap: 4px;
-  margin: 6px 0;
-  color: #8b949e;
-  font-size: 10px;
+  gap: var(--space-1);
+  margin: var(--space-15) 0;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
   font-weight: 600;
   letter-spacing: .02em;
 }
 .parametric-reference-field select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #3b424c;
-  border-radius: 5px;
-  background: #20242b;
-  color: #d0d7de;
-  padding: 6px 7px;
+  border: 1px solid var(--graphite-650);
+  border-radius: var(--radius-sm);
+  background: var(--border-subtle);
+  color: var(--graphite-300);
+  padding: var(--space-15) var(--space-15);
   font: 11px inherit;
 }
 .parametric-reference-field select:focus-visible {
-  outline: 2px solid #8b949e;
+  outline: 2px solid var(--text-muted);
   outline-offset: 1px;
 }
 .parametric-reference-error {
   color: #ff938a !important;
   border-left: 2px solid #f85149;
-  padding-left: 7px;
+  padding-left: var(--space-15);
 }
 .parametric-group-editor .checkbox-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-top: 8px;
-  color: #b1bac4;
-  font-size: 11px;
+  gap: var(--space-15);
+  margin-top: var(--space-2);
+  color: var(--graphite-350);
+  font-size: var(--font-size-sm);
 }
 @media (max-width: 1700px) {
   .tool-button { width: 34px; justify-content: center; padding: 0; }

@@ -1,3 +1,4 @@
+import { canvasColors, editorColors, overlayColors, palette } from '../design-system/tokens';
 import { isPixelGridVisible } from './view-settings';
 import type { CollaboratorPresence } from '../collaboration/session';
 import {
@@ -120,16 +121,31 @@ interface RenderOptions {
   overlayOnly?: boolean;
 }
 
+/**
+ * Renderer colours come from the design system (src/design-system/tokens.ts),
+ * which mirrors src/styles/system/tokens.css. Do not add literals here: canvas
+ * and the DOM must resolve the same values.
+ */
 const COLORS = {
-  canvas: '#e4e4e0',
-  minorGrid: '#efefec',
-  majorGrid: '#deded9',
-  axis: '#b9b9b9',
-  segment: '#6d737d',
-  selected: '#0d99ff',
-  node: '#ffffff',
-  nodeCore: '#ffffff',
-  handle: '#0d99ff',
+  canvas: canvasColors.paper,
+  minorGrid: canvasColors.gridMinor,
+  majorGrid: canvasColors.gridMajor,
+  axis: canvasColors.axis,
+  segment: editorColors.segment,
+  selected: editorColors.selection,
+  selectedStrong: editorColors.selectionStrong,
+  node: editorColors.node,
+  nodeCore: editorColors.nodeCore,
+  handle: editorColors.handle,
+  guide: editorColors.guide,
+  artboardBorder: editorColors.artboardBorder,
+  artboardBorderIdle: editorColors.artboardBorderIdle,
+  label: palette.graphite200,
+  inverse: palette.white,
+  muted: palette.graphite550,
+  faint: palette.slate500,
+  panel: palette.graphite850,
+  success: palette.green600,
 };
 
 export function renderVectorScene(context: CanvasRenderingContext2D, options: RenderOptions): void {
@@ -367,7 +383,7 @@ function drawNetworkPathSkeleton(
   if (segmentIds.length === 0) return;
 
   context.save();
-  context.strokeStyle = '#aab0ba';
+  context.strokeStyle = COLORS.artboardBorder;
   context.lineWidth = 1 / scale;
   context.lineCap = 'butt';
   context.lineJoin = 'round';
@@ -447,9 +463,9 @@ function drawNetworkNodes(
     const badgeY = midpointY - 9 / scale;
     context.beginPath();
     context.roundRect(badgeX, badgeY, 19 / scale, 19 / scale, 4 / scale);
-    context.fillStyle = '#1F2023';
+    context.fillStyle = COLORS.panel;
     context.fill();
-    context.fillStyle = '#FFFFFF';
+    context.fillStyle = COLORS.inverse;
     context.font = `600 ${11 / scale}px Geist, system-ui, sans-serif`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
@@ -468,10 +484,10 @@ function drawNetworkNodes(
       : node.position;
     context.beginPath();
     context.rect(position.x - size / 2 / scale, position.y - size / 2 / scale, size / scale, size / scale);
-    context.fillStyle = selected ? COLORS.selected : '#ffffff';
+    context.fillStyle = selected ? COLORS.selected : COLORS.inverse;
     context.fill();
     context.lineWidth = (hovered ? 1.75 : 1.5) / scale;
-    context.strokeStyle = selected ? '#0A6FC2' : COLORS.selected;
+    context.strokeStyle = selected ? COLORS.selectedStrong : COLORS.selected;
     context.stroke();
   }
 }
@@ -619,13 +635,13 @@ function drawArtboards(
     // it has no resting outline in the supplied composition. Selection remains
     // explicit, while inactive artboards retain a quiet dashed boundary.
     if (selected || !active) {
-      context.strokeStyle = selected ? COLORS.selected : '#a5aab2';
+      context.strokeStyle = selected ? COLORS.selected : COLORS.artboardBorder;
       context.lineWidth = (selected ? 1.5 : 1) / scale;
       context.setLineDash(selected ? [] : [5 / scale, 4 / scale]);
       context.strokeRect(x, y, width, height);
       context.setLineDash([]);
     }
-    context.fillStyle = selected ? COLORS.selected : active ? '#4a4d55' : '#747a84';
+    context.fillStyle = selected ? COLORS.selected : active ? COLORS.muted : COLORS.faint;
     context.font = `600 ${11 / scale}px Geist, system-ui, sans-serif`;
     context.textAlign = 'left';
     context.textBaseline = 'bottom';
@@ -648,10 +664,10 @@ function drawArtboards(
         const radius = (point.edgeMiddle ? 4.75 : 4) / scale;
         context.beginPath();
         context.rect(point.x - radius, point.y - radius, radius * 2, radius * 2);
-        context.fillStyle = '#ffffff';
+        context.fillStyle = COLORS.inverse;
         context.fill();
         context.lineWidth = 2.75 / scale;
-        context.strokeStyle = '#ffffff';
+        context.strokeStyle = COLORS.inverse;
         context.stroke();
         context.lineWidth = 1.35 / scale;
         context.strokeStyle = COLORS.selected;
@@ -720,7 +736,7 @@ function drawRemotePresence(
       const label = collaborator.user.name;
       const width = context.measureText(label).width + 10 / scale;
       context.fillRect(cursor.x + 9 / scale, cursor.y + 9 / scale, width, 18 / scale);
-      context.fillStyle = '#ffffff';
+      context.fillStyle = COLORS.inverse;
       context.textAlign = 'left';
       context.textBaseline = 'middle';
       context.fillText(label, cursor.x + 14 / scale, cursor.y + 18 / scale);
@@ -886,7 +902,7 @@ function drawParametricInstances(
         instanceMatrix.d, instanceMatrix.e, instanceMatrix.f,
       );
       context.globalAlpha = (appearance?.opacity ?? 1) * (stroke?.opacity ?? 1);
-      context.strokeStyle = stroke?.color ?? alpha('#8da0c8', 0.72);
+      context.strokeStyle = stroke?.color ?? alpha(COLORS.faint, 0.72);
       context.lineCap = stroke?.cap ?? 'round';
       context.lineJoin = stroke?.join ?? 'round';
       context.setLineDash(stroke?.dash ?? [5 / scale, 3 / scale]);
@@ -925,8 +941,8 @@ function drawParametricControls(
   if (selectedObjectIds.size === 0) return;
   context.save();
   context.lineWidth = 1.25 / scale;
-  context.strokeStyle = '#a78bfa';
-  context.fillStyle = '#191622';
+  context.strokeStyle = COLORS.guide;
+  context.fillStyle = overlayColors.guideFill;
   context.setLineDash([4 / scale, 3 / scale]);
   for (const group of document.parametricGroups.values()) {
     const objectId = parametricSourceObjectId(document, group);
@@ -984,8 +1000,8 @@ function drawWidthHandles(
   scale: number,
 ): void {
   context.save();
-  context.strokeStyle = '#b28cff';
-  context.fillStyle = '#1b1824';
+  context.strokeStyle = overlayColors.bend;
+  context.fillStyle = overlayColors.bendFill;
   context.lineWidth = 1.25 / scale;
   for (const segment of document.segments.values()) {
     if (!document.isSegmentVisible(segment.id) || document.isSegmentLocked(segment.id)) continue;
@@ -1059,8 +1075,8 @@ function drawGeometryImpactHighlights(
 ): void {
   if (objectIds.size === 0) return;
   context.save();
-  context.strokeStyle = '#c8892f';
-  context.fillStyle = alpha('#c8892f', 0.08);
+  context.strokeStyle = overlayColors.width;
+  context.fillStyle = alpha(overlayColors.width, 0.08);
   context.lineWidth = 2 / scale;
   context.setLineDash([6 / scale, 4 / scale]);
   for (const objectId of objectIds) {
@@ -1191,7 +1207,7 @@ function drawPenPreview(context: CanvasRenderingContext2D, preview: PenPreview, 
     context.save();
     context.beginPath();
     context.arc(preview.point.x, preview.point.y, 5 / scale, 0, Math.PI * 2);
-    context.fillStyle = '#ffffff';
+    context.fillStyle = COLORS.inverse;
     context.fill();
     context.strokeStyle = COLORS.selected;
     context.lineWidth = 1.5 / scale;
@@ -1228,9 +1244,9 @@ function drawPenPreview(context: CanvasRenderingContext2D, preview: PenPreview, 
 
     context.beginPath();
     context.arc(preview.cursor.x, preview.cursor.y, (preview.targetKind ? 5 : 3.5) / scale, 0, Math.PI * 2);
-    context.fillStyle = '#ffffff';
+    context.fillStyle = COLORS.inverse;
     context.fill();
-    context.strokeStyle = preview.willClose ? '#2da44e' : COLORS.selected;
+    context.strokeStyle = preview.willClose ? COLORS.success : COLORS.selected;
     context.lineWidth = (preview.targetKind ? 1.5 : 1.25) / scale;
     context.stroke();
     if (preview.targetKind === 'segment') {
@@ -1245,7 +1261,7 @@ function drawPenPreview(context: CanvasRenderingContext2D, preview: PenPreview, 
     if (preview.closeTarget) {
       context.beginPath();
       context.arc(preview.closeTarget.x, preview.closeTarget.y, (preview.willClose ? 7 : 4.5) / scale, 0, Math.PI * 2);
-      context.strokeStyle = preview.willClose ? '#2da44e' : alpha(COLORS.selected, 0.65);
+      context.strokeStyle = preview.willClose ? COLORS.success : alpha(COLORS.selected, 0.65);
       context.lineWidth = (preview.willClose ? 2 : 1) / scale;
       context.stroke();
     }
@@ -1303,7 +1319,7 @@ function drawConstraintIndicators(
   document: VectorDocument,
   scale: number,
 ): void {
-  const cyan = '#57c8d4';
+  const cyan = overlayColors.lasso;
   const lineWidth = 1 / scale;
   const fontSize = 9 / scale;
   context.save();
@@ -1337,7 +1353,7 @@ function drawConstraintIndicators(
       context.setLineDash([]);
       const midpoint = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
       const value = constraint.parameters?.distance ?? Math.hypot(end.x - start.x, end.y - start.y);
-      context.fillStyle = '#162126';
+      context.fillStyle = overlayColors.lassoFill;
       context.fillRect(midpoint.x - 17 / indicatorScale, midpoint.y - 7 / indicatorScale, 34 / indicatorScale, 14 / indicatorScale);
       context.fillStyle = cyan;
       context.fillText(formatIndicator(value), midpoint.x, midpoint.y);
@@ -1412,7 +1428,7 @@ function drawConstraintIndicators(
       if (!midpoint) continue;
       context.beginPath();
       context.arc(midpoint.x, midpoint.y - offset, 7 / indicatorScale, 0, Math.PI * 2);
-      context.fillStyle = alpha('#13262b', 0.94);
+      context.fillStyle = alpha(overlayColors.lassoFill, 0.94);
       context.fill();
       context.strokeStyle = alpha(cyan, 0.72);
       context.stroke();
@@ -1506,7 +1522,7 @@ function drawRegionOverlays(
       const spacing = 9 / scale;
       context.save();
       context.clip(region.fillRule);
-      context.strokeStyle = alpha('#82aaff', 0.72);
+      context.strokeStyle = alpha(overlayColors.offset, 0.72);
       context.lineWidth = 1.5 / scale;
       context.beginPath();
       for (let offset = minX - (maxY - minY); offset <= maxX; offset += spacing) {
@@ -1518,7 +1534,7 @@ function drawRegionOverlays(
       appendRegionPath(context, region);
     }
     if (selected || hovered) {
-      const color = hovered && subtract ? '#ef6b72' : hovered ? '#68a0ff' : '#8b6cf6';
+      const color = hovered && subtract ? overlayColors.shapeSubtract : hovered ? overlayColors.shapeAdd : overlayColors.shape;
       context.fillStyle = alpha(color, hovered ? (paintHover ? 0.1 : 0.27) : 0.16);
       context.fill(region.fillRule);
       context.strokeStyle = alpha(color, 0.92);
@@ -1544,8 +1560,8 @@ function appendRegionPath(context: CanvasRenderingContext2D, region: Region): vo
 function drawSnapPreview(context: CanvasRenderingContext2D, snap: SnapResult, scale: number): void {
   if (snap.matches.length === 0) return;
   context.save();
-  context.strokeStyle = alpha('#57c8d4', 0.82);
-  context.fillStyle = '#0e0e0e';
+  context.strokeStyle = alpha(overlayColors.lasso, 0.82);
+  context.fillStyle = overlayColors.lassoFill;
   context.lineWidth = 1 / scale;
   context.setLineDash([4 / scale, 3 / scale]);
   if (snap.guideX !== undefined) {
@@ -1596,7 +1612,7 @@ function drawConstructionLinePreview(
     context.stroke();
   }
   context.setLineDash([]);
-  context.fillStyle = '#c8c8c8';
+  context.fillStyle = overlayColors.muted;
   for (const point of [preview.start, end]) {
     context.beginPath();
     context.arc(point.x, point.y, 3 / scale, 0, Math.PI * 2);
@@ -1622,8 +1638,8 @@ function drawPrimitivePreview(context: CanvasRenderingContext2D, preview: Primit
   const width = Math.abs(second.x - first.x);
   const height = Math.abs(second.y - first.y);
   context.save();
-  context.fillStyle = alpha('#8b6cf6', 0.16);
-  context.strokeStyle = '#b99cff';
+  context.fillStyle = alpha(overlayColors.shape, 0.16);
+  context.strokeStyle = overlayColors.bright;
   context.lineWidth = 1.25 / scale;
   context.setLineDash([5 / scale, 3 / scale]);
   context.beginPath();
@@ -1658,9 +1674,9 @@ function drawLassoPreview(context: CanvasRenderingContext2D, points: Point[], sc
   context.moveTo(points[0].x, points[0].y);
   for (const point of points.slice(1)) context.lineTo(point.x, point.y);
   context.closePath();
-  context.fillStyle = alpha('#6f9cff', 0.1);
+  context.fillStyle = alpha(overlayColors.offset, 0.1);
   context.fill();
-  context.strokeStyle = '#78a2ff';
+  context.strokeStyle = overlayColors.offset;
   context.lineWidth = 1.25 / scale;
   context.setLineDash([5 / scale, 4 / scale]);
   context.stroke();
@@ -1673,8 +1689,8 @@ function drawMarqueePreview(context: CanvasRenderingContext2D, preview: MarqueeP
   const width = Math.abs(preview.end.x - preview.start.x);
   const height = Math.abs(preview.end.y - preview.start.y);
   context.save();
-  context.fillStyle = alpha('#d7d7d7', preview.mode === 'contain' ? 0.09 : 0.14);
-  context.strokeStyle = '#d8d8d8';
+  context.fillStyle = alpha(overlayColors.importFill, preview.mode === 'contain' ? 0.09 : 0.14);
+  context.strokeStyle = overlayColors.importPreview;
   context.lineWidth = 1 / scale;
   context.setLineDash(preview.mode === 'contain' ? [] : [4 / scale, 3 / scale]);
   context.fillRect(x, y, width, height);
@@ -1695,9 +1711,9 @@ function drawEraserPreview(context: CanvasRenderingContext2D, preview: EraserPre
   } else {
     context.arc(preview.point.x, preview.point.y, preview.radius / scale, 0, Math.PI * 2);
   }
-  context.fillStyle = alpha('#ffffff', 0.16);
+  context.fillStyle = alpha(COLORS.inverse, 0.16);
   context.fill();
-  context.strokeStyle = '#1f6feb';
+  context.strokeStyle = overlayColors.print;
   context.lineWidth = 1 / scale;
   context.setLineDash([]);
   context.stroke();
@@ -1713,7 +1729,7 @@ function drawCutPreview(
   context.beginPath();
   context.moveTo(preview.start.x, preview.start.y);
   context.lineTo(preview.end.x, preview.end.y);
-  context.strokeStyle = '#f0b35b';
+  context.strokeStyle = overlayColors.measure;
   context.lineWidth = 1.5 / scale;
   context.setLineDash([6 / scale, 4 / scale]);
   context.stroke();
@@ -1721,7 +1737,7 @@ function drawCutPreview(
   for (const point of [preview.start, preview.end]) {
     context.beginPath();
     context.arc(point.x, point.y, 3 / scale, 0, Math.PI * 2);
-    context.fillStyle = '#f0b35b';
+    context.fillStyle = overlayColors.measure;
     context.fill();
   }
   context.restore();
@@ -1736,7 +1752,7 @@ function drawBendPreview(context: CanvasRenderingContext2D, preview: BendPreview
   context.beginPath();
   context.moveTo(curve.p0.x, curve.p0.y);
   context.bezierCurveTo(curve.p1.x, curve.p1.y, curve.p2.x, curve.p2.y, curve.p3.x, curve.p3.y);
-  context.strokeStyle = '#74a0ff';
+  context.strokeStyle = overlayColors.offset;
   context.lineWidth = 2 / scale;
   context.stroke();
   context.beginPath();
@@ -1744,7 +1760,7 @@ function drawBendPreview(context: CanvasRenderingContext2D, preview: BendPreview
   context.lineTo(curve.p1.x, curve.p1.y);
   context.moveTo(curve.p3.x, curve.p3.y);
   context.lineTo(curve.p2.x, curve.p2.y);
-  context.strokeStyle = alpha('#74a0ff', 0.6);
+  context.strokeStyle = alpha(overlayColors.offset, 0.6);
   context.lineWidth = 1 / scale;
   context.stroke();
 }

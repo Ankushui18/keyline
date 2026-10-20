@@ -4,6 +4,8 @@
  * cannot read gets an honest message with examples instead of a wrong change.
  */
 
+import { NAMED_COLORS } from '../design-system/document-defaults';
+
 export interface AppearanceUpdates {
   opacity?: number;
   strokeWidth?: number;
@@ -44,10 +46,7 @@ export interface QuickEditFailure {
 
 export const QUICK_EDIT_EXAMPLES = ['thinner', 'line 1.5', 'round ends', 'sharp corners', 'no fill', 'line color black'];
 
-const COLORS: Record<string, string> = {
-  black: '#17181a', white: '#ffffff', red: '#e5484d', green: '#30a46c', blue: '#0d99ff', orange: '#f76b15',
-  yellow: '#f5d90a', purple: '#8e4ec6', pink: '#d6409f', gray: '#8b8d98', grey: '#8b8d98', teal: '#12a594',
-};
+const COLORS = NAMED_COLORS;
 const MIN_WIDTH = 0.25;
 const WIDTH_STEP = 0.25;
 
