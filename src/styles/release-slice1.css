@@ -3,15 +3,15 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .quick-frame-control { position: relative; }
 .add-icon-frame-button {
-  height: 32px;
+  height: var(--control-height-lg);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
+  gap: var(--space-15);
+  padding: 0 var(--space-25);
   color: var(--fgColor-default);
   background: var(--surface-raised);
   border: 1px solid var(--borderColor-default);
@@ -31,7 +31,7 @@
   top: 38px;
   left: 0;
   width: 224px;
-  padding: 5px;
+  padding: var(--space-1);
   background: var(--surface-panel);
   border: 1px solid var(--graphite-600);
   border-radius: var(--radius-lg);
@@ -39,11 +39,11 @@
 }
 .icon-frame-menu > button {
   width: 100%;
-  min-height: 42px;
+  min-height: var(--control-height-xl);
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
-  padding: 5px 9px;
+  padding: var(--space-1) var(--space-2);
   color: var(--fgColor-muted);
   text-align: left;
   background: transparent;
@@ -57,8 +57,8 @@
 .custom-frame-size {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 7px;
+  gap: var(--space-15);
+  padding: var(--space-15);
   border-top: 1px solid var(--borderColor-default);
 }
 .custom-frame-size label {
@@ -71,12 +71,12 @@
   border: 1px solid var(--borderColor-default);
   border-radius: var(--radius-sm);
 }
-.custom-frame-size label span { padding-left: 7px; font-size: var(--font-size-2xs); font-weight: 700; }
+.custom-frame-size label span { padding-left: var(--space-15); font-size: var(--font-size-2xs); font-weight: 700; }
 .custom-frame-size input {
   min-width: 0;
   width: 100%;
   height: 100%;
-  padding: 0 6px;
+  padding: 0 var(--space-15);
   color: var(--fgColor-default);
   text-align: right;
   background: var(--surface-panel);
@@ -85,7 +85,7 @@
 }
 .custom-frame-size > button {
   grid-column: 1 / -1;
-  height: 30px;
+  height: var(--control-height-md);
   color: var(--text-inverse);
   background: var(--border-strong);
   border: 1px solid var(--text-disabled);
@@ -102,7 +102,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   color: var(--fgColor-muted);
   cursor: pointer;
   font-size: var(--font-size-xs);
@@ -115,7 +115,7 @@
 .artboard-frame-section > summary::before {
   content: '›';
   width: 12px;
-  margin-right: 5px;
+  margin-right: var(--space-1);
   color: var(--fgColor-subtle);
   transform: rotate(0deg);
   transition: transform 120ms ease;
@@ -131,8 +131,8 @@
 .artboard-frame-section > summary:hover { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); }
 .frame-inspector-body {
   display: grid;
-  gap: 8px;
-  padding: 4px 16px 14px;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4) var(--space-35);
 }
 .frame-dimension-grid { margin: 0; }
 .frame-preset-field {
@@ -146,12 +146,12 @@
   border: 1px solid var(--borderColor-default);
   border-radius: var(--radius-md);
 }
-.frame-preset-field > span { padding: 0 8px; font-size: var(--font-size-2xs); font-weight: 650; }
+.frame-preset-field > span { padding: 0 var(--space-2); font-size: var(--font-size-2xs); font-weight: 650; }
 .frame-preset-field select {
   min-width: 0;
   width: 100%;
   height: 100%;
-  padding: 0 7px;
+  padding: 0 var(--space-15);
   color: var(--fgColor-default);
   background: var(--bgColor-default);
   border: 0;
@@ -159,7 +159,7 @@
   font-size: var(--font-size-xs);
 }
 .duplicate-artboard-button {
-  height: 30px;
+  height: var(--control-height-md);
   color: var(--fgColor-muted);
   background: transparent;
   border: 1px solid var(--borderColor-default);
@@ -170,14 +170,14 @@
 }
 .duplicate-artboard-button:hover { color: var(--fgColor-default); background: var(--bgColor-neutral-muted); border-color: var(--graphite-600); }
 
-.svg-export-controls { display: grid; gap: 8px; }
+.svg-export-controls { display: grid; gap: var(--space-2); }
 .export-toggle-row {
   min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-25);
   color: var(--fgColor-default);
   background: var(--border-subtle);
   border: 1px solid var(--graphite-650);
@@ -185,14 +185,14 @@
   cursor: pointer;
 }
 .export-toggle-row:hover { background: var(--graphite-775); border-color: var(--graphite-600); }
-.export-toggle-row > span { display: grid; gap: 2px; }
+.export-toggle-row > span { display: grid; gap: var(--space-05); }
 .export-toggle-row strong { font-size: var(--font-size-sm); font-weight: 650; }
 .export-toggle-row small { color: var(--text-muted); font-size: var(--font-size-2xs); }
 .export-toggle-row input { width: 16px; height: 16px; accent-color: var(--blue-300); }
 .export-viewbox-card {
   display: grid;
-  gap: 4px;
-  padding: 10px;
+  gap: var(--space-1);
+  padding: var(--space-25);
   background: var(--graphite-950);
   border: 1px solid var(--graphite-650);
   border-radius: var(--radius-md);
@@ -201,12 +201,12 @@
 .export-viewbox-card code { color: var(--tint-info-ink-strong); font: 11px var(--font-sans); }
 .export-advanced { color: var(--text-muted); font-size: var(--font-size-xs); }
 .export-advanced > summary {
-  padding: 6px 2px;
+  padding: var(--space-15) var(--space-05);
   cursor: pointer;
   font-weight: 600;
 }
 .export-advanced > summary:hover { color: var(--text-primary); }
-.export-advanced .export-summary { padding: 7px 2px 0; }
+.export-advanced .export-summary { padding: var(--space-15) var(--space-05) 0; }
 
 /* Subtle, consistent feedback without replacing the graphite focus system. */
 .toolbar button,

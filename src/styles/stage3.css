@@ -25,15 +25,15 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px 5px;
+  gap: var(--space-05);
+  padding: var(--space-05) var(--space-1);
   background: var(--surface-panel);
   border-bottom: 1px solid var(--borderColor-default);
 }
 .sidebar-panel-tabs button {
   min-width: 0;
-  height: 27px;
-  padding: 0 8px;
+  height: var(--control-height-md);
+  padding: 0 var(--space-2);
   color: var(--fgColor-muted);
   background: transparent;
   border: 0;
@@ -46,7 +46,7 @@
 .right-sidebar.is-collapsed .sidebar-panel-tabs {
   justify-content: center;
   align-items: flex-start;
-  padding-top: 8px;
+  padding-top: var(--space-2);
 }
 .right-sidebar.is-collapsed .sidebar-panel-tabs button { width: 28px; padding: 0; font-size: var(--font-size-4xl); }
 .sidebar-resizer {
@@ -70,7 +70,7 @@
 
 .layers-panel { grid-template-rows: 56px 76px minmax(0, 1fr) auto; }
 .document-location { overflow: visible; }
-.location-actions { justify-content: flex-start; gap: 6px; position: relative; }
+.location-actions { justify-content: flex-start; gap: var(--space-15); position: relative; }
 .location-actions details { position: relative; }
 .location-actions summary {
   min-width: 88px;
@@ -78,7 +78,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 9px;
+  padding: 0 var(--space-2);
   color: var(--fgColor-muted);
   background: var(--bgColor-default);
   border: 1px solid var(--borderColor-default);
@@ -96,7 +96,7 @@
   top: 34px;
   left: 0;
   width: 164px;
-  padding: 4px;
+  padding: var(--space-1);
   background: var(--surface-panel);
   border: 1px solid var(--graphite-600);
   border-radius: var(--radius-md);
@@ -105,21 +105,21 @@
 .location-actions details:last-child .location-action-menu { left: auto; right: 0; }
 .location-actions .location-action-menu button {
   width: 100%;
-  min-height: 32px;
+  min-height: var(--control-height-lg);
   display: flex;
   justify-content: flex-start;
-  gap: 7px;
-  padding: 0 9px;
+  gap: var(--space-15);
+  padding: 0 var(--space-2);
   font-size: var(--font-size-xs);
 }
 
 /* Dense desktop controls remain precise without dropping below a usable target. */
 .layer-row { height: 36px; grid-template-columns: 32px 20px minmax(0, 1fr) auto 32px 32px; }
 .layer-disclosure { width: 32px; height: 32px; }
-.layer-state-button { width: 32px; height: 32px; }
-.layer-order-actions button { width: 32px; height: 32px; }
-.layer-footer-actions button { min-height: 32px; }
-.layers-heading-actions button { width: 32px; height: 32px; }
+.layer-state-button { width: 32px; height: var(--control-height-lg); }
+.layer-order-actions button { width: 32px; height: var(--control-height-lg); }
+.layer-footer-actions button { min-height: var(--control-height-lg); }
+.layers-heading-actions button { width: 32px; height: var(--control-height-lg); }
 
 /* Readable semantic foregrounds for essential modal and palette copy. */
 .export-summary > p,
@@ -141,15 +141,15 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
-  padding: 0 3px;
+  gap: var(--space-15);
+  padding: 0 var(--space-05);
   color: var(--fgColor-muted);
   font-size: var(--font-size-2xs);
 }
 .move-layer-field select {
   min-width: 0;
   height: 27px;
-  padding: 0 7px;
+  padding: 0 var(--space-15);
   color: var(--fgColor-muted);
   background: var(--bgColor-default);
   border: 1px solid var(--borderColor-default);
@@ -173,7 +173,7 @@
   position: fixed;
   z-index: var(--z-max);
   min-width: max-content;
-  padding: 6px 8px;
+  padding: var(--space-15) var(--space-2);
   color: var(--fgColor-default);
   background: var(--surface-raised);
   border: 1px solid var(--borderColor-default);
@@ -193,8 +193,8 @@
   left: 50%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 7px 6px 12px;
+  gap: var(--space-3);
+  padding: var(--space-15) var(--space-15) var(--space-15) var(--space-3);
   color: var(--fgColor-muted);
   background: rgba(37,37,37,.96);
   border: 1px solid var(--graphite-600);
@@ -205,8 +205,8 @@
 }
 .isolation-banner strong { color: var(--fgColor-default); }
 .isolation-banner button {
-  height: 28px;
-  padding: 0 9px;
+  height: var(--control-height-md);
+  padding: 0 var(--space-2);
   color: var(--fgColor-default);
   background: var(--border-strong);
   border: 1px solid var(--graphite-600);
@@ -222,8 +222,8 @@
   max-width: min(560px, calc(100vw - 32px));
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 10px 10px 14px;
+  gap: var(--space-35);
+  padding: var(--space-25) var(--space-25) var(--space-25) var(--space-35);
   color: var(--fgColor-default);
   background: var(--surface-raised);
   border: 1px solid var(--graphite-600);
@@ -235,7 +235,7 @@
 .workspace-notice.is-error { border-color: #8a4b50; }
 .workspace-notice button {
   width: 28px;
-  height: 28px;
+  height: var(--control-height-md);
   padding: 0;
   color: var(--fgColor-muted);
   background: transparent;

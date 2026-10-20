@@ -71,7 +71,7 @@ their files.
 | **Your files** | A local dashboard with search, filters, rename, duplicate, delete (undoable) and thumbnails. Import SVG or restore a `.keyline.json` backup. Everything is stored in IndexedDB on this device. |
 | **Two renderers** | Canvas 2D for compatibility, batched WebGL2 for large drawings, switched in **Settings → Performance**, with automatic fallback. |
 | **Accessible by default** | Keyboard tools, labelled controls, modal focus containment, reduced-motion support, and automated WCAG A/AA checks in the browser suites. |
-| **One design system** | 246 tokens in a single source, mirrored for the canvas renderers, one shared primitive layer, WCAG-checked colour pairs, and a build gate that fails on drift in colour, type, radius or layering. |
+| **One design system** | 253 tokens in a single source, mirrored for the canvas renderers, one shared primitive layer, WCAG-checked colour pairs, and a build gate that fails on drift in colour, type, radius or layering. |
 
 ---
 
@@ -197,8 +197,8 @@ Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
   isolation, offline convergence, payload caps and idle-room expiry.
 - **Rust unit tests** for direct arc radius/endpoint solving and rejection of proxy geometry.
 - **A design-system gate** so one palette stays one palette: token integrity, CSS↔TS parity,
-  a literal-colour ratchet, no dangling `var(--x)`, type/radius/z-index on scale, and eleven
-  WCAG contrast pairs.
+  a literal-colour ratchet, no dangling `var(--x)`, type/radius/spacing/z-index on scale, and
+  eleven WCAG contrast pairs.
 - **Documentation checks** so relative links cannot rot and the published test count cannot drift.
 
 Browser suites are available locally but are **not** in CI because they require a preinstalled

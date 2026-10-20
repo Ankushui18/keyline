@@ -8,13 +8,13 @@
 .construction-semantics {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--space-2);
 }
 
 .semantic-control-row {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-15);
 }
 
 .semantic-control-row > span {
@@ -33,7 +33,7 @@
   font-size: var(--font-size-2xs);
   font-weight: 700;
   letter-spacing: .05em;
-  padding: 1px 6px;
+  padding: var(--space-px) var(--space-15);
   text-transform: uppercase;
 }
 
@@ -53,7 +53,7 @@
   font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
   margin: 0;
-  padding-left: 8px;
+  padding-left: var(--space-2);
 }
 
 .construction-explanation {

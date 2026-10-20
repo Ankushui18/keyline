@@ -2,18 +2,18 @@
 .transform-flip-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 8px;
+  gap: var(--space-15);
+  margin-top: var(--space-2);
 }
 
 .transform-flip-actions button {
   min-width: 0;
-  height: 29px;
+  height: var(--control-height-md);
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
-  padding: 0 7px;
+  gap: var(--space-15);
+  padding: 0 var(--space-15);
   color: var(--graphite-350);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);

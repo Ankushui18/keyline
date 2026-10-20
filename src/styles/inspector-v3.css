@@ -7,14 +7,14 @@
 
 .sidebar-panel-tabs {
   height: 42px;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: var(--space-1);
+  padding: var(--space-15) var(--space-2);
   background: var(--surface-canvas);
   border-bottom: 1px solid var(--surface-active);
 }
 .sidebar-panel-tabs button {
-  height: 28px;
-  padding: 0 11px;
+  height: var(--control-height-md);
+  padding: 0 var(--space-25);
   color: var(--text-muted);
   background: transparent;
   border: 1px solid transparent;
@@ -35,7 +35,7 @@
 
 .properties-panel {
   --inspector-pad: 12px;
-  padding: 0 0 10px;
+  padding: 0 0 var(--space-25);
   background: var(--surface-canvas);
   scrollbar-color: var(--graphite-600) transparent;
 }
@@ -45,7 +45,7 @@
   z-index: 8;
   height: 42px;
   margin: 0;
-  padding: 0 10px 0 12px;
+  padding: 0 var(--space-25) 0 var(--space-3);
   background: rgba(27, 27, 29, .94);
   border-bottom: 1px solid var(--surface-active);
   backdrop-filter: blur(14px);
@@ -60,7 +60,7 @@
 }
 .properties-panel .inspector-context {
   max-width: 152px;
-  padding: 4px 7px;
+  padding: var(--space-1) var(--space-15);
   color: var(--text-secondary);
   background: transparent;
   border-color: transparent;
@@ -81,8 +81,8 @@
 .properties-panel > fieldset > .inspector-section,
 .properties-panel > .empty-inspector,
 .properties-panel > fieldset > .multi-summary {
-  margin: 8px 8px 0;
-  padding: 11px;
+  margin: var(--space-2) var(--space-2) 0;
+  padding: var(--space-25);
   background: var(--surface-panel);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -100,7 +100,7 @@
 
 .properties-panel .inspector-section > summary {
   min-height: 39px;
-  padding: 0 11px;
+  padding: 0 var(--space-25);
   color: var(--graphite-300);
   border-radius: var(--radius-md);
   font-size: var(--font-size-xs);
@@ -114,7 +114,7 @@
   font-size: var(--font-size-2xs);
   font-weight: 560;
 }
-.properties-panel .inspector-section-body { gap: 8px; padding: 1px 11px 11px; }
+.properties-panel .inspector-section-body { gap: var(--space-2); padding: var(--space-px) var(--space-25) var(--space-25); }
 
 .properties-panel .section-label {
   color: var(--text-muted);
@@ -129,8 +129,8 @@
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
-  padding: 10px;
+  gap: var(--space-2);
+  padding: var(--space-25);
   background: linear-gradient(180deg, var(--border-subtle) 0%, var(--border-subtle) 100%);
   border-color: var(--graphite-650);
 }
@@ -144,7 +144,7 @@
 .properties-panel .object-name-field {
   width: 100%;
   height: 23px;
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
@@ -152,10 +152,10 @@
 }
 .properties-panel .object-name-field:hover { background: var(--graphite-775); }
 .properties-panel .object-name-field:focus { background: var(--surface-canvas); box-shadow: 0 0 0 1px var(--slate-600); }
-.properties-panel .object-summary div span { padding-left: 4px; color: var(--text-muted); font-size: var(--font-size-3xs); }
+.properties-panel .object-summary div span { padding-left: var(--space-1); color: var(--text-muted); font-size: var(--font-size-3xs); }
 .properties-panel .edit-network-button {
-  min-height: 29px;
-  padding: 0 10px;
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-25);
   color: var(--tint-info-ink-strong);
   background: var(--blue-700);
   border: 1px solid var(--accent-pressed);
@@ -191,7 +191,7 @@
 .properties-panel .numeric-field input,
 .properties-panel .frame-preset-field select,
 .properties-panel .appearance-select-grid select { color: var(--text-primary); font-size: var(--font-size-xs); }
-.properties-panel .appearance-color-row { padding: 0 7px; }
+.properties-panel .appearance-color-row { padding: 0 var(--space-15); }
 .properties-panel .appearance-color-row code { color: var(--text-secondary); }
 
 /* Secondary values exist on demand rather than competing with primary work. */
@@ -205,8 +205,8 @@
   min-height: 30px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px;
+  gap: var(--space-15);
+  padding: 0 var(--space-2);
   color: var(--text-secondary);
   cursor: pointer;
   list-style: none;
@@ -218,17 +218,17 @@
 .inline-disclosure[open] > summary::before { transform: rotate(90deg); }
 .inline-disclosure > summary:hover { color: var(--graphite-300); background: var(--surface-raised); }
 .inline-disclosure > summary output { margin-left: auto; color: var(--text-secondary); text-transform: capitalize; }
-.inline-disclosure > .appearance-select-grid { padding: 0 8px 8px; }
+.inline-disclosure > .appearance-select-grid { padding: 0 var(--space-2) var(--space-2); }
 
-.properties-panel .stroke-alignment-control { gap: 6px; }
+.properties-panel .stroke-alignment-control { gap: var(--space-15); }
 .properties-panel .stroke-alignment-control > span { color: var(--text-muted); font-size: var(--font-size-3xs); }
 .properties-panel .segmented-control {
-  padding: 2px;
+  padding: var(--space-05);
   background: var(--surface-canvas);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
 }
-.properties-panel .segmented-control button { min-height: 25px; border-radius: var(--radius-sm); }
+.properties-panel .segmented-control button { min-height: var(--control-height-sm); border-radius: var(--radius-sm); }
 .properties-panel .segmented-control button[aria-pressed='true'],
 .properties-panel .segmented-control button.is-active {
   color: var(--text-primary);
@@ -236,7 +236,7 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, .28);
 }
 .properties-panel .remove-paint-button {
-  min-height: 29px;
+  min-height: var(--control-height-md);
   color: #aa8e8e;
   background: transparent;
   border-color: var(--tint-danger-border);
@@ -245,60 +245,60 @@
 .properties-panel .remove-paint-button:hover { color: var(--tint-danger-ink); background: var(--tint-danger-surface); border-color: var(--red-900); }
 
 /* Context summaries preserve confidence without exposing implementation IDs by default. */
-.properties-panel .property-list { gap: 8px; }
+.properties-panel .property-list { gap: var(--space-2); }
 .properties-panel .property-row { min-height: 19px; }
 .properties-panel .node-details-body,
-.properties-panel .constraint-inspector-body { padding-top: 1px; }
-.properties-panel .handle-details { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-strong); }
-.properties-panel .segment-primary-details { gap: 7px; }
+.properties-panel .constraint-inspector-body { padding-top: var(--space-px); }
+.properties-panel .handle-details { display: grid; gap: var(--space-15); padding-top: var(--space-2); border-top: 1px solid var(--border-strong); }
+.properties-panel .segment-primary-details { gap: var(--space-15); }
 
 .properties-panel .constraint-inspector > summary output {
   min-width: 18px;
-  padding: 2px 6px;
+  padding: var(--space-05) var(--space-15);
   text-align: center;
   background: var(--surface-active);
   border-radius: var(--radius-xl);
 }
-.properties-panel .no-constraints { margin: 1px 0 2px; color: var(--text-muted); font-size: var(--font-size-2xs); line-height: var(--line-height-normal); }
+.properties-panel .no-constraints { margin: var(--space-px) 0 var(--space-05); color: var(--text-muted); font-size: var(--font-size-2xs); line-height: var(--line-height-normal); }
 .properties-panel .constraint-suggestions { margin: 0; }
 
-.properties-panel .network-edit-summary h3 { margin: 5px 0 4px; font-size: var(--font-size-md); }
+.properties-panel .network-edit-summary h3 { margin: var(--space-1) 0 var(--space-1); font-size: var(--font-size-md); }
 .properties-panel .network-edit-summary p { color: var(--text-muted); line-height: var(--line-height-normal); }
-.properties-panel .network-edit-summary button { min-height: 29px; border-radius: var(--radius-md); }
+.properties-panel .network-edit-summary button { min-height: var(--control-height-md); border-radius: var(--radius-md); }
 .properties-panel .field-help { margin-bottom: 0; color: var(--text-muted); font-size: var(--font-size-3xs); line-height: var(--line-height-normal); }
 
-.properties-panel .artboard-frame-section > summary { min-height: 42px; padding: 0 11px; }
-.properties-panel .frame-inspector-body { padding: 0 11px 11px; }
-.properties-panel .artboard-action-row { gap: 7px; }
+.properties-panel .artboard-frame-section > summary { min-height: 42px; padding: 0 var(--space-25); }
+.properties-panel .frame-inspector-body { padding: 0 var(--space-25) var(--space-25); }
+.properties-panel .artboard-action-row { gap: var(--space-15); }
 .properties-panel .duplicate-artboard-button,
-.properties-panel .delete-artboard-button { min-height: 30px; border-radius: var(--radius-md); }
+.properties-panel .delete-artboard-button { min-height: var(--control-height-md); border-radius: var(--radius-md); }
 
 .properties-panel .empty-inspector {
   min-height: 78px;
   grid-template-columns: 30px minmax(0, 1fr);
-  padding: 12px;
+  padding: var(--space-3);
 }
 .properties-panel .empty-visual { transform: scale(.86); transform-origin: left center; }
-.properties-panel .panel-help { margin-top: 8px; background: transparent; border-color: transparent; box-shadow: none; }
+.properties-panel .panel-help { margin-top: var(--space-2); background: transparent; border-color: transparent; box-shadow: none; }
 .properties-panel .panel-help > summary { color: var(--text-secondary); }
 
 /* The canvas toolbar keeps frequent work visible and puts specialist tools one level deeper. */
 .vector-edit-toolbar {
   top: 14px;
-  gap: 2px;
+  gap: var(--space-05);
   min-height: 40px;
-  padding: 4px;
+  padding: var(--space-1);
   background: rgba(27, 27, 29, .96);
   border-color: var(--border-strong);
   border-radius: var(--radius-xl);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .26), 0 1px 2px rgba(0, 0, 0, .3);
   backdrop-filter: blur(14px);
 }
-.vector-edit-toolbar-label { padding: 0 7px; color: var(--text-muted); font-size: var(--font-size-2xs); letter-spacing: .06em; }
+.vector-edit-toolbar-label { padding: 0 var(--space-15); color: var(--text-muted); font-size: var(--font-size-2xs); letter-spacing: .06em; }
 .vector-edit-toolbar button { min-width: 42px; border-radius: var(--radius-md); }
 .vector-edit-toolbar button.is-active { color: var(--text-inverse); background: var(--border-strong); border-color: var(--graphite-600); }
 .vector-edit-toolbar-more { position: relative; }
-.vector-edit-toolbar-more > button { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.vector-edit-toolbar-more > button { display: flex; align-items: center; justify-content: center; gap: var(--space-1); }
 .vector-edit-toolbar-more > button span { color: var(--text-muted); font-size: var(--font-size-2xs); }
 .vector-edit-toolbar-menu {
   position: absolute;
@@ -307,8 +307,8 @@
   right: 0;
   width: 150px;
   display: grid;
-  gap: 2px;
-  padding: 5px;
+  gap: var(--space-05);
+  padding: var(--space-1);
   background: var(--surface-panel);
   border: 1px solid var(--graphite-650);
   border-radius: var(--radius-lg);
@@ -320,7 +320,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 9px;
+  padding: 0 var(--space-2);
   text-align: left;
 }
 
@@ -329,5 +329,5 @@
   .properties-panel > .panel-section,
   .properties-panel > .inspector-section,
   .properties-panel > fieldset > .panel-section,
-  .properties-panel > fieldset > .inspector-section { margin-left: 9px; margin-right: 9px; }
+  .properties-panel > fieldset > .inspector-section { margin-left: var(--space-2); margin-right: var(--space-2); }
 }

@@ -13,6 +13,8 @@
  *   8. typography        — sizes and families come from the type scale
  *   9. radius            — corners come from the radius scale
  *  10. layering          — z-index is a token, or a local layer of 0–9
+ *  11. spacing           — gap/margin/padding come from the space scale
+ *  12. controls          — button heights come from the control-height scale
  *
  * The baseline records the literals that existed when the system landed. It may
  * only shrink: deleting a fix is never easier than keeping it.
@@ -256,7 +258,51 @@ for (const file of styleFiles) {
   }
 }
 
-/* ------------------------------------------------------- 11. baseline update */
+/* --------------------------------------------------------------- 11. spacing */
+// Rhythm is the last dimension that drifted: gaps of 7px next to gaps of 8px.
+// 0, negative offsets and page-layout values above 48px are exempt — they encode
+// overlap and page structure rather than rhythm.
+for (const file of styleFiles) {
+  const text = await readFile(file, 'utf8');
+  for (const match of text.matchAll(/(^|[;{\s])(padding|margin|gap|row-gap|column-gap)(-[a-z]+)?\s*:\s*([^;{}]+)/g)) {
+    const value = match[4];
+    if (/calc\(/.test(value)) continue;
+    for (const part of value.split(/\s+/)) {
+      const px = /^(-?)([0-9.]+)px$/.exec(part);
+      if (!px) continue;
+      const negative = px[1] === '-';
+      const size = Number(px[2]);
+      if (negative || size === 0 || size > 48) continue;
+      const line = text.slice(0, match.index).split('\n').length;
+      problems.push(`${relative(root, file)}:${line}: ${match[2]}${match[3] ?? ''} uses ${part}; use var(--space-*)`);
+    }
+  }
+}
+
+/* -------------------------------------------------------------- 12. controls */
+// Nine button heights became four tiers. A literal height in that band on a
+// control's own selector is drift; heights on its children (svg, i, b) are the
+// glyph, not the control, and stay as they are.
+const controlSubject = (selector) => selector
+  .split(',')
+  .map((part) => part.trim().split(/[\s>+~]+/).filter(Boolean).pop() ?? '')
+  .map((subject) => subject.replace(/::?[a-z-]+(\([^)]*\))?/gi, '').replace(/\[.*?\]/g, ''));
+
+for (const file of styleFiles) {
+  const text = await readFile(file, 'utf8');
+  for (const block of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const isControl = controlSubject(block[1]).some((subject) => /(button|btn)/i.test(subject) || subject === 'button');
+    if (!isControl) continue;
+    for (const match of block[2].matchAll(/(^|;)\s*height\s*:\s*([0-9.]+)px/g)) {
+      const size = Number(match[2]);
+      if (size < 22 || size > 48) continue;
+      const line = text.slice(0, block.index).split('\n').length;
+      problems.push(`${relative(root, file)}:${line}: control height ${size}px is off the control-height scale`);
+    }
+  }
+}
+
+/* ------------------------------------------------------- 13. baseline update */
 if (process.argv.includes('--update')) {
   const next = { colors: {} };
   const bump = (bucket, hex, n) => { bucket[hex] = (bucket[hex] ?? 0) + n; };
@@ -286,7 +332,7 @@ if (process.argv.includes('--update')) {
   process.exit(0);
 }
 
-/* -------------------------------------------------------------- 12. drift list */
+/* -------------------------------------------------------------- 14. drift list */
 if (process.argv.includes('--list')) {
   const near = new Map();
   for (const file of styleFiles) {

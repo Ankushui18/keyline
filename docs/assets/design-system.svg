@@ -9,7 +9,7 @@
   <!-- source of truth -->
   <rect x="40" y="100" width="280" height="120" rx="10" fill="#1f2023" stroke="#0d99ff" stroke-width="1.5"/>
   <text x="60" y="128" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="13" font-weight="600">tokens.css</text>
-  <text x="60" y="150" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">246 tokens · palette, semantic</text>
+  <text x="60" y="150" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">253 tokens · palette, semantic</text>
   <text x="60" y="168" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">roles, scales, layout metrics</text>
   <text x="60" y="196" fill="#74a0ff" font-family="Geist Mono, ui-monospace, monospace" font-size="10">--accent: #0d99ff;</text>
 

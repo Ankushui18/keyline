@@ -6,6 +6,6 @@
   font-size: var(--font-size-sm);
   font-weight: 600;
   line-height: var(--line-height-normal);
-  margin: 0 0 2px;
-  padding: 7px 8px;
+  margin: 0 0 var(--space-05);
+  padding: var(--space-15) var(--space-2);
 }

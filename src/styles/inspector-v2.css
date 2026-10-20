@@ -6,7 +6,7 @@
   position: absolute;
   z-index: var(--z-popover);
   height: 25px;
-  padding: 0 7px;
+  padding: 0 var(--space-15);
   color: var(--text-primary);
   background: var(--surface-panel);
   border: 1px solid var(--accent-control);
@@ -21,13 +21,13 @@
 .right-sidebar.mode-layers,
 .right-sidebar.mode-properties { grid-template-rows: 40px minmax(0, 1fr); }
 .sidebar-panel-tabs {
-  gap: 2px;
-  padding: 5px 7px;
+  gap: var(--space-05);
+  padding: var(--space-1) var(--space-15);
   background: var(--surface-panel);
 }
 .sidebar-panel-tabs button {
-  height: 29px;
-  padding: 0 10px;
+  height: var(--control-height-md);
+  padding: 0 var(--space-25);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
   font-weight: 560;
@@ -59,7 +59,7 @@
   backdrop-filter: blur(10px);
 }
 .properties-panel .panel-heading h2 {
-  margin: 1px 0 0;
+  margin: var(--space-px) 0 0;
   font-size: var(--font-size-xl);
   font-weight: 650;
   letter-spacing: -.015em;
@@ -74,7 +74,7 @@
   min-width: 0;
   max-width: 142px;
   overflow: hidden;
-  padding: 4px 7px;
+  padding: var(--space-1) var(--space-15);
   color: var(--text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -91,13 +91,13 @@
 }
 
 /* Section anatomy follows a single predictable pattern. */
-.properties-panel .panel-section { padding: 12px; }
+.properties-panel .panel-section { padding: var(--space-3); }
 .properties-panel .inspector-section { padding: 0; }
 .inspector-section > summary {
   min-height: 42px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-15);
   padding: 0 var(--inspector-pad);
   color: var(--graphite-300);
   cursor: pointer;
@@ -122,8 +122,8 @@
 .inspector-section > summary:hover::before { color: var(--graphite-350); }
 .inspector-section-body {
   display: grid;
-  gap: 8px;
-  padding: 0 var(--inspector-pad) 12px;
+  gap: var(--space-2);
+  padding: 0 var(--inspector-pad) var(--space-3);
 }
 
 /* Active frame: clear context, direct dimensions, no ornamental card stack. */
@@ -131,7 +131,7 @@
 .properties-panel .artboard-frame-section > summary {
   min-height: 46px;
   height: auto;
-  gap: 7px;
+  gap: var(--space-15);
   padding: 0 var(--inspector-pad);
   color: var(--graphite-300);
   font-size: var(--font-size-sm);
@@ -141,7 +141,7 @@
 .artboard-frame-section > summary > span {
   min-width: 0;
   display: grid;
-  gap: 1px;
+  gap: var(--space-px);
   margin-right: auto;
 }
 .artboard-frame-section > summary strong { font-size: var(--font-size-sm); font-weight: 630; }
@@ -159,16 +159,16 @@
   font-weight: 560;
 }
 .properties-panel .frame-inspector-body {
-  gap: 7px;
-  padding: 0 var(--inspector-pad) 12px;
+  gap: var(--space-15);
+  padding: 0 var(--inspector-pad) var(--space-3);
 }
 
 /* Selection identity remains compact and immediately editable. */
 .properties-panel .object-selection-summary {
   min-height: 58px;
   grid-template-columns: 28px minmax(0, 1fr);
-  gap: 9px;
-  padding: 9px var(--inspector-pad);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--inspector-pad);
   background: var(--surface-panel);
 }
 .properties-panel .object-glyph {
@@ -180,18 +180,18 @@
 }
 .properties-panel .object-name-field {
   height: 23px;
-  padding: 0 3px;
+  padding: 0 var(--space-05);
   font-size: var(--font-size-md);
 }
 .properties-panel .object-summary div span {
-  padding-left: 3px;
+  padding-left: var(--space-05);
   color: var(--text-muted);
   font: 9px/1.25 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
 .properties-panel .edit-network-button {
-  min-height: 27px;
-  padding: 0 9px;
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-2);
   color: var(--graphite-300);
   background: var(--surface-raised);
   border-color: var(--graphite-650);
@@ -204,14 +204,14 @@
   display: block;
 }
 .object-transform-body,
-.appearance-body { gap: 8px; }
+.appearance-body { gap: var(--space-2); }
 .transform-advanced {
   color: var(--text-muted);
   font-size: var(--font-size-2xs);
 }
 .transform-advanced > summary {
   width: max-content;
-  padding: 2px 0;
+  padding: var(--space-05) 0;
   cursor: pointer;
   list-style: none;
   font-weight: 570;
@@ -220,7 +220,7 @@
 .transform-advanced > summary::before { content: '+ '; color: var(--text-subtle); }
 .transform-advanced[open] > summary::before { content: '− '; }
 .transform-advanced > summary:hover { color: var(--graphite-300); }
-.transform-advanced .transform-secondary-grid { margin-top: 6px; }
+.transform-advanced .transform-secondary-grid { margin-top: var(--space-15); }
 
 /* Compact fields: quiet surfaces, clear labels, and strong focus. */
 .properties-panel .numeric-field,
@@ -233,7 +233,7 @@
 .properties-panel .numeric-field > span,
 .properties-panel .frame-preset-field > span {
   min-width: 26px;
-  padding: 0 7px;
+  padding: 0 var(--space-15);
   color: var(--text-muted);
   font-size: var(--font-size-2xs);
   font-weight: 600;
@@ -254,7 +254,7 @@
   box-shadow: 0 0 0 1px var(--text-subtle);
 }
 .properties-panel .duplicate-artboard-button {
-  height: 29px;
+  height: var(--control-height-md);
   color: var(--graphite-350);
   background: var(--surface-raised);
   border-color: var(--border-strong);
@@ -265,8 +265,8 @@
 .properties-panel .appearance-color-row {
   min-height: 32px;
   grid-template-columns: minmax(48px, 1fr) 24px auto;
-  gap: 7px;
-  padding: 0 7px;
+  gap: var(--space-15);
+  padding: 0 var(--space-15);
   color: var(--graphite-350);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
@@ -275,13 +275,13 @@
 .properties-panel .appearance-color-row input {
   width: 22px;
   height: 22px;
-  padding: 2px;
+  padding: var(--space-05);
   background: var(--surface-panel);
   border-color: var(--graphite-650);
   border-radius: var(--radius-sm);
 }
 .properties-panel .appearance-color-row code { color: var(--graphite-300); font-size: var(--font-size-2xs); }
-.properties-panel .appearance-select-grid label { gap: 3px; color: var(--text-muted); }
+.properties-panel .appearance-select-grid label { gap: var(--space-05); color: var(--text-muted); }
 .properties-panel .appearance-select-grid select {
   height: 30px;
   background: var(--surface-raised);
@@ -295,8 +295,8 @@
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
-  column-gap: 10px;
-  padding: 14px var(--inspector-pad);
+  column-gap: var(--space-25);
+  padding: var(--space-35) var(--inspector-pad);
   text-align: left;
 }
 .properties-panel .empty-visual { width: 34px; height: 30px; margin: 0; grid-row: 1 / span 2; }
@@ -307,7 +307,7 @@
 .properties-panel .empty-visual span:nth-child(3) { left: 15px; bottom: 0; }
 .properties-panel .empty-inspector h3 {
   align-self: end;
-  margin: 0 0 2px;
+  margin: 0 0 var(--space-05);
   font-size: var(--font-size-sm);
   font-weight: 620;
 }
@@ -324,8 +324,8 @@
 /* Help is available but no longer competes with design controls. */
 .properties-panel .panel-help { padding: 0; border-bottom: 0; }
 .properties-panel .panel-help > summary { color: var(--text-muted); font-size: var(--font-size-xs); font-weight: 560; }
-.properties-panel .shortcut-list { gap: 2px; }
-.properties-panel .shortcut-row { margin: 4px 0; font-size: var(--font-size-xs); }
+.properties-panel .shortcut-list { gap: var(--space-05); }
+.properties-panel .shortcut-row { margin: var(--space-1) 0; font-size: var(--font-size-xs); }
 
 /* Pen and Pencil expose one persistent style instead of hiding it behind selection. */
 .drawing-style-inspector > summary output {
@@ -339,8 +339,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 7px;
+  gap: var(--space-2);
+  padding: 0 var(--space-15);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -349,21 +349,21 @@
 .drawing-fill-row > input[type='color'] {
   width: 24px;
   height: 24px;
-  padding: 2px;
+  padding: var(--space-05);
   background: var(--surface-panel);
   border: 1px solid var(--graphite-650);
   border-radius: var(--radius-sm);
 }
 .drawing-fill-row > input[type='color']:disabled { opacity: .35; }
-.appearance-stroke-control { display: grid; gap: 8px; }
-.stroke-alignment-control { display: grid; gap: 5px; }
+.appearance-stroke-control { display: grid; gap: var(--space-2); }
+.stroke-alignment-control { display: grid; gap: var(--space-1); }
 .stroke-alignment-control > span { color: var(--text-muted); font-size: var(--font-size-2xs); }
 .stroke-alignment-control .segmented-control { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.stroke-alignment-control button { min-width: 0; padding: 0 5px; font-size: var(--font-size-2xs); }
-.multi-stroke-controls { display: grid; gap: 8px; margin-top: 8px; }
+.stroke-alignment-control button { min-width: 0; padding: 0 var(--space-1); font-size: var(--font-size-2xs); }
+.multi-stroke-controls { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
 .remove-paint-button {
   width: 100%;
-  min-height: 27px;
+  min-height: var(--control-height-md);
   color: var(--graphite-350);
   background: transparent;
   border: 1px solid var(--border-strong);
@@ -374,7 +374,7 @@
 .node-selection-summary .direct-delete-point {
   margin-left: auto;
   min-height: 26px;
-  padding: 0 8px;
+  padding: 0 var(--space-2);
   color: var(--tint-danger-ink-muted);
   background: transparent;
   border: 1px solid var(--tint-danger-border);
@@ -382,13 +382,13 @@
   font-size: var(--font-size-2xs);
 }
 .node-selection-summary .direct-delete-point:hover { color: var(--tint-danger-ink); background: var(--tint-danger-surface); }
-.drawing-style-body > p { margin: 1px 0 0; color: var(--text-muted); font-size: var(--font-size-2xs); line-height: var(--line-height-normal); }
+.drawing-style-body > p { margin: var(--space-px) 0 0; color: var(--text-muted); font-size: var(--font-size-2xs); line-height: var(--line-height-normal); }
 
 /* A little more breathing room when the inspector owns the full rail. */
-.artboard-action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.artboard-action-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-15); }
 .artboard-action-row .duplicate-artboard-button { width: auto; }
 .delete-artboard-button {
-  min-height: 30px;
+  min-height: var(--control-height-md);
   color: var(--tint-danger-ink-muted);
   background: var(--surface-panel);
   border: 1px solid var(--tint-danger-border);
@@ -397,7 +397,7 @@
 }
 .delete-artboard-button:hover:not(:disabled) { color: var(--tint-danger-ink); background: var(--tint-danger-surface); border-color: var(--red-900); }
 .delete-artboard-button:disabled { color: var(--text-disabled); background: var(--surface-panel); border-color: var(--surface-active); }
-.right-sidebar.mode-properties .properties-panel { padding-bottom: 16px; }
+.right-sidebar.mode-properties .properties-panel { padding-bottom: var(--space-4); }
 @media (min-width: 1500px) {
   .right-sidebar.mode-properties .properties-panel { --inspector-pad: 14px; }
 }

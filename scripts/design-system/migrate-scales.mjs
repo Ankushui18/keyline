@@ -64,6 +64,21 @@ function ratioScale(prefix) {
   return values;
 }
 const LINE_HEIGHT = ratioScale('line-height-');
+const SPACE = scale('space-');
+const CONTROL_HEIGHT = scale('control-height-');
+
+/**
+ * True when the *element* being sized is the control itself — not a child of it.
+ * `.dialog-footer button` and `.x-button:hover` qualify; `.x-button i` does not,
+ * because that height belongs to an icon, not the button.
+ */
+function isControlSelector(selector) {
+  return selector
+    .split(',')
+    .map((part) => part.trim().split(/[\s>+~]+/).filter(Boolean).pop() ?? '')
+    .map((subject) => subject.replace(/::?[a-z-]+(\([^)]*\))?/gi, '').replace(/\[.*?\]/g, ''))
+    .some((subject) => /(button|btn)/i.test(subject) || subject === 'button');
+}
 
 /** Nearest scale step; ties resolve to the smaller step so text never grows. */
 function nearest(scaleMap, value) {
@@ -103,7 +118,7 @@ function mapZIndex(fileSource) {
   return assignment;
 }
 
-const counters = { fontSize: 0, fontFamily: 0, radius: 0, zIndex: 0, lineHeight: 0 };
+const counters = { fontSize: 0, fontFamily: 0, radius: 0, zIndex: 0, lineHeight: 0, spacing: 0, controlHeight: 0 };
 const notes = [];
 
 for (const file of scope) {
@@ -158,6 +173,42 @@ for (const file of scope) {
     return `${lead}line-height: var(${match.name})`;
   });
 
+  // Spacing: every px in gap/padding/margin becomes the nearest space step.
+  // Negative offsets and calc() are left alone; they encode overlap, not rhythm.
+  out = out.replace(/(^|[;{\s])(padding|margin|gap|row-gap|column-gap)(-[a-z]+)?:\s*([^;{}]+)/g,
+    (whole, lead, property, side = '', value) => {
+      if (/calc\(/.test(value)) return whole;
+      const rewritten = value.replace(/(^|\s)([0-9.]+)px/g, (chunk, space, raw) => {
+        // Above 48px a value is page layout, not rhythm; leave it exact.
+        if (Number(raw) > 48) return chunk;
+        const match = nearest(SPACE, Number(raw));
+        if (!match) return chunk;
+        counters.spacing += 1;
+        if (match.step !== Number(raw)) {
+          notes.push(`${relative(root, file)}: ${property}${side} ${raw}px → ${match.name} (${match.step}px)`);
+        }
+        return `${space}var(${match.name})`;
+      });
+      return `${lead}${property}${side}: ${rewritten}`;
+    });
+
+  // Control geometry: buttons snap to one of four heights.
+  out = out.replace(/([^{}]+)\{([^{}]*)\}/g, (whole, selector, body) => {
+    if (!isControlSelector(selector)) return whole;
+    const rewritten = body.replace(/(height:\s*)([0-9.]+)px/g, (chunk, property, raw) => {
+      // Sub-22px heights inside a control are its glyphs, not the control.
+      if (Number(raw) < 22 || Number(raw) > 48) return chunk;
+      const match = nearest(CONTROL_HEIGHT, Number(raw));
+      if (!match) return chunk;
+      counters.controlHeight += 1;
+      if (match.step !== Number(raw)) {
+        notes.push(`${relative(root, file)}: control height ${raw}px → ${match.name} (${match.step}px)`);
+      }
+      return `${property}var(${match.name})`;
+    });
+    return `${selector}{${rewritten}}`;
+  });
+
   const zMap = mapZIndex(out);
   out = out.replace(/z-index:\s*(-?\d+)/g, (whole, raw) => {
     const value = Number(raw);
@@ -172,7 +223,7 @@ for (const file of scope) {
   if (out !== before) console.log(`${relative(root, file).padEnd(34)} ${reportOnly ? 'would change' : 'updated'}`);
 }
 
-console.log(`\nfont-size ${counters.fontSize} · font-family ${counters.fontFamily} · radius ${counters.radius} · z-index ${counters.zIndex} · line-height ${counters.lineHeight}${reportOnly ? ' (report only)' : ''}`);
+console.log(`\nfont-size ${counters.fontSize} · font-family ${counters.fontFamily} · radius ${counters.radius} · z-index ${counters.zIndex} · line-height ${counters.lineHeight} · spacing ${counters.spacing} · control height ${counters.controlHeight}${reportOnly ? ' (report only)' : ''}`);
 if (process.argv.includes('--details')) {
   console.log('\nApproximated values (closest scale step):');
   for (const note of notes) console.log(`  ${note}`);

@@ -43,6 +43,11 @@ const numbersOf = (prefix) => {
   return values;
 };
 
+const spaceStep = (name) => {
+  const match = new RegExp(`^\\s*${name}\\s*:\\s*([0-9.]+)px`, 'mi').exec(tokensCss);
+  return match ? Number(match[1]) : undefined;
+};
+
 const scales = {
   'font-size': numbersOf('--font-size-'),
   radius: numbersOf('--radius-'),
@@ -86,7 +91,7 @@ const findings = {
   'font-family': await collect(cssFiles, /font-family\s*:\s*([^;]+)/g, 'css'),
   radius: await collect(cssFiles, /border(?:-[a-z]+)?-radius\s*:\s*([^;]+)/g, 'css'),
   'font token': await collect(cssFiles, /font-family\s*:\s*(var\(--font-[a-z]+\))/g, 'css'),
-  gap: await collect(cssFiles, /(?:^|;)\s*gap\s*:\s*([0-9.]+)px/g, 'css'),
+  gap: await collect(cssFiles, /(?:^|;)\s*gap\s*:\s*(?:var\((--space-[a-z0-9-]+)\)|([0-9.]+)px)/g, 'css'),
   padding: await collect(cssFiles, /padding\s*:\s*([^;{}]+)/g, 'css'),
   'line-height': await collect(cssFiles, /line-height\s*:\s*([0-9.]+)/g, 'css'),
   'z token': await collect(cssFiles, /z-index\s*:\s*(var\(--z-[a-z0-9-]+\))/g, 'css'),
@@ -97,6 +102,23 @@ const findings = {
 
 const numeric = (list) => list.map((entry) => Number.parseFloat(entry.value)).filter((n) => Number.isFinite(n));
 const distinct = (list) => [...new Set(list)].sort((a, b) => a - b);
+
+// Control heights only count on the control's own selector, not on its glyphs.
+const controlHeights = new Set();
+for (const file of cssFiles) {
+  const text = await readFile(file, 'utf8');
+  for (const block of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const subjects = block[1]
+      .split(',')
+      .map((part) => part.trim().split(/[\s>+~]+/).filter(Boolean).pop() ?? '')
+      .map((subject) => subject.replace(/::?[a-z-]+(\([^)]*\))?/gi, '').replace(/\[.*?\]/g, ''));
+    if (!subjects.some((subject) => /(button|btn)/i.test(subject) || subject === 'button')) continue;
+    for (const match of block[2].matchAll(/height\s*:\s*(?:var\((--control-height-[a-z0-9-]+)\)|([0-9.]+)px)/g)) {
+      const value = match[1] ? spaceStep(match[1]) : Number(match[2]);
+      if (Number.isFinite(value)) controlHeights.add(value);
+    }
+  }
+}
 
 const report = {};
 const radiusValues = distinct(
@@ -125,13 +147,23 @@ report.radius = {
 };
 report.layering = { declaredValues: zValues.length, values: zValues, tokenRefs: findings['z token'].length };
 
-const gapValues = distinct(numeric(findings.gap));
+const gapValues = distinct(
+  findings.gap.flatMap((entry) => (entry.token ? [spaceStep(entry.token)] : [Number(entry.raw)])).filter((n) => Number.isFinite(n)),
+);
+const paddingTokens = new Set(findings.padding.flatMap((entry) => [...entry.value.matchAll(/var\((--space-[a-z0-9-]+)\)/g)].map((m) => m[1])));
+const paddingLiterals = findings.padding
+  .filter((entry) => !/calc\(/.test(entry.value))
+  .flatMap((entry) => [...entry.value.matchAll(/(^|\s)([0-9.]+)px/g)]
+    .map((m) => Number(m[2])).filter((size) => size > 0 && size <= 48));
 report.spacing = {
   distinctGaps: gapValues.length,
-  offGridGaps: gapValues.filter((value) => value % 2 !== 0),
+  offGridGaps: gapValues.filter((value) => !scales.space.has(value)),
   gapUsages: findings.gap.length,
+  paddingTokens: paddingTokens.size,
+  paddingLiterals: paddingLiterals.length,
   distinctPaddings: new Set(findings.padding.map((entry) => entry.value.trim())).size,
   lineHeights: distinct(numeric(findings['line-height'])),
+  controlHeights: [...controlHeights].filter((n) => n >= 22 && n <= 48).sort((a, b) => a - b),
 };
 report.inline = { pxLiterals: findings['inline px'].length };
 report.specificity = { important: findings.important.length };
@@ -166,8 +198,10 @@ if (asJson) {
   row('raw font-family declarations', report.type.shorthandFamilies + report.type.longhandLiterals);
   row('distinct border-radius values', `${report.radius.declaredValues} (${report.radius.offScale.length} off scale)`);
   row('z-index values', `${report.layering.tokenRefs} on tokens, ${report.layering.declaredValues} local literal(s)`);
-  row('distinct gaps', `${report.spacing.distinctGaps} (${report.spacing.offGridGaps.length} off the 2px grid)`);
+  row('distinct gaps', `${report.spacing.distinctGaps} values, ${report.spacing.offGridGaps.length} off scale`);
+  row('padding', `${report.spacing.paddingTokens} space tokens in use, ${report.spacing.paddingLiterals} literal px`);
   row('distinct padding shorthands', report.spacing.distinctPaddings);
+  row('control heights', report.spacing.controlHeights.join(', ') || 'none');
   row('distinct line-heights', report.spacing.lineHeights.join(', '));
   row('inline px literals in TSX', report.inline.pxLiterals);
   row('!important declarations', report.specificity.important);

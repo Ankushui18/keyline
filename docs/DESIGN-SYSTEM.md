@@ -67,7 +67,8 @@ Feature CSS had invented roughly a dozen pale reds within ΔE 3 of each other; t
 
 | Scale | Values |
 |---|---|
-| Space (2px base) | `--space-0`, `--space-05` … `--space-12` → 0–48px |
+| Space | `--space-0`, `--space-px` (1px hairline), `--space-05` … `--space-12` → 0–48px, plus 18 and 28 |
+| Control height | `--control-height-sm/md/lg/xl` → 24, 28, 32, 36px |
 | Radius | `--radius-xs/sm/md/lg/xl/2xl/3xl/full` → 3, 4, 6, 8, 10, 12, 16, 999px |
 | Type size | `--font-size-3xs … 6xl` → 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 32px |
 | Line height | `--line-height-tight/snug/normal/relaxed` → 1.2, 1.3, 1.45, 1.55 |
@@ -215,11 +216,15 @@ npm run check:design -- --list      # nearest token for each surviving literal
    the type scale.
 9. **Radius** — no `border-radius: Npx`; corners come from the radius scale.
 10. **Layering** — `z-index` is a `var(--z-*)` tier, or a local layer `0–9` inside one component.
+11. **Spacing** — `gap`, `padding` and `margin` use `var(--space-*)`. Zero, negative offsets and
+    page-layout values above 48px are exempt.
+12. **Controls** — a button's own `height` is one of the four control tiers; heights on its
+    children (`svg`, `i`, `b`) are glyphs and stay as they are.
 
 Current state, from the last run:
 
 ```
-Design system: 246 tokens, 61 mirrored values.
+Design system: 253 tokens, 61 mirrored values.
 Literal colours remaining — CSS 37, TS 0 (tracked in baseline.json).
 Design-system check passed: one palette, no drift.
 ```
@@ -300,12 +305,15 @@ migration pass the answer was "more than the design system owns":
 | Distinct border radii | 15 (7 off scale: 1, 2, 5, 7, 9, 11, 14) | **8, all on scale** |
 | Distinct z-index values | 36 arbitrary numbers, −1 to 300 | **38 token references + 10 local layers (0–9)** |
 | Distinct line-heights | 13 ratios (1.2 … 1.55) | **4 ratio tokens**, plus deliberate `line-height: 1` locks |
+| Spacing values | 25 distinct px in gap/padding/margin (194× `8px`, but also 7, 9, 11, 13, 15) | **15 space tokens, 0 stray px** (only page-layout values above 48px stay literal) |
+| Button heights | 9 distinct (24, 25, 26, 27, 28, 30, 32, 34, 36) | **4 tiers** (24, 28, 32, 36) |
 | Literal hex in feature CSS | 2,064 | **37** (ratcheted) |
 | Inline `px` literals in TSX | 0 | 0 |
 
 That pass is `scripts/design-system/migrate-scales.mjs` (`npm run migrate:scales`). It is a
 codemod, not a rewrite: every replacement is printed, and it only ever moves a value to the
-nearest scale step (ties resolve to the smaller step, so text and corners never grow).
+nearest scale step (ties resolve to the smaller step, so text and corners never grow). It also
+moved 1,325 spacing values onto the 2px grid and 126 button heights onto four tiers.
 
 The z-index mapping is the careful one. It is **monotonic within each stylesheet**: a value that
 sat above another still sits above it afterwards, so no component's internal stacking can change.
@@ -318,10 +326,10 @@ Measured, not guessed — these are the remaining dimensions where the product i
 
 | Dimension | Today | Why it is still open |
 |---|---|---|
-| Spacing | 19 distinct `gap` values, 6 off the 2px grid; 161 distinct `padding` shorthands | 1px shifts in gap and padding move real layout. This needs a browser to verify, and this sandbox has none. |
-| Button geometry | 24 bespoke button classes; 9 distinct heights (24, 25, 26, 27, 28, 30, 32, 34, 36) | Same reason, plus each height is tuned to a specific row (top bar 28, dialog footer 34). |
-| Specificity | 50 `!important` declarations | Most are legacy overrides from the pre-token slices. Removing them safely needs the same visual check. |
+| Component vocabulary | 24 bespoke button classes (`.icon-button`, `.tool-button`, `.share-button`, …) | They now share the same tokens for height, radius, type, spacing and colour, but they are still 24 classes. Folding them into `.ui-button` is a markup change, not a CSS change. |
+| Specificity | 50 `!important` declarations | Most are legacy overrides from the pre-token slices. Removing them safely needs a browser. |
 | Colour | 37 literals | Frozen by the ratchet; see `--list`. |
+| Layout | values above 48px (`padding-left: 200px`, a `52px` gap) | Page structure, not rhythm; deliberately exact. |
 
 The plan for those is the same shape as the work above: measure with the audit, codemod with a
 printed diff, then ratchet. They are listed here so "the design system is done" is never a false
@@ -361,5 +369,6 @@ claim.
   read tokens, but folding them into `.ui-*` primitives is incremental work, tracked by the
   ratchet rather than done in one pass.
 - **37 literals remain** and are frozen by the baseline, not eliminated. See `--list` for the list.
-- **Spacing, button geometry and 50 `!important`s are still uneven.** The audit quantifies them
-  (above) rather than implying they are finished.
+- **24 bespoke button classes and 50 `!important`s remain.** Their geometry and colour now come
+  from the same tokens, so they look alike; they are still separate classes, and merging them is
+  markup work. The audit counts both rather than implying the job is finished.

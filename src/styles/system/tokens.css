@@ -191,6 +191,7 @@
   /* ---------------------------------------------------------------- 3. scales */
   /* Spacing: 2px base unit. Use these, not arbitrary pixel gaps. */
   --space-0: 0;
+  --space-px: 1px;
   --space-05: 2px;
   --space-1: 4px;
   --space-15: 6px;
@@ -199,8 +200,10 @@
   --space-3: 12px;
   --space-35: 14px;
   --space-4: 16px;
+  --space-45: 18px;
   --space-5: 20px;
   --space-6: 24px;
+  --space-7: 28px;
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
@@ -279,6 +282,10 @@
   --layout-sidebar-default: 300px;
   --layout-control: 28px;
   --layout-control-sm: 22px;
+  --control-height-sm: 24px;
+  --control-height-md: 28px;
+  --control-height-lg: 32px;
+  --control-height-xl: 36px;
   --inspector-pad: 12px;
 
   /* ---------------------------------------------------------------- 4. legacy */
