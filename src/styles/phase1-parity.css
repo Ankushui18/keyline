@@ -14,7 +14,7 @@
 .setview button { font: inherit; color: inherit; cursor: pointer; }
 .setview-head button, .setview-actions button, .setview-tools button { height: 34px; padding: 0 14px; border: 1px solid #2e3036; background: transparent; border-radius: 8px; }
 .setview-head .setview-back { border: 0; padding: 0 8px 0 0; color: #a0a3ab; }
-.setview .is-primary { border: 0 !important; background: #0b7bd6 !important; color: #fff; font-weight: 600; }
+.setview .is-primary { border: 0 !important; background: #0868b6 !important; color: #fff; font-weight: 600; }
 .setview .is-primary:disabled { background: #26272b !important; color: #6b6e76; cursor: default; }
 .setview button:disabled { opacity: .55; cursor: default; }
 .setview-tools { display: flex; gap: 8px; padding: 20px 20px 0; }

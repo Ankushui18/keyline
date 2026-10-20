@@ -24,6 +24,7 @@ import './styles/phase1-match.css';
 import './styles/phase1-parity.css';
 import './styles/layers.css';
 import './styles/motion.css';
+import './styles/design-sidebar.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

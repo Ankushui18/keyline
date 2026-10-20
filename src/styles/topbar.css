@@ -34,7 +34,8 @@
 .topbar-icon { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; color: #a7a9b0; background: transparent; border: 0; border-radius: 6px; }
 .topbar-icon:hover:not(:disabled) { color: #ececee; background: #2c2e33; }
 .topbar-icon:disabled { color: #4d5058; cursor: default; }
-.topbar-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+/* Octicons are already filled silhouettes; stroking their contours doubles their weight. */
+.topbar .topbar-icon svg.octicon { display: block; width: 16px; height: 16px; fill: currentColor; stroke: none; stroke-width: 0; }
 .topbar-text-button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; color: #c9cbd1; background: transparent; border: 0; border-radius: 6px; }
 .topbar-text-button:hover:not(:disabled) { color: #fff; background: #2c2e33; }
 .topbar-text-button:disabled, .topbar-export:disabled { color: #5c5f67; cursor: default; }
@@ -61,8 +62,8 @@
 .topbar-share.status-synced i { display: block; }
 .topbar-share.status-connecting i, .topbar-share.status-offline i { display: block; background: #e8a33d; }
 .topbar-share.status-error i { display: block; background: #ef747c; }
-.topbar-export { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; color: #fff; background: #0b7bd6; border: 0; border-radius: 8px; font-weight: 600; }
-.topbar-export:hover:not(:disabled) { background: #2b91e0; }
+.topbar-export { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; color: #fff; background: #0868b6; border: 0; border-radius: 8px; font-weight: 600; }
+.topbar-export:hover:not(:disabled) { background: #096fbe; }
 .topbar-export:disabled { background: #26272b; }
 .topbar-export svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 1180px) { .topbar-command { min-width: 0; } .topbar-command kbd { display: none; } .topbar-save { display: none; } }

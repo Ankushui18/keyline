@@ -17,9 +17,10 @@ interface LayersPanelProps {
   onFrameLayer: (layerId: EntityId) => void;
   onDuplicateArtboard: () => void;
   onDeleteArtboard: () => void;
+  onCollapse?: () => void;
 }
 
-export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayers, onFrameLayer, onDuplicateArtboard, onDeleteArtboard }: LayersPanelProps) {
+export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayers, onFrameLayer, onDuplicateArtboard, onDeleteArtboard, onCollapse }: LayersPanelProps) {
   const [renamingId, setRenamingId] = useState<EntityId>();
   const [selectionAnchorId, setSelectionAnchorId] = useState<EntityId>();
   const [focusedLayerId, setFocusedLayerId] = useState<EntityId>();
@@ -627,6 +628,7 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
             const rect = event.currentTarget.getBoundingClientRect();
             setMenu({ x: rect.right - 188, y: rect.bottom + 4, kind: 'page' });
           }} onPointerDown={(event) => event.stopPropagation()}><LpIcon name="more" /></button>
+          {onCollapse && <button type="button" className="lp-icon lp-collapse" aria-label="Collapse panels" title="Collapse Layers and Design" onClick={onCollapse}><LpIcon name="right" /></button>}
         </div>
       </div>
       <div className="lp-page-row">

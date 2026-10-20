@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useModalFocus } from './use-modal-focus';
 import { planQuickEdit, QUICK_EDIT_EXAMPLES, type QuickEditPlan, type QuickEditTarget } from '../core/quick-edit';
 
 export interface CommandItem {
@@ -28,6 +29,8 @@ export function CommandBar({
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  useModalFocus(dialogRef);
 
   const plan = useMemo(() => (query.trim() ? planQuickEdit(query, targets) : null), [query, targets]);
 
@@ -81,12 +84,13 @@ export function CommandBar({
 
   return (
     <div className="modal-backdrop kd-backdrop is-top" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="kd-command" role="dialog" aria-modal="true" aria-label="Search or ask">
+      <section ref={dialogRef} className="kd-command" role="dialog" aria-modal="true" aria-label="Search or ask">
         <div className="kd-command-input">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg>
           <input
             ref={inputRef}
             role="combobox"
+            aria-label="Search actions or describe an edit"
             aria-expanded="true"
             aria-controls="kd-command-list"
             aria-activedescendant={rows[active] ? `kd-row-${active}` : undefined}
@@ -97,7 +101,7 @@ export function CommandBar({
           />
           <kbd>Esc</kbd>
         </div>
-        <div className="kd-command-list" id="kd-command-list" role="listbox" ref={listRef}>
+        <div className="kd-command-list" id="kd-command-list" role="listbox" aria-label="Matching actions" ref={listRef}>
           {rows.map((row, index) => {
             if (row.kind === 'edit') {
               return (

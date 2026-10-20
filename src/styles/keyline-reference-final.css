@@ -8,8 +8,13 @@
 .brand-mark svg.keyline-mark .keyline-mark-frame,
 .brand-mark svg.keyline-mark .keyline-mark-circle { fill: none; stroke: #ececee; stroke-width: 3.5; }
 .brand-mark svg.keyline-mark .keyline-mark-accent { fill: #0d99ff; stroke: none; }
-.canvas-tool-rail .canvas-rail-primary svg,
+.canvas-tool-rail .canvas-rail-primary svg:not(.octicon),
 .layer-kind-icon svg { fill: none; stroke: currentColor; }
+/* Filled icon glyphs must not inherit the line-icon stroke (the cursor was double-outlined). */
+.canvas-tool-rail svg.octicon { fill: currentColor; stroke: none; stroke-width: 0; }
+.canvas-tool-rail .canvas-tool-icon,
+.canvas-tool-rail .canvas-rail-primary svg { display: block; width: 18px; height: 18px; }
+.canvas-tool-rail .canvas-flyout-tool-icon svg { width: 16px; height: 16px; }
 .workspace-utilities .renderer-button,
 .workspace-utilities .family-button {
   position: fixed;

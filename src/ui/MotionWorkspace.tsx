@@ -1,3 +1,4 @@
+import { useModalFocus } from './use-modal-focus';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   MOTION_EASINGS,
@@ -43,6 +44,8 @@ export function MotionWorkspace({ fileName, svg, settings, onSettingsChange, onD
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+  useModalFocus(modalRef, exporting);
   const [pair, setPair] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef(0);
@@ -102,7 +105,7 @@ export function MotionWorkspace({ fileName, svg, settings, onSettingsChange, onD
 
   if (exporting) {
     return (
-      <div className="mw-export-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setExporting(false)}>
+      <div ref={modalRef} className="mw-export-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setExporting(false)}>
         <section className="mw-export" role="dialog" aria-modal="true" aria-labelledby="mw-export-title">
           <header><h2 id="mw-export-title">Export motion</h2><span>{fileName} · {(total / 1000).toFixed(1)}s{clean.loop ? ' · loops' : ''}</span></header>
           <ExportChoices svg={animated} css={motionCss(clean)} onDownload={() => { onDownload(); setExporting(false); }} onCopyCss={(css) => { onCopyCss(css); setExporting(false); }} onCancel={() => setExporting(false)} />
@@ -112,7 +115,7 @@ export function MotionWorkspace({ fileName, svg, settings, onSettingsChange, onD
   }
 
   return (
-    <div className="mw" role="dialog" aria-modal="true" aria-labelledby="mw-title">
+    <div ref={modalRef} className="mw" role="dialog" aria-modal="true" aria-labelledby="mw-title">
       <header className="mw-top">
         <div className="mw-brand"><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#26272b" /><rect x="14" y="14" width="36" height="36" fill="none" stroke="#ececee" strokeWidth="3.5" /><circle cx="32" cy="32" r="18" fill="none" stroke="#ececee" strokeWidth="3.5" /><rect x="44" y="8" width="12" height="12" fill="#0d99ff" /></svg><strong id="mw-title">{fileName}</strong></div>
         <div className="mw-mode" role="group" aria-label="Mode"><button type="button" onClick={onClose}>Design</button><button type="button" aria-pressed="true" className="is-active">Motion</button></div>

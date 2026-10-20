@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { contrastTextColor } from './contrast-color';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { isPixelGridVisible, setPixelGridVisible, subscribePixelGrid } from '../canvas/view-settings';
 import type { ConsistencyReport } from '../core/consistency';
 import type { DrawingStyle } from '../core/types';
@@ -6,6 +7,7 @@ import { renderImportPreview } from '../import/import-preview';
 import { applyTidy, type TidyAnalysis, type TidyRuleId } from '../import/tidy';
 import type { SvgImportResult } from '../import/svg-import';
 import { MODIFIER_LABEL } from './Toolbar';
+import { useModalFocus } from './use-modal-focus';
 
 interface CommonDialogProps { onClose: () => void }
 
@@ -18,8 +20,10 @@ function useDialogEscape(onClose: () => void) {
 }
 
 function Backdrop({ onClose, children, wide }: { onClose?: () => void; children: ReactNode; wide?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useModalFocus(ref);
   return (
-    <div className={`modal-backdrop kd-backdrop${wide ? ' is-wide' : ''}`} onMouseDown={(event) => onClose && event.target === event.currentTarget && onClose()}>
+    <div ref={ref} className={`modal-backdrop kd-backdrop${wide ? ' is-wide' : ''}`} onMouseDown={(event) => onClose && event.target === event.currentTarget && onClose()}>
       {children}
     </div>
   );
@@ -51,11 +55,16 @@ export function ShareDialog({
   link: string;
   status: 'connecting' | 'synced' | 'offline' | 'error' | null;
   people: SharePerson[];
-  onCreateLink: () => void;
-  onCopyLink: () => void;
+  onCreateLink: () => Promise<boolean>;
+  onCopyLink: () => Promise<boolean>;
   onStopSharing: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
   useDialogEscape(onClose);
   const statusText = status === 'synced' ? 'Live. Changes sync as you draw.'
     : status === 'offline' ? 'Offline. Changes sync when you reconnect.'
@@ -68,20 +77,20 @@ export function ShareDialog({
       <section className="kd-dialog kd-share" role="dialog" aria-modal="true" aria-labelledby="share-title">
         <header><h2 id="share-title">Share “{documentName}”</h2><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
         <div className="kd-people" aria-label="People in this drawing">
-          <div><span className="kd-avatar" style={{ background: '#0b7bd6' }}>YO</span><span><strong>You</strong><small>This device</small></span><em>Owner</em></div>
+          <div><span className="kd-avatar" style={{ background: '#0868b6' }}>YO</span><span><strong>You</strong><small>This device</small></span><em>Can edit</em></div>
           {people.filter((person) => !/\(you\)$/i.test(person.name)).map((person) => (
-            <div key={person.id}><span className="kd-avatar" style={{ background: person.color }}>{initials(person.name)}</span><span><strong>{person.name}</strong><small className="is-good">{person.detail}</small></span><em>Can edit</em></div>
+            <div key={person.id}><span className="kd-avatar" style={{ background: person.color, color: contrastTextColor(person.color) }}>{initials(person.name)}</span><span><strong>{person.name}</strong><small className="is-good">{person.detail}</small></span><em>Can edit</em></div>
           ))}
           {sharing && people.filter((person) => !/\(you\)$/i.test(person.name)).length === 0 && <p className="kd-muted">No one else has joined yet. Send the link to start drawing together.</p>}
         </div>
         <div className="kd-linkrow">
-          <span><strong>Anyone with the link</strong><small>{sharing ? 'Can edit this drawing with you. Turn off to stop.' : 'Off. The drawing stays on this device.'}</small></span>
-          <Toggle label="Share a live link" value={sharing} onChange={(value) => { if (value) { onCreateLink(); setCopied(true); } else onStopSharing(); }} />
+          <span><strong>Anyone with the link</strong><small>{sharing ? 'Can edit with you. Turning off disconnects this device, not existing links.' : 'Not connected to a live room.'}</small></span>
+          <Toggle label="Share a live link" value={sharing} onChange={(value) => { if (value) void onCreateLink().then(setCopied); else onStopSharing(); }} />
         </div>
         {sharing && <div className={`kd-status is-${status ?? 'connecting'}`} role="status"><i />{statusText}</div>}
         <div className="kd-copy">
           <code>{sharing ? link : 'Turn on the link to get an address to share'}</code>
-          <button type="button" disabled={!sharing} onClick={() => { onCopyLink(); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? 'Copied' : 'Copy link'}</button>
+          <button type="button" disabled={!sharing} onClick={() => { void onCopyLink().then(setCopied); }}>{copied ? 'Copied' : 'Copy link'}</button>
         </div>
         <footer><button type="button" className="is-primary" onClick={onClose}>Done</button></footer>
       </section>

@@ -1,3 +1,4 @@
+import { contrastTextColor } from './contrast-color';
 import { useEffect, useRef, useState } from 'react';
 import { RedoIcon } from '@primer/octicons-react/RedoIcon';
 import { UndoIcon } from '@primer/octicons-react/UndoIcon';
@@ -130,8 +131,8 @@ export function Toolbar({
         )}
         <span className={`topbar-save is-${saveStatus}`} role="status"><i />{saveStatus === 'saving' ? 'Saving…' : saveStatus === 'error' ? 'Could not save' : 'Saved'}</span>
         <div className="topbar-group" role="group" aria-label="History">
-          <button type="button" className="topbar-icon" aria-label="Undo" title={`Undo (${MODIFIER_LABEL} Z)`} disabled={!canUndo} onClick={onUndo}><UndoIcon size={17} /></button>
-          <button type="button" className="topbar-icon" aria-label="Redo" title={`Redo (${MODIFIER_LABEL} Shift Z)`} disabled={!canRedo} onClick={onRedo}><RedoIcon size={17} /></button>
+          <button type="button" className="topbar-icon" aria-label="Undo" title={`Undo (${MODIFIER_LABEL} Z)`} disabled={!canUndo} onClick={onUndo}><UndoIcon size={16} /></button>
+          <button type="button" className="topbar-icon" aria-label="Redo" title={`Redo (${MODIFIER_LABEL} Shift Z)`} disabled={!canRedo} onClick={onRedo}><RedoIcon size={16} /></button>
         </div>
       </div>
 
@@ -139,7 +140,7 @@ export function Toolbar({
         {collaborators.length > 0 && (
           <div className="topbar-people" role="status" aria-live="polite" aria-label={`${collaborators.length} collaborators online`}>
             {collaborators.slice(0, 3).map((presence) => (
-              <span key={presence.clientId} style={{ background: presence.user.color }} title={presence.user.name}>
+              <span key={presence.clientId} style={{ background: presence.user.color, color: contrastTextColor(presence.user.color) }} title={presence.user.name}>
                 {presence.user.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}
               </span>
             ))}

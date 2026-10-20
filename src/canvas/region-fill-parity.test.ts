@@ -34,6 +34,24 @@ function vertexArea(data: number[]): number {
 }
 
 describe('compound Smart Fill renderer parity', () => {
+  it('preserves RGB and embedded hex alpha in the shared WebGL paint vertices', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    addPolygon(document, manager, [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }]);
+    const regionId = document.regions[0].id;
+    for (const [color, alpha] of [['#12345680', 128 / 255], ['#12345600', 0], ['#123456', 1]] as const) {
+      manager.execute({ type: 'SET_REGION_FILL', payload: { regionId, fill: { type: 'solid', color } } });
+      const vertices = regionFillVertexData(document, document.regions.find((region) => region.id === regionId)!);
+      expect(vertices.length).toBeGreaterThan(0);
+      for (let offset = 0; offset < vertices.length; offset += 6) {
+        expect(vertices[offset + 2]).toBeCloseTo(0x12 / 255);
+        expect(vertices[offset + 3]).toBeCloseTo(0x34 / 255);
+        expect(vertices[offset + 4]).toBeCloseTo(0x56 / 255);
+        expect(vertices[offset + 5]).toBeCloseTo(alpha);
+      }
+    }
+  });
+
   it('uses one loop/rule model for WebGL tessellation and SVG export', () => {
     const document = VectorDocument.createEmpty();
     const manager = new OperationManager(document);

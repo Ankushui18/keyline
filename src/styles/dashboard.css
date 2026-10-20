@@ -23,8 +23,8 @@
 .dashboard-device-note { color: #8a8d95; }
 .dashboard-button { height: 34px; padding: 0 14px; border: 1px solid #2e3036; background: transparent; border-radius: 8px; }
 .dashboard-button:hover { background: #26272b; }
-.dashboard-button.is-primary { border: 0; background: #0b7bd6; color: #fff; font-weight: 600; padding: 0 16px; }
-.dashboard-button.is-primary:hover { background: #2b91e0; }
+.dashboard-button.is-primary { border: 0; background: #0868b6; color: #fff; font-weight: 600; padding: 0 16px; }
+.dashboard-button.is-primary:hover { background: #096fbe; }
 .dashboard-main { flex: 1; overflow: auto; padding: 28px 40px 40px; display: flex; flex-direction: column; gap: 28px; }
 .dashboard-label { margin: 0 0 12px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #8a8d95; }
 .dashboard-starts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }

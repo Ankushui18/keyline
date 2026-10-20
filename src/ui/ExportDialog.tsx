@@ -1,3 +1,4 @@
+import { copyTextToClipboard } from '../core/browser-clipboard';
 import { drawnObjectsForArtboard } from '../core/real-content';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { VectorDocument } from '../core/document';
@@ -476,9 +477,14 @@ export function ExportDialog({
             {!error && !progress && openFilledCount === 0 && <span>{deliveryFileCount || 1} icon · {plan.targets[0]?.filename ?? `${activeName.toLowerCase().replaceAll(' ', '-')}.svg`}</span>}
           </div>
           <button className="secondary-button" onClick={() => {
-            void navigator.clipboard.writeText(codeContent).then(() => {
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1200);
+            void copyTextToClipboard(codeContent).then((success) => {
+              setCopied(success);
+              if (success) {
+                setError('');
+                window.setTimeout(() => setCopied(false), 1200);
+              } else {
+                setError('Could not copy. Download the file instead, or allow clipboard access in your browser.');
+              }
             });
           }}>{copied ? 'Copied' : 'Copy code'}</button>
           <button

@@ -756,7 +756,8 @@ function appendLine(output: number[], start: Point, end: Point, color: string, a
 
 function appendVertex(output: number[], point: Point, color: string, alpha: number): void {
   const [r, g, b] = rgb(color);
-  output.push(point.x, point.y, r, g, b, alpha);
+  const embeddedAlpha = /^#[a-f0-9]{8}$/i.test(color) ? Number.parseInt(color.slice(7, 9), 16) / 255 : 1;
+  output.push(point.x, point.y, r, g, b, alpha * embeddedAlpha);
 }
 
 function triangulate(points: Point[]): number[] {
@@ -869,7 +870,7 @@ function samePoint(a: Point, b: Point): boolean {
 }
 
 function rgb(hex: string): [number, number, number] {
-  const normalized = hex.replace('#', '');
+  const normalized = /^#[a-f0-9]{8}$/i.test(hex) ? hex.slice(1, 7) : hex.replace('#', '');
   if (normalized.length !== 6) return [0.65, 0.7, 0.8];
   return [0, 2, 4].map((offset) => Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255) as [number, number, number];
 }

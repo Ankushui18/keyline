@@ -8,24 +8,24 @@
 .mw-grow { flex: 1; }
 .mw-mode { display: flex; padding: 3px; background: #1f2023; border: 1px solid #2e3036; border-radius: 9px; }
 .mw-mode button { height: 28px; padding: 0 16px; border: 0; background: transparent; border-radius: 6px; color: #a0a3ab; }
-.mw-mode button.is-active { background: #0b7bd6; color: #fff; font-weight: 600; }
+.mw-mode button.is-active { background: #0868b6; color: #fff; font-weight: 600; }
 .mw-ghost { height: 34px; padding: 0 16px; border: 1px solid #2e3036; background: transparent; border-radius: 8px; }
 .mw-ghost[aria-pressed="true"] { border-color: #0d99ff; background: #12233a; }
-.mw-primary { height: 34px; padding: 0 18px; border: 0; background: #0b7bd6; color: #fff !important; border-radius: 8px; font-weight: 600; }
-.mw-primary:hover:not(:disabled) { background: #2b91e0; }
+.mw-primary { height: 34px; padding: 0 18px; border: 0; background: #0868b6; color: #fff !important; border-radius: 8px; font-weight: 600; }
+.mw-primary:hover:not(:disabled) { background: #096fbe; }
 .mw-primary:disabled { background: #26272b; color: #6b6e76 !important; cursor: default; }
 .mw-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px minmax(0, 1fr) 310px; }
 .mw-left, .mw-right { padding: 16px 14px; display: flex; flex-direction: column; gap: 8px; overflow: auto; background: #1f2023; }
 .mw-left { border-right: 1px solid #2e3036; }
 .mw-right { border-left: 1px solid #2e3036; }
-.mw-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #8a8d95; margin-bottom: 4px; }
+.mw-label { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #a0a3ab; margin-bottom: 4px; }
 .mw-preset { display: flex; align-items: center; gap: 12px; padding: 10px 12px; text-align: left; background: #26272b; border: 1px solid #2e3036; border-radius: 10px; }
 .mw-preset span { display: flex; flex-direction: column; }
 .mw-preset small { color: #a0a3ab; }
 .mw-preset svg { color: #a0a3ab; flex: none; }
 .mw-preset.is-active { border-color: #0d99ff; background: #12233a; }
 .mw-preset.is-active svg { color: #0d99ff; }
-.mw-help, .mw-next { margin: auto 0 0; color: #8a8d95; font-size: 12px; }
+.mw-help, .mw-next { margin: auto 0 0; color: #a0a3ab; font-size: 12px; }
 .mw-next { margin-top: 14px; padding: 10px 12px; border: 1px dashed #3a3d44; border-radius: 10px; }
 .mw-stage { position: relative; display: grid; place-items: center; background: #e4e4e0; color: #17181a; min-height: 0; }
 .mw-art { color: #17181a; }
@@ -41,15 +41,15 @@
 .mw-field select { height: 28px; border: 0; background: transparent; color: #ececee; text-align: right; }
 .mw-num { display: flex; align-items: center; gap: 6px; }
 .mw-num input { width: 70px; border: 0; background: transparent; color: #ececee; text-align: right; font-family: 'Geist', system-ui, sans-serif; }
-.mw-num em { color: #8a8d95; font-style: normal; width: 20px; }
+.mw-num em { color: #a0a3ab; font-style: normal; width: 20px; }
 .mw-timeline { flex: none; height: 224px; display: flex; flex-direction: column; border-top: 1px solid #2e3036; background: #1f2023; }
 .mw-controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid #2e3036; }
-.mw-play { width: 34px; height: 30px; display: grid; place-items: center; border: 0; background: #0b7bd6; border-radius: 8px; color: #fff !important; }
+.mw-play { width: 34px; height: 30px; display: grid; place-items: center; border: 0; background: #0868b6; border-radius: 8px; color: #fff !important; }
 .mw-time { font-family: 'Geist', system-ui, sans-serif; }
-.mw-controls small { color: #8a8d95; }
+.mw-controls small { color: #a0a3ab; }
 .mw-switch { display: flex; align-items: center; gap: 10px; color: #c9cbd1; }
 .mw-switch button { position: relative; width: 36px; height: 20px; border: 0; border-radius: 999px; background: #3a3d44; padding: 0; }
-.mw-switch button.is-on { background: #0b7bd6; }
+.mw-switch button.is-on { background: #0868b6; }
 .mw-switch button i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.12s; }
 .mw-switch button.is-on i { transform: translateX(16px); }
 .mw-switch button:disabled { cursor: default; opacity: 0.9; }
@@ -60,9 +60,9 @@
 .mw-empty-row { color: #8a8d95 !important; }
 .mw-lanes { position: relative; padding-right: 16px; }
 .mw-scrub { position: absolute; left: 0; right: 16px; top: 0; width: calc(100% - 16px); height: 32px; margin: 0; opacity: 0; cursor: ew-resize; z-index: 2; }
-.mw-ruler { height: 32px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px; color: #8a8d95; font: 11px 'Geist', system-ui, sans-serif; }
+.mw-ruler { height: 32px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px; color: #a0a3ab; font: 11px 'Geist', system-ui, sans-serif; }
 .mw-lane { position: relative; height: 28px; border-bottom: 1px solid #2e3036; }
-.mw-lane span { position: absolute; top: 6px; height: 16px; border-radius: 4px; background: #0b7bd6; }
+.mw-lane span { position: absolute; top: 6px; height: 16px; border-radius: 4px; background: #0868b6; }
 .mw-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #0d99ff; pointer-events: none; margin-left: -1px; }
 .mw-export-backdrop { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; background: rgba(10, 11, 12, 0.7); }
 .mw-export { width: min(840px, calc(100vw - 32px)); padding: 24px; display: flex; flex-direction: column; gap: 14px; background: #1f2023; border: 1px solid #2e3036; border-radius: 16px; color: #ececee; font: 13px/1.4 'Geist', system-ui, sans-serif; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45); }
@@ -83,5 +83,5 @@
 .mw-reduced b { color: #7fd1a0; font-weight: 500; }
 .mw-export footer { display: flex; justify-content: flex-end; gap: 10px; }
 .mw-export footer button { height: 36px; padding: 0 18px; border: 1px solid #2e3036; background: transparent; border-radius: 8px; color: inherit; cursor: pointer; font: inherit; }
-.mw-export footer .mw-primary { border: 0; background: #0b7bd6; color: #fff; font-weight: 600; }
+.mw-export footer .mw-primary { border: 0; background: #0868b6; color: #fff; font-weight: 600; }
 @media (max-width: 900px) { .mw-body { grid-template-columns: 200px minmax(0, 1fr); } .mw-right { display: none; } }

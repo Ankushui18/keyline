@@ -2362,7 +2362,7 @@ export function VectorCanvas({
           open={railGroupOpen === 'select'}
           active={activeTool === 'select' && (selection.mode !== 'network' || networkSelectExplicit)}
           primaryLabel="Select (V)"
-          icon={<CursorIcon size={20} />}
+          icon={<CursorIcon size={18} />}
           onPrimary={() => {
             if (selection.mode === 'network') setNetworkSelectExplicit(true);
             onRequestToolChange('select');

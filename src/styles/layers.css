@@ -23,7 +23,7 @@
 .lp-row.drop-inside { background: #0D99FF22; box-shadow: inset 0 0 0 1px #0D99FF; }
 .lp-row.drop-before::before, .lp-row.drop-after::after { content: ''; position: absolute; left: 8px; right: 8px; height: 2px; background: #0D99FF; border-radius: 2px; }
 .lp-row.drop-before::before { top: -1px; } .lp-row.drop-after::after { bottom: -1px; }
-.lp-row.is-hidden .lp-name, .lp-row.is-hidden .lp-kind { opacity: .45; }
+.lp-row.is-hidden .lp-name, .lp-row.is-hidden .lp-kind { color: #A0A3AB; }
 .lp-frame { font-weight: 600; margin-top: 2px; }
 .lp-frame.is-active:not(.is-selected) .lp-name { color: #ECECEE; }
 .lp-chevron { width: 18px !important; height: 18px !important; flex: none; }

@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { VectorCanvas } from './canvas/VectorCanvas';
+import { alignmentUpdates } from './core/inspector-layout';
+import { DesignIcon } from './ui/DesignControls';
 import type {
   CollaborationSession,
   CollaborationStatus,
@@ -14,13 +16,14 @@ import {
   serializeVectorClipboard,
   type VectorClipboardPayload,
 } from './core/clipboard';
-import { deleteArtboardsTransactional, prepareCreateIconArtboard, prepareDuplicateArtboard } from './core/artboard-operations';
+import { deleteArtboardsTransactional, prepareCreateIconArtboard, prepareDuplicateArtboard, removeLegacyIconStarter } from './core/artboard-operations';
 import { VectorDocument } from './core/document';
 import { DEFAULT_DRAWING_STYLE, normalizeDrawingStyle, normalizeStoredDrawingStyle } from './core/drawing-style';
 import { evaluateSegment } from './core/geometry';
 import type { GeometryConflictResolution } from './core/geometry-components';
 import { createEntityId } from './core/ids';
-import { ARTWORK_BOUNDS_POLICY, objectBounds } from './core/object-geometry';
+import { copyTextToClipboard } from './core/browser-clipboard';
+import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
 import { prepareDeleteObject, prepareFlipObjects } from './core/object-operations';
@@ -50,7 +53,7 @@ import { ConstraintContextMenu, ConstraintPalette } from './ui/ConstraintPalette
 import { ConstraintDiagnostics } from './ui/ConstraintDiagnostics';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
-import { drawnObjectCount, drawnObjectsForArtboard, realArtboards } from './core/real-content';
+import { drawnObjectCount, drawnObjectsForArtboard, isUnusedStarterArtboard, realArtboards } from './core/real-content';
 import { SetView } from './ui/SetView';
 import { Dashboard, type StartAction } from './ui/Dashboard';
 import type { AppearanceUpdates, QuickEditPlan, QuickEditTarget } from './core/quick-edit';
@@ -137,7 +140,10 @@ export default function App() {
       if (room) {
         // Joining a shared link always starts a fresh file so it can never overwrite one of your own.
         const document = VectorDocument.createEmpty();
-        if (!cancelled()) setRoute({ kind: 'editor', runtime: { document, manager: new OperationManager(document) }, name: 'Shared drawing', loadError: false });
+        if (!cancelled()) {
+          setDocParam(document.id, 'replace', { keepRoom: true });
+          setRoute({ kind: 'editor', runtime: { document, manager: new OperationManager(document) }, name: 'Shared drawing', loadError: false });
+        }
         return;
       }
       const files = await listDocuments();
@@ -208,7 +214,8 @@ export default function App() {
 function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime: Runtime; loadError: boolean; initialName: string; start?: StartAction; onHome: () => void }) {
   const { document, manager } = runtime;
   const [activeTool, setActiveTool] = useState<ToolId>('select');
-  const [showEmptyStart, setShowEmptyStart] = useState(() => document.segments.size === 0 && !start);
+  const [showEmptyStart, setShowEmptyStart] = useState(() => !start && document.pages.length === 1 && document.activePage.artboardIds.length === 1 &&
+    isUnusedStarterArtboard(document, document.activeArtboard));
   const [documentName, setDocumentName] = useState(initialName);
   const documentNameRef = useRef(initialName);
   const [constructionExtent, setConstructionExtent] = useState<ConstructionExtent>('infinite');
@@ -223,9 +230,9 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   const [paintColor, setPaintColor] = useState('#8b6cf6');
   const [drawingStyle, setDrawingStyle] = useState<DrawingStyle>(() => {
     try {
-      const stored = window.localStorage.getItem('vector-studio-drawing-style');
+      const stored = readPreference('vector-studio-drawing-style');
       const style = normalizeStoredDrawingStyle(stored ? JSON.parse(stored) as Partial<DrawingStyle> : DEFAULT_DRAWING_STYLE);
-      window.localStorage.setItem('vector-studio-drawing-style', JSON.stringify(style));
+      writePreference('vector-studio-drawing-style', JSON.stringify(style));
       return style;
     } catch {
       return DEFAULT_DRAWING_STYLE;
@@ -245,26 +252,26 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   const [motionOpen, setMotionOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<import('./ui/KeylineDialogs').SettingsSection>('General');
-  const [reduceMotion, setReduceMotion] = useState(() => window.localStorage.getItem('keyline-reduce-motion') === 'true');
+  const [reduceMotion, setReduceMotion] = useState(() => readPreference('keyline-reduce-motion') === 'true');
   const [motionSettings, setMotionSettings] = useState<MotionSettings>(() => {
-    try { return clampMotionSettings({ ...DEFAULT_MOTION_SETTINGS, ...JSON.parse(window.localStorage.getItem('keyline-motion') ?? '{}') }); } catch { return DEFAULT_MOTION_SETTINGS; }
+    try { return clampMotionSettings({ ...DEFAULT_MOTION_SETTINGS, ...JSON.parse(readPreference('keyline-motion') ?? '{}') }); } catch { return DEFAULT_MOTION_SETTINGS; }
   });
   const [tidyState, setTidyState] = useState<{ imported: SvgImportResult; analysis: TidyAnalysis; sourceName: string } | null>(null);
   const [consistencyReport, setConsistencyReport] = useState<ConsistencyReport | null>(null);
   const [familyCollectionOpen, setFamilyCollectionOpen] = useState(false);
   const [geometryReviewComponentId, setGeometryReviewComponentId] = useState<EntityId>();
   const [rendererMode, setRendererMode] = useState<'canvas2d' | 'webgl'>(() =>
-    window.localStorage.getItem('vector-studio-renderer') === 'webgl' ? 'webgl' : 'canvas2d');
+    readPreference('vector-studio-renderer') === 'webgl' ? 'webgl' : 'canvas2d');
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const stored = Number(window.localStorage.getItem('vector-studio-sidebar-width'));
-    return Number.isFinite(stored) && stored >= 240 && stored <= 560 ? stored : 300;
+    const stored = Number(readPreference('vector-studio-sidebar-width'));
+    return Number.isFinite(stored) && stored >= 240 && stored <= 560 ? stored : 288;
   });
-  const [sidebarMode, setSidebarMode] = useState<'split' | 'layers' | 'properties'>(() => {
-    const stored = window.localStorage.getItem('vector-studio-sidebar-mode');
-    return stored === 'layers' || stored === 'properties' || stored === 'split' ? stored : 'split';
+  const [layersPanelHeight, setLayersPanelHeight] = useState(() => {
+    const stored = Number(readPreference('keyline-layers-panel-height'));
+    return Number.isFinite(stored) && stored >= 140 && stored <= 500 ? stored : 216;
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
-    window.localStorage.getItem('vector-studio-sidebar-collapsed') === 'true');
+    readPreference('vector-studio-sidebar-collapsed') === 'true');
   const [solverStatus, setSolverStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [diagnostics, setDiagnostics] = useState<ConstraintConflict[]>([]);
   const [notice, setNotice] = useState<{ message: string; tone: 'info' | 'error'; action?: { label: string; run: () => void } } | null>(null);
@@ -293,7 +300,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   const updateDrawingStyle = useCallback((updates: Partial<DrawingStyle>) => {
     setDrawingStyle((current) => {
       const next = normalizeDrawingStyle({ ...current, ...updates });
-      window.localStorage.setItem('vector-studio-drawing-style', JSON.stringify(next));
+      writePreference('vector-studio-drawing-style', JSON.stringify(next));
       return next;
     });
   }, []);
@@ -348,16 +355,15 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     if (tool !== 'shape-builder') setShapeBuilderState({ regionIds: [], resultPathIds: [] });
   }, [announce, document, toolDisabledReasons]);
 
-  const shareDocument = useCallback(() => {
+  const shareDocument = useCallback(async () => {
     const nextRoom = roomId ?? createEntityId().toLowerCase();
     const url = new URL(window.location.href);
     url.searchParams.set('room', nextRoom);
     window.history.replaceState({}, '', url);
     if (!roomId) setRoomId(nextRoom);
-    void navigator.clipboard?.writeText(url.toString()).catch(() => {
-      // The room URL is already reflected in the address bar when clipboard
-      // permission is unavailable, so sharing still succeeds without a page error.
-    });
+    const publicLink = new URL(window.location.pathname, window.location.origin);
+    publicLink.searchParams.set('room', nextRoom);
+    return copyTextToClipboard(publicLink.toString());
   }, [roomId]);
 
   const createParametricGroup = useCallback((kind: 'mirror-x' | 'mirror-y' | 'radial') => {
@@ -825,49 +831,12 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     objectIds: EntityId[],
     alignment: 'left' | 'center-x' | 'right' | 'top' | 'center-y' | 'bottom',
   ) => {
-    const objects = objectIds
-      .map((id) => document.getObject(id))
-      .filter((object): object is NetworkObject => object !== undefined)
-      .filter((object) => document.isObjectVisible(object.id) && !document.isObjectLocked(object.id));
-    if (objects.length < 2) return;
-    const bounds = objects.map((object) => ({
-      object,
-      bounds: objectBounds(document, object.id, ARTWORK_BOUNDS_POLICY),
-    }));
-    const target = alignment === 'left'
-      ? Math.min(...bounds.map((item) => item.bounds.minX))
-      : alignment === 'right'
-        ? Math.max(...bounds.map((item) => item.bounds.maxX))
-        : alignment === 'top'
-          ? Math.min(...bounds.map((item) => item.bounds.minY))
-          : alignment === 'bottom'
-            ? Math.max(...bounds.map((item) => item.bounds.maxY))
-            : alignment === 'center-x'
-              ? (Math.min(...bounds.map((item) => item.bounds.minX)) + Math.max(...bounds.map((item) => item.bounds.maxX))) / 2
-              : (Math.min(...bounds.map((item) => item.bounds.minY)) + Math.max(...bounds.map((item) => item.bounds.maxY))) / 2;
+    const updates = alignmentUpdates(document, objectIds, alignment);
+    if (!updates.length) return;
     try {
       manager.beginTransaction(`Align objects ${alignment}`);
-      for (const item of bounds) {
-        const current = alignment === 'left' ? item.bounds.minX
-          : alignment === 'right' ? item.bounds.maxX
-            : alignment === 'top' ? item.bounds.minY
-              : alignment === 'bottom' ? item.bounds.maxY
-                : alignment === 'center-x' ? (item.bounds.minX + item.bounds.maxX) / 2
-                  : (item.bounds.minY + item.bounds.maxY) / 2;
-        const horizontal = alignment === 'left' || alignment === 'right' || alignment === 'center-x';
-        manager.execute({
-          type: 'UPDATE_OBJECT',
-          payload: {
-            objectId: item.object.id,
-            updates: {
-              transform: {
-                ...item.object.transform,
-                x: item.object.transform.x + (horizontal ? target - current : 0),
-                y: item.object.transform.y + (horizontal ? 0 : target - current),
-              },
-            },
-          },
-        });
+      for (const { objectId, transform } of updates) {
+        manager.execute({ type: 'UPDATE_OBJECT', payload: { objectId, updates: { transform } } });
       }
       manager.commitTransaction();
     } catch (error) {
@@ -1274,9 +1243,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     setSelectedArtboardIds(new Set());
     setActiveTool('select');
     setSidebarCollapsed(false);
-    setSidebarMode('properties');
-    window.localStorage.setItem('vector-studio-sidebar-collapsed', 'false');
-    window.localStorage.setItem('vector-studio-sidebar-mode', 'properties');
+    writePreference('vector-studio-sidebar-collapsed', 'false');
     setViewportFocusRequest({ id: ++focusRequestIdRef.current, objectIds: [object.id] });
   }, [document]);
 
@@ -1558,6 +1525,16 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   }, [announce, document, manager, persistence]);
 
   useEffect(() => {
+    // Repair the old two-frame onboarding result only in local files, after persistence subscribes.
+    if (roomId || !removeLegacyIconStarter(manager)) return;
+    const frame = document.activeArtboard.frame;
+    setViewportFocusRequest({
+      id: ++focusRequestIdRef.current,
+      bounds: { minX: frame.x, minY: frame.y, maxX: frame.x + frame.width, maxY: frame.y + frame.height },
+    });
+  }, [document, manager, roomId]);
+
+  useEffect(() => {
     if (!roomId) {
       collaborationRef.current = null;
       setCollaborationStatus(null);
@@ -1654,10 +1631,10 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     const untouched = drawingStyle.strokeWidth === DEFAULT_DRAWING_STYLE.strokeWidth
       && drawingStyle.strokeCap === DEFAULT_DRAWING_STYLE.strokeCap
       && drawingStyle.strokeJoin === DEFAULT_DRAWING_STYLE.strokeJoin;
-    if (untouched && !window.localStorage.getItem('keyline-icon-style-seeded')) {
+    if (untouched && !readPreference('keyline-icon-style-seeded')) {
       updateDrawingStyle({ strokeWidth: 1.5, strokeCap: 'round', strokeJoin: 'round' });
     }
-    window.localStorage.setItem('keyline-icon-style-seeded', 'true');
+    writePreference('keyline-icon-style-seeded', 'true');
   }, [drawingStyle, updateDrawingStyle]);
 
   const goHome = useCallback(async () => {
@@ -1679,12 +1656,12 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
 
   useEffect(() => {
     window.document.documentElement.dataset.reduceMotion = String(reduceMotion);
-    window.localStorage.setItem('keyline-reduce-motion', String(reduceMotion));
+    writePreference('keyline-reduce-motion', String(reduceMotion));
   }, [reduceMotion]);
 
   const updateMotionSettings = useCallback((next: MotionSettings) => {
     setMotionSettings(next);
-    window.localStorage.setItem('keyline-motion', JSON.stringify(next));
+    writePreference('keyline-motion', JSON.stringify(next));
   }, []);
 
   /* Sharing */
@@ -1695,7 +1672,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     setRoomId(null);
     setCollaborationStatus(null);
     setCollaborators([]);
-    announce('Sharing stopped. This drawing is private again.');
+    announce('This device disconnected. Existing room links may still be used by others.');
   }, [announce]);
   const shareLink = roomId ? `${window.location.origin}${window.location.pathname}?room=${roomId}` : '';
 
@@ -1782,10 +1759,10 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     announce('Animated SVG downloaded.');
   }, [announce, motionSettings, motionSvg]);
   const copyMotionCss = useCallback((css: string) => {
-    void navigator.clipboard?.writeText(css).then(
-      () => announce('Animation CSS copied. Give each path the class “kl”, and “kl-line” or “kl-fill”.'),
-      () => announce('Could not copy. Your browser blocked clipboard access.', 'error'),
-    );
+    void copyTextToClipboard(css).then((copied) => {
+      if (copied) announce('Animation CSS copied. Give each path the class “kl”, and “kl-line” or “kl-fill”.');
+      else announce('Could not copy. Your browser blocked clipboard access.', 'error');
+    });
   }, [announce]);
 
   /* Command bar */
@@ -1937,17 +1914,40 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   // revision intentionally makes graph-derived shell values update after operations.
   void revision;
 
-  const chooseSidebarMode = (mode: 'split' | 'layers' | 'properties') => {
-    setSidebarMode(mode);
-    window.localStorage.setItem('vector-studio-sidebar-mode', mode);
-  };
   const toggleSidebar = () => {
     setSidebarCollapsed((current) => {
-      window.localStorage.setItem('vector-studio-sidebar-collapsed', String(!current));
+      writePreference('vector-studio-sidebar-collapsed', String(!current));
       return !current;
     });
   };
+  const saveLayersPanelHeight = (height: number) => {
+    const next = Math.min(500, Math.max(140, height));
+    setLayersPanelHeight(next);
+    writePreference('keyline-layers-panel-height', String(next));
+  };
+  const startPanelSplitResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = event.currentTarget.previousElementSibling?.getBoundingClientRect().height ?? layersPanelHeight;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const move = (moveEvent: PointerEvent) => {
+      setLayersPanelHeight(Math.min(500, Math.max(140, startHeight + moveEvent.clientY - startY)));
+    };
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      setLayersPanelHeight((current) => {
+        writePreference('keyline-layers-panel-height', String(current));
+        return current;
+      });
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end, { once: true });
+    window.addEventListener('pointercancel', end, { once: true });
+  };
   const startSidebarResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
     const startX = event.clientX;
     const startWidth = sidebarWidth;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1958,13 +1958,15 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     const end = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
       setSidebarWidth((current) => {
-        window.localStorage.setItem('vector-studio-sidebar-width', String(current));
+        writePreference('vector-studio-sidebar-width', String(current));
         return current;
       });
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end, { once: true });
+    window.addEventListener('pointercancel', end, { once: true });
   };
 
   return (
@@ -2019,15 +2021,15 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
               { id: 'you', name: `${collaborationIdentity().name} (you)`, color: collaborationIdentity().color, detail: 'This device' },
               ...collaborators.map((person) => ({ id: String(person.clientId), name: person.user.name, color: person.user.color, detail: 'Editing now' })),
             ]}
-            onCreateLink={() => {
-              shareDocument();
-              announce('Link copied. Anyone who opens it can edit with you.');
+            onCreateLink={async () => {
+              const copied = await shareDocument();
+              announce(copied ? 'Link copied. Anyone who opens it can edit with you.' : 'Link created. Select it in the Share dialog and copy it by hand.');
+              return copied;
             }}
-            onCopyLink={() => {
-              void navigator.clipboard?.writeText(shareLink).then(
-                () => announce('Link copied.'),
-                () => announce('Could not copy. Select the link and copy it by hand.', 'error'),
-              );
+            onCopyLink={async () => {
+              const copied = await copyTextToClipboard(shareLink);
+              announce(copied ? 'Link copied.' : 'Could not copy. Select the link and copy it by hand.', copied ? 'info' : 'error');
+              return copied;
             }}
             onStopSharing={() => { stopSharing(); setShareOpen(false); }}
             onClose={() => setShareOpen(false)}
@@ -2041,7 +2043,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
             rendererMode={rendererMode}
             onRendererModeChange={(mode) => {
               setRendererMode(mode);
-              window.localStorage.setItem('vector-studio-renderer', mode);
+              writePreference('vector-studio-renderer', mode);
             }}
             reduceMotion={reduceMotion}
             onReduceMotionChange={setReduceMotion}
@@ -2246,7 +2248,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
             </div>
           </section>
         )}
-        <aside className={`right-sidebar mode-${sidebarMode}${sidebarCollapsed ? ' is-collapsed' : ''}`}>
+        <aside aria-label="Layers and Design" className={`right-sidebar reference-sidebar mode-split${sidebarCollapsed ? ' is-collapsed' : ''}`} style={{ '--layers-height': `${layersPanelHeight}px` } as CSSProperties}>
           {!sidebarCollapsed && (
             <div
               className="sidebar-resizer"
@@ -2261,29 +2263,24 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
               onKeyDown={(event) => {
                 if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
                 event.preventDefault();
+                event.stopPropagation();
                 const next = Math.min(560, Math.max(240, sidebarWidth + (event.key === 'ArrowLeft' ? 16 : -16)));
                 setSidebarWidth(next);
-                window.localStorage.setItem('vector-studio-sidebar-width', String(next));
+                writePreference('vector-studio-sidebar-width', String(next));
               }}
             />
           )}
-          <div className="sidebar-panel-tabs" role="toolbar" aria-label="Sidebar layout">
-            {sidebarCollapsed ? (
-              <button type="button" onClick={toggleSidebar} aria-label="Open panels" title="Open panels">‹</button>
-            ) : (
-              <>
-                <button type="button" aria-pressed={sidebarMode === 'layers'} onClick={() => chooseSidebarMode('layers')}>Layers</button>
-                <button type="button" aria-label="Properties" aria-pressed={sidebarMode === 'properties'} onClick={() => chooseSidebarMode('properties')}><span aria-hidden="true">Design</span></button>
-                <button className="sidebar-split-button" type="button" aria-label="Split" title="Show Layers and Design together" aria-pressed={sidebarMode === 'split'} onClick={() => chooseSidebarMode('split')}><span aria-hidden="true">◫</span></button>
-                <button type="button" onClick={toggleSidebar} aria-label="Collapse panels" title="Collapse panels">›</button>
-              </>
-            )}
-          </div>
+          {sidebarCollapsed ? (
+            <div className="sidebar-closed">
+              <button type="button" onClick={toggleSidebar} aria-label="Open panels" title="Open Layers and Design"><DesignIcon name="chevron-right" /></button>
+            </div>
+          ) : (
           <Suspense fallback={<div className="panel-loading" role="status">Loading panels…</div>}>
           <LayersPanel
             document={document}
             manager={manager}
             selectedLayerIds={selectedLayerIds}
+            onCollapse={toggleSidebar}
             onFrameLayer={frameLayerOnCanvas}
             onDuplicateArtboard={duplicateActiveArtboard}
             onDeleteArtboard={deleteActiveArtboard}
@@ -2308,6 +2305,17 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
               setActiveTool('select');
             }}
           />
+          <div
+            className="panel-split-resizer" role="separator" aria-label="Resize Layers and Design"
+            aria-orientation="horizontal" aria-valuemin={140} aria-valuemax={500} aria-valuenow={layersPanelHeight} tabIndex={0}
+            onPointerDown={startPanelSplitResize}
+            onKeyDown={(event) => {
+              if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              saveLayersPanelHeight(event.key === 'Home' ? 140 : event.key === 'End' ? 500 : layersPanelHeight + (event.key === 'ArrowUp' ? -12 : 12));
+            }}
+          ><span /></div>
           <PropertiesPanel
             document={document}
             manager={manager}
@@ -2375,6 +2383,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
             onExitNetworkEdit={exitObjectNetwork}
           />
           </Suspense>
+          )}
         </aside>
       </main>
       {constraintMenu && (
@@ -2500,9 +2509,16 @@ function applyAppearanceUpdates(
 
 function collaborationIdentity(): { id: string; name: string; color: string } {
   const storageKey = 'vector-studio-collaboration-user';
-  const stored = window.localStorage.getItem(storageKey);
+  const stored = readPreference(storageKey);
   if (stored) {
-    try { return JSON.parse(stored) as { id: string; name: string; color: string }; } catch { /* regenerate */ }
+    try {
+      const value = JSON.parse(stored) as { id?: unknown; name?: unknown; color?: unknown } | null;
+      if (value && typeof value.id === 'string' && value.id.length > 0 && value.id.length <= 128
+        && typeof value.name === 'string' && value.name.length > 0 && value.name.length <= 48
+        && typeof value.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(value.color)) {
+        return { id: value.id, name: value.name, color: value.color };
+      }
+    } catch { /* Regenerate malformed or outdated preferences. */ }
   }
   const colors = ['#68a0ff', '#9b7cff', '#56c9a5', '#f0a85b', '#ef7181'];
   const id = createEntityId();
@@ -2511,7 +2527,7 @@ function collaborationIdentity(): { id: string; name: string; color: string } {
     name: `Designer ${id.slice(-4).toUpperCase()}`,
     color: colors[id.charCodeAt(id.length - 1) % colors.length],
   };
-  window.localStorage.setItem(storageKey, JSON.stringify(identity));
+  writePreference(storageKey, JSON.stringify(identity));
   return identity;
 }
 

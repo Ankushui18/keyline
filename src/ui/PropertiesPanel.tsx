@@ -13,6 +13,8 @@ import {
 import { evaluateSegment } from '../core/geometry';
 import { FamilyQaDialog } from './FamilyQaDialog';
 import { evaluateNumericExpression } from '../core/numeric-expression';
+import { alignmentUpdates, arrangementUpdates, resizedObjectTransform, verticalDistributionUpdates, type InspectorTransformUpdate, type ObjectAlignment } from '../core/inspector-layout';
+import { DesignAlignment, DesignFlow, DesignIcon, DesignIconButton, DesignNumberField, DesignSectionHead } from './DesignControls';
 import type { OperationManager, SegmentRoleUpdate } from '../core/operations';
 import { parametricSourceObjectId, validateParametricGroup } from '../core/parametric';
 import { objectConstructionComposition, selectionIsConstructionOnly } from '../core/segment-semantics';
@@ -211,7 +213,7 @@ export function PropertiesPanel({
   const showArtboardProperties = selection.mode === 'object' && selectedObjects.length === 0;
 
   return (
-    <aside className="properties-panel">
+    <aside className="properties-panel reference-design" aria-label="Design inspector">
       <div className="panel-heading">
         <div>
           <h2 aria-label="Properties">Design</h2>
@@ -249,6 +251,7 @@ export function PropertiesPanel({
 
       {selection.mode === 'object' && selectedObjects.length === 1 ? (
         <ObjectInspector
+          key={selectedObjects[0].id}
           document={document}
           manager={manager}
           object={selectedObjects[0]}
@@ -261,10 +264,13 @@ export function PropertiesPanel({
           onCommitContinuousEdit={onCommitContinuousEdit}
           onRollbackContinuousEdit={onRollbackContinuousEdit}
           onFlip={(axis) => onFlipObjects([selectedObjects[0].id], axis)}
+          onAlign={(alignment) => onAlignObjects([selectedObjects[0].id], alignment)}
+          onHide={() => onSetObjectLayerState([selectedObjects[0].id], { visible: false })}
         />
       ) : selection.mode === 'object' && selectedObjects.length > 1 ? (
         <MultiObjectInspector
           document={document}
+          manager={manager}
           objects={selectedObjects}
           onUpdateObjects={onUpdateObjects}
           onUpdateAppearances={onUpdateObjectAppearances}
@@ -276,7 +282,7 @@ export function PropertiesPanel({
           onSetLayerState={onSetObjectLayerState}
         />
       ) : selection.mode === 'object' ? (
-        activeTool === 'select' ? <EmptyInspector /> : null
+        null
       ) : selectedNodes.length === 0 && selectedSegments.length === 0 ? (
         <NetworkEditSummary
           object={selection.editingObjectId ? document.getObject(selection.editingObjectId) : undefined}
@@ -1127,6 +1133,18 @@ function StrokeAlignmentControl({
 
 const ARTBOARD_PRESETS = [16, 20, 24, 32, 48, 64, 1024] as const;
 
+function applyInspectorTransforms(manager: OperationManager, label: string, updates: InspectorTransformUpdate[]) {
+  if (!updates.length) return;
+  manager.beginTransaction(label);
+  try {
+    updates.forEach(({ objectId, transform }) => manager.execute({ type: 'UPDATE_OBJECT', payload: { objectId, updates: { transform } } }));
+    manager.commitTransaction();
+  } catch (error) {
+    manager.rollbackTransaction();
+    console.warn(`${label} failed.`, error);
+  }
+}
+
 function ArtboardFrameInspector({
   document,
   manager,
@@ -1140,6 +1158,9 @@ function ArtboardFrameInspector({
 }) {
   const artboard = document.activeArtboard;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [aspectLocked, setAspectLocked] = useState(false);
+  const editSizeRef = useRef({ width: artboard.frame.width, height: artboard.frame.height });
+  const lastBackgroundOpacity = useRef(1);
   const [widthDraft, setWidthDraft] = useState(String(artboard.frame.width));
   const [heightDraft, setHeightDraft] = useState(String(artboard.frame.height));
   const editingRef = useRef<'width' | 'height'>();
@@ -1165,6 +1186,7 @@ function ArtboardFrameInspector({
 
   const beginEdit = (field: 'width' | 'height') => {
     editingRef.current = field;
+    editSizeRef.current = { width: artboard.frame.width, height: artboard.frame.height };
     if (!transactionOpenRef.current) {
       manager.beginTransaction('Resize artboard');
       transactionOpenRef.current = true;
@@ -1175,12 +1197,16 @@ function ArtboardFrameInspector({
     if (field === 'width') setWidthDraft(text); else setHeightDraft(text);
     const value = Number(text);
     if (!Number.isFinite(value) || value <= 0) return;
+    if (aspectLocked) {
+      if (field === 'width') setHeightDraft(String(Number((value * editSizeRef.current.height / editSizeRef.current.width).toFixed(3))));
+      else setWidthDraft(String(Number((value * editSizeRef.current.width / editSizeRef.current.height).toFixed(3))));
+    }
     manager.execute({
       type: 'UPDATE_ARTBOARD_DIMENSIONS',
       payload: {
         artboardId: artboard.id,
-        width: field === 'width' ? value : document.activeArtboard.frame.width,
-        height: field === 'height' ? value : document.activeArtboard.frame.height,
+        width: field === 'width' ? value : aspectLocked ? value * editSizeRef.current.width / editSizeRef.current.height : document.activeArtboard.frame.width,
+        height: field === 'height' ? value : aspectLocked ? value * editSizeRef.current.height / editSizeRef.current.width : document.activeArtboard.frame.height,
       },
     });
   };
@@ -1199,6 +1225,7 @@ function ArtboardFrameInspector({
   };
 
   const handleDimensionKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    event.stopPropagation();
     if (event.key === 'Enter') event.currentTarget.blur();
     if (event.key !== 'Escape') return;
     event.preventDefault();
@@ -1216,76 +1243,91 @@ function ArtboardFrameInspector({
     ? String(artboard.frame.width)
     : 'custom';
 
+  const contentIds = document.objectsForArtboard(artboard.id)
+    .filter((object) => document.isObjectVisible(object.id) && !document.isObjectLocked(object.id))
+    .filter((object) => (document.getNetwork(object.networkId)?.nodeIds.length ?? 0) > 0)
+    .map((object) => object.id);
+  const background = /^#([a-f0-9]{6})([a-f0-9]{2})?$/i.exec(artboard.background);
+  const backgroundColor = background ? `#${background[1]}` : '#ffffff';
+  const backgroundOpacity = background?.[2] ? Number.parseInt(background[2], 16) / 255 : 1;
+  const setBackground = (color: string, opacity = backgroundOpacity) => {
+    const alpha = Math.round(Math.min(1, Math.max(0, opacity)) * 255);
+    manager.execute({ type: 'UPDATE_ARTBOARD', payload: { artboardId: artboard.id, updates: { background: `${color}${alpha === 255 ? '' : alpha.toString(16).padStart(2, '0')}` } } });
+  };
+  const moveFrame = (axis: 'x' | 'y', value: number) => {
+    const delta = value - artboard.frame[axis];
+    manager.beginTransaction('Move frame');
+    try {
+      manager.execute({ type: 'UPDATE_ARTBOARD', payload: { artboardId: artboard.id, updates: { frame: { ...artboard.frame, [axis]: value } } } });
+      // Frame children keep their position relative to the frame, including locked layers.
+      for (const object of document.objectsForArtboard(artboard.id)) {
+        manager.execute({ type: 'UPDATE_OBJECT', payload: { objectId: object.id, updates: { transform: { ...object.transform, [axis]: object.transform[axis] + delta } } } });
+      }
+      manager.commitTransaction();
+    } catch (error) { manager.rollbackTransaction(); console.warn('Move frame failed.', error); }
+  };
+
   return (
-    <section className="frame-card" aria-label="Frame">
-      <header className="frame-card-head">
-        <div><strong>{artboard.name}</strong><small>Frame</small></div>
-        <div className="frame-card-menu">
-          <button type="button" aria-label="Frame actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>···</button>
+    <section className="di-inspector di-frame" aria-label="Frame">
+      <div className="di-selection-summary">
+        <DesignIcon name="frame" size={14} />
+        <strong title={artboard.name}>{artboard.name}</strong>
+        <div className="di-frame-menu">
+          <button type="button" className="di-icon-button" aria-label="Frame actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><DesignIcon name="more" /></button>
           {menuOpen && (
-            <div role="menu" className="frame-card-popover" onMouseLeave={() => setMenuOpen(false)}>
+            <div role="menu" className="di-frame-popover" onMouseLeave={() => setMenuOpen(false)}>
               <button type="button" role="menuitem" className="duplicate-artboard-button" onClick={() => { setMenuOpen(false); onDuplicate(); }}>Duplicate frame</button>
-              <button
-                type="button"
-                role="menuitem"
-                className="delete-artboard-button"
-                disabled={Boolean(artboard.isCanvasRoot)}
-                onClick={() => { setMenuOpen(false); onDelete(); }}
-              >Delete frame</button>
+              <button type="button" role="menuitem" className="delete-artboard-button" disabled={Boolean(artboard.isCanvasRoot)} onClick={() => { setMenuOpen(false); onDelete(); }}>Delete frame</button>
             </div>
           )}
         </div>
-      </header>
-      <div className="frame-card-block">
-        <span className="frame-card-label">Size</span>
-        <div className="frame-size-chips" role="group" aria-label="Frame size">
-          {[16, 24, 32, 48].map((size) => (
-            <button
-              type="button"
-              key={size}
-              aria-pressed={preset === String(size)}
-              className={preset === String(size) ? 'is-active' : ''}
-              onClick={() => manager.execute({ type: 'UPDATE_ARTBOARD_DIMENSIONS', payload: { artboardId: artboard.id, width: size, height: size } })}
-            >{size}</button>
-          ))}
-        </div>
-        <div className="frame-dimension-grid">
-          <label className="frame-field">
-            <span>W</span>
-            <input
-              data-dimension="width"
-              aria-label="Artboard width"
-              type="number"
-              min="1"
-              step="1"
-              value={widthDraft}
-              onFocus={() => beginEdit('width')}
-              onChange={(event) => applyDimension('width', event.target.value)}
-              onBlur={finishEdit}
-              onKeyDown={handleDimensionKeyDown}
-            />
-          </label>
-          <label className="frame-field">
-            <span>H</span>
-            <input
-              data-dimension="height"
-              aria-label="Artboard height"
-              type="number"
-              min="1"
-              step="1"
-              value={heightDraft}
-              onFocus={() => beginEdit('height')}
-              onChange={(event) => applyDimension('height', event.target.value)}
-              onBlur={finishEdit}
-              onKeyDown={handleDimensionKeyDown}
-            />
-          </label>
-        </div>
       </div>
-      <label className="frame-grid-toggle">
-        <span>Show pixel grid</span>
-        <input type="checkbox" checked={gridOn} onChange={(event) => setPixelGridVisible(event.target.checked)} />
-      </label>
+      <section className="di-section di-position-section">
+        <DesignAlignment
+          disabled={contentIds.length < 2}
+          onAlign={(alignment) => {
+            // Frame selection aligns its contents, never the frame against itself.
+            applyInspectorTransforms(manager, 'Align frame contents', alignmentUpdates(document, contentIds, alignment));
+          }}
+          onDistribute={contentIds.length >= 3 ? () => applyInspectorTransforms(manager, 'Distribute frame contents', verticalDistributionUpdates(document, contentIds)) : undefined}
+        />
+        <div className="di-control-block"><span className="di-label">Position</span><div className="di-two-columns di-with-trailing-space">
+          <DesignNumberField label="Artboard X position" prefix="X" value={artboard.frame.x} onCommit={(value) => moveFrame('x', value)} />
+          <DesignNumberField label="Artboard Y position" prefix="Y" value={artboard.frame.y} onCommit={(value) => moveFrame('y', value)} />
+        </div></div>
+        <div className="di-control-block"><span className="di-label">Rotation</span><div className="di-rotation-row">
+          <DesignNumberField label="Frame rotation (frames are axis-aligned)" icon="corner" suffix="°" value={0} disabled onCommit={() => {}} />
+          <div className="di-segment-group"><DesignIconButton icon="rotate" label="Frames are axis-aligned" disabled /><DesignIconButton icon="flip-x" label="Select a shape to flip horizontally" disabled /><DesignIconButton icon="flip-y" label="Select a shape to flip vertically" disabled /></div>
+        </div></div>
+      </section>
+      <section className="di-section di-layout-section">
+        <DesignSectionHead title="Layout">
+          <DesignIconButton icon="reset" label="Reset frame to 24 × 24" onClick={() => manager.execute({ type: 'UPDATE_ARTBOARD_DIMENSIONS', payload: { artboardId: artboard.id, width: 24, height: 24 } })} />
+          <DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Lock aspect ratio" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} />
+        </DesignSectionHead>
+        <DesignFlow disabled={contentIds.length < 2} onArrange={(mode) => applyInspectorTransforms(manager, `Arrange frame contents ${mode}`, arrangementUpdates(document, contentIds, mode))} />
+        <div className="di-control-block"><span className="di-label">Dimensions</span><div className="di-dimension-row">
+          <div className="di-two-columns">
+            <label className="di-number-field"><span className="di-field-prefix" aria-hidden="true">W</span><input data-dimension="width" aria-label="Artboard width" type="number" min="1" step="1" value={widthDraft} onFocus={(event) => { beginEdit('width'); event.currentTarget.select(); }} onChange={(event) => applyDimension('width', event.target.value)} onBlur={finishEdit} onKeyDown={handleDimensionKeyDown} /></label>
+            <label className="di-number-field"><span className="di-field-prefix" aria-hidden="true">H</span><input data-dimension="height" aria-label="Artboard height" type="number" min="1" step="1" value={heightDraft} onFocus={(event) => { beginEdit('height'); event.currentTarget.select(); }} onChange={(event) => applyDimension('height', event.target.value)} onBlur={finishEdit} onKeyDown={handleDimensionKeyDown} /></label>
+          </div>
+          <DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Constrain frame proportions" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} />
+        </div></div>
+        <label className="di-checkbox is-unavailable" title="Artboard clipping is not yet supported by the canvas renderer"><input type="checkbox" checked={artboard.clipContent} disabled readOnly /><span>Clip content</span></label>
+      </section>
+      <section className="di-section di-appearance-section">
+        <DesignSectionHead title="Appearance"><DesignIconButton icon={backgroundOpacity > 0 ? 'eye' : 'eye-off'} label={backgroundOpacity > 0 ? 'Hide frame background' : 'Show frame background'} onClick={() => { if (backgroundOpacity > 0) lastBackgroundOpacity.current = backgroundOpacity; setBackground(backgroundColor, backgroundOpacity > 0 ? 0 : lastBackgroundOpacity.current); }} /></DesignSectionHead>
+        <div className="di-two-columns di-with-trailing-space"><div className="di-control-block"><span className="di-label">Opacity</span><DesignNumberField label="Frame background opacity" icon="opacity" suffix="%" value={Math.round(backgroundOpacity * 100)} min={0} max={100} onCommit={(value) => setBackground(backgroundColor, value / 100)} /></div><div className="di-control-block"><span className="di-label">Corner radius</span><DesignNumberField label="Frame corner radius (not supported)" icon="corners" value={0} disabled onCommit={() => {}} /></div></div>
+      </section>
+      <section className="di-section di-fill-section">
+        <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add frame background" onClick={() => setBackground(backgroundColor, 1)} /></DesignSectionHead>
+        <PaintRow label="Frame fill" color={backgroundColor} opacity={backgroundOpacity} visible={backgroundOpacity > 0} onColor={(color) => setBackground(color)} onOpacity={(opacity) => setBackground(backgroundColor, opacity)} onToggle={() => { if (backgroundOpacity > 0) lastBackgroundOpacity.current = backgroundOpacity; setBackground(backgroundColor, backgroundOpacity > 0 ? 0 : lastBackgroundOpacity.current); }} onRemove={() => setBackground(backgroundColor, 0)} />
+      </section>
+      <section className="di-section di-frame-options">
+        <DesignSectionHead title="Frame settings" />
+        <div className="di-frame-presets" role="group" aria-label="Frame size">{([16, 24, 32, 48] as const).map((size) => <button type="button" key={size} aria-pressed={preset === String(size)} onClick={() => manager.execute({ type: 'UPDATE_ARTBOARD_DIMENSIONS', payload: { artboardId: artboard.id, width: size, height: size } })}>{size}</button>)}</div>
+        <label className="di-checkbox"><input type="checkbox" checked={gridOn} onChange={(event) => setPixelGridVisible(event.target.checked)} /><span>Show pixel grid</span></label>
+      </section>
     </section>
   );
 }
@@ -1313,6 +1355,7 @@ function PaintRow({
 }) {
   return (
     <div className={`paint-row${visible ? '' : ' is-hidden'}`}>
+      <div className="paint-value-group">
       <label className="paint-swatch" title={`${label} colour`}>
         <input type="color" value={color} aria-label={`${label} colour`} onChange={(event) => onColor(event.target.value)} />
         <span style={{ background: color }} />
@@ -1343,6 +1386,7 @@ function PaintRow({
           }}
         />%
       </span>
+      </div>
       <button type="button" className="icon-button" aria-label={visible ? `Hide ${label}` : `Show ${label}`} title={visible ? 'Hide' : 'Show'} onClick={onToggle}><PanelIcon d={visible ? EYE : EYE_OFF} /></button>
       <button type="button" className="icon-button" aria-label={`Remove ${label}`} title={`Remove ${label.toLowerCase()}`} onClick={onRemove}><PanelIcon d={MINUS} /></button>
     </div>
@@ -1370,6 +1414,8 @@ function ObjectInspector({
   onCommitContinuousEdit,
   onRollbackContinuousEdit,
   onFlip,
+  onAlign,
+  onHide,
 }: {
   document: VectorDocument;
   manager: OperationManager;
@@ -1383,6 +1429,8 @@ function ObjectInspector({
   onCommitContinuousEdit: () => void;
   onRollbackContinuousEdit: () => void;
   onFlip: (axis: 'horizontal' | 'vertical') => void;
+  onAlign: (alignment: ObjectAlignment) => void;
+  onHide: () => void;
 }) {
   const bounds = objectBounds(document, object.id, INTERACTION_BOUNDS_POLICY);
   const appearance = document.getAppearance(object.appearanceId);
@@ -1403,6 +1451,7 @@ function ObjectInspector({
   });
   const corners = inspectCorners(document, object.id);
   const [perCorner, setPerCorner] = useState(false);
+  const [aspectLocked, setAspectLocked] = useState(false);
   const [cornerNote, setCornerNote] = useState('');
   const roundedAvg = corners.roundedRadii.length
     ? corners.roundedRadii.reduce((sum, value) => sum + value, 0) / corners.roundedRadii.length
@@ -1429,94 +1478,51 @@ function ObjectInspector({
   const patchFill = (index: number, patch: Partial<(typeof fills)[number]>) =>
     setFills(fills.map((item, i) => (i === index ? { ...item, ...patch } : item)));
 
+  const layer = document.getLayerForObject(object.id);
+  const owningFrame = layer ? document.getArtboard(layer.artboardId) : undefined;
+  const resize = (dimension: 'width' | 'height', value: number) => onUpdate(object.id, { transform: resizedObjectTransform(document, object, dimension, value, aspectLocked) });
+
   return (
-    <fieldset className="object-inspector-fieldset figma-inspector" disabled={locked} aria-label={locked ? 'Locked object properties' : 'Object properties'}>
+    <fieldset className="object-inspector-fieldset di-inspector" disabled={locked} aria-label={locked ? 'Locked object properties' : 'Object properties'}>
       {locked && <div className="locked-object-notice">Locked in Layers · properties are read-only</div>}
-      <div className="panel-section object-summary object-selection-summary">
-        <div>
-          <input
-            className="object-name-field"
-            aria-label="Object name"
-            defaultValue={object.name}
-            key={object.name}
-            onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-            onBlur={(event) => {
-              const name = event.target.value.trim();
-              if (name && name !== object.name) onUpdate(object.id, { name });
-            }}
-          />
-        </div>
-        <button type="button" className="edit-network-button" onClick={onEnterEdit}>Edit points</button>
+      <div className="di-selection-summary">
+        <DesignIcon name="vector" size={14} />
+        <input className="di-object-name" aria-label="Object name" defaultValue={object.name} key={object.name} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} onBlur={(event) => { const name = event.target.value.trim(); if (name && name !== object.name) onUpdate(object.id, { name }); else event.target.value = object.name; }} />
+        <DesignIconButton icon="edit" label="Edit points" onClick={onEnterEdit} />
       </div>
-
-      <section className="panel-section figma-section object-transform-inspector">
-        <SectionHead title="Position and size" />
-        <div className="numeric-field-grid">
-          <NumericField label="X" value={bounds.minX - frameOrigin.x} onCommit={(value) => updateTransform({ x: object.transform.x + value + frameOrigin.x - bounds.minX })} />
-          <NumericField label="Y" value={bounds.minY - frameOrigin.y} onCommit={(value) => updateTransform({ y: object.transform.y + value + frameOrigin.y - bounds.minY })} />
-          <NumericField label="W" value={bounds.width} min={0.001} onCommit={(value) => { if (bounds.width > 1e-9) updateTransform({ scaleX: object.transform.scaleX * value / bounds.width }); }} />
-          <NumericField label="H" value={bounds.height} min={0.001} onCommit={(value) => { if (bounds.height > 1e-9) updateTransform({ scaleY: object.transform.scaleY * value / bounds.height }); }} />
-          <NumericField label="∠" value={object.transform.rotation} onCommit={(value) => updateTransform({ rotation: value })} />
-        </div>
-        <div className="figma-icon-row" role="group" aria-label="Flip">
-          <button type="button" onClick={() => onFlip('horizontal')} title="Flip horizontal · Shift+H"><FlipHorizontalIcon />Flip horizontal</button>
-          <button type="button" onClick={() => onFlip('vertical')} title="Flip vertical · Shift+V"><FlipVerticalIcon />Flip vertical</button>
-        </div>
+      <section className="di-section di-position-section">
+        <DesignAlignment onAlign={onAlign} disabled={constructionOnly || !owningFrame || Boolean(owningFrame.isCanvasRoot)} />
+        <div className="di-control-block"><span className="di-label">Position</span><div className="di-two-columns di-with-trailing-space">
+          <DesignNumberField label="Object X position" prefix="X" value={bounds.minX - frameOrigin.x} onCommit={(value) => updateTransform({ x: object.transform.x + value + frameOrigin.x - bounds.minX })} />
+          <DesignNumberField label="Object Y position" prefix="Y" value={bounds.minY - frameOrigin.y} onCommit={(value) => updateTransform({ y: object.transform.y + value + frameOrigin.y - bounds.minY })} />
+        </div></div>
+        <div className="di-control-block"><span className="di-label">Rotation</span><div className="di-rotation-row">
+          <DesignNumberField label="Object rotation" icon="corner" suffix="°" value={object.transform.rotation} onCommit={(value) => updateTransform({ rotation: value })} />
+          <div className="di-segment-group"><DesignIconButton icon="rotate" label="Rotate 90 degrees" onClick={() => updateTransform({ rotation: (object.transform.rotation + 90) % 360 })} /><DesignIconButton icon="flip-x" label="Flip horizontal" onClick={() => onFlip('horizontal')} /><DesignIconButton icon="flip-y" label="Flip vertical" onClick={() => onFlip('vertical')} /></div>
+        </div></div>
       </section>
-
-      {canRound && (
-        <section className="panel-section figma-section corner-radius-section">
-          <SectionHead title="Corner radius" />
-          <div className="radius-row">
-            {!perCorner ? (
-              <NumericField label="R" value={roundedAvg} min={0} onCommit={(value) => applyRadii(slots.map(() => value))} />
-            ) : (
-              <div className="numeric-field-grid radius-grid">
-                {slots.map((corner, index) => (
-                  <NumericField
-                    key={corner.nodeId}
-                    label={typeof corner.slot === 'string' ? slotLabels[corner.slot].replace(/^(\w)\w*\s(\w)\w*$/, (_m, a: string, b: string) => `${a}${b}`.toUpperCase()) : String(index + 1)}
-                    value={remembered?.[index] ?? 0}
-                    min={0}
-                    onCommit={(value) => applyRadii(slots.map((_c, i) => (i === index ? value : (remembered?.[i] ?? 0))))}
-                  />
-                ))}
-              </div>
-            )}
-            <button type="button" className={`icon-button${perCorner ? ' is-active' : ''}`} aria-pressed={perCorner} aria-label="Independent corners" title="Set each corner on its own" onClick={() => setPerCorner((value) => !value)}>
-              <PanelIcon d="M2.5 6V3.5H5M11 3.5h2.5V6M13.5 10v2.5H11M5 12.5H2.5V10" />
-            </button>
-          </div>
-          {cornerNote && <p className="semantic-disabled-reason" role="note">{cornerNote}</p>}
-          {perCorner && <p className="panel-hint">Order: top left, top right, bottom right, bottom left.</p>}
-        </section>
-      )}
-
+      <section className="di-section di-layout-section">
+        <DesignSectionHead title="Layout"><DesignIconButton icon="reset" label="Reset scale" onClick={() => updateTransform({ scaleX: 1, scaleY: 1 })} /><DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Lock aspect ratio" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} /></DesignSectionHead>
+        <div className="di-control-block"><span className="di-label">Dimensions</span><div className="di-dimension-row"><div className="di-two-columns">
+          <DesignNumberField label="Object width" prefix="W" value={bounds.width} min={0.001} onCommit={(value) => resize('width', value)} />
+          <DesignNumberField label="Object height" prefix="H" value={bounds.height} min={0.001} onCommit={(value) => resize('height', value)} />
+        </div><DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Constrain proportions" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} /></div></div>
+      </section>
+      {appearance && <section className="di-section di-appearance-section">
+        <DesignSectionHead title="Appearance"><DesignIconButton icon="eye" label="Hide object" onClick={onHide} /><DesignIconButton icon="fill" label={fills.some((fill) => fill.visible) ? 'Hide all fills' : 'Show all fills'} disabled={fills.length === 0 || constructionOnly} onClick={() => { const visible = !fills.some((fill) => fill.visible); setFills(fills.map((fill) => ({ ...fill, visible }))); }} /></DesignSectionHead>
+        <div className="di-appearance-row"><div className="di-two-columns">
+          <div className="di-control-block"><span className="di-label">Opacity</span><DesignNumberField label="Object opacity" icon="opacity" suffix="%" value={appearance.opacity * 100} min={0} max={100} onCommit={(value) => onUpdateAppearance(appearance.id, { opacity: value / 100 })} /></div>
+          <div className="di-control-block"><span className="di-label">Corner radius</span><DesignNumberField label={canRound ? 'Corner radius' : 'Corner radius (unavailable for this path)'} icon="corners" value={roundedAvg} min={0} disabled={!canRound || perCorner} onCommit={(value) => applyRadii(slots.map(() => value))} /></div>
+        </div><DesignIconButton icon="corners" label="Independent corners" pressed={perCorner} disabled={!canRound} onClick={() => setPerCorner((value) => !value)} /></div>
+        {canRound && perCorner && <div className="di-corner-grid">{slots.map((corner, index) => <DesignNumberField key={corner.nodeId} label={typeof corner.slot === 'string' ? `${slotLabels[corner.slot]} corner radius` : `Corner ${index + 1} radius`} prefix={typeof corner.slot === 'string' ? slotLabels[corner.slot].split(' ').map((word) => word[0]).join('') : String(index + 1)} value={remembered?.[index] ?? 0} min={0} onCommit={(value) => applyRadii(slots.map((_c, i) => i === index ? value : (remembered?.[i] ?? 0)))} />)}</div>}
+        {cornerNote && <p className="di-note" role="note">{cornerNote}</p>}
+      </section>}
+      {appearance && <section className="di-section di-fill-section">
+        <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add fill" disabled={constructionOnly} onClick={() => setFills([...fills, { type: 'solid', color: fills.length ? '#c8ced9' : '#8b6cf6', opacity: 1, visible: true }])} /></DesignSectionHead>
+        {constructionOnly ? <p className="di-note">Fill is unavailable for construction geometry.</p> : fills.length === 0 ? <p className="di-note">No fill</p> : fills.map((fill, index) => <PaintRow key={index} label="Fill" color={fill.color} opacity={fill.opacity ?? 1} visible={fill.visible} onColor={(color) => patchFill(index, { color })} onOpacity={(opacity) => patchFill(index, { opacity })} onToggle={() => patchFill(index, { visible: !fill.visible })} onRemove={() => setFills(fills.filter((_item, i) => i !== index))} />)}
+      </section>}
       {appearance && (
-        <section className="panel-section figma-section object-appearance-inspector">
-          <SectionHead title="Fill" onAdd={constructionOnly ? undefined : () => setFills([...fills, { type: 'solid', color: fills.length ? '#c8ced9' : '#8b6cf6', opacity: 1, visible: true }])} addLabel="Add fill" />
-          {constructionOnly ? (
-            <p className="semantic-disabled-reason" role="note">Fill is unavailable because this object contains only construction geometry.</p>
-          ) : fills.length === 0 ? (
-            <p className="panel-hint">No fill. Press + to add one.</p>
-          ) : fills.map((fill, index) => (
-            <PaintRow
-              key={index}
-              label="Fill"
-              color={fill.color}
-              opacity={fill.opacity ?? 1}
-              visible={fill.visible}
-              onColor={(color) => patchFill(index, { color })}
-              onOpacity={(opacity) => patchFill(index, { opacity })}
-              onToggle={() => patchFill(index, { visible: !fill.visible })}
-              onRemove={() => setFills(fills.filter((_item, i) => i !== index))}
-            />
-          ))}
-        </section>
-      )}
-
-      {appearance && (
-        <section className="panel-section figma-section appearance-stroke-section">
+        <section className="di-section appearance-stroke-section">
           <SectionHead
             title="Stroke"
             addLabel="Add stroke"
@@ -1566,14 +1572,6 @@ function ObjectInspector({
         </section>
       )}
 
-      {appearance && (
-        <section className="panel-section figma-section">
-          <SectionHead title="Layer" />
-          <div className="numeric-field-grid">
-            <NumericField label="Opacity" value={appearance.opacity * 100} min={0} max={100} onCommit={(value) => onUpdateAppearance(appearance.id, { opacity: value / 100 })} />
-          </div>
-        </section>
-      )}
     </fieldset>
   );
 }
@@ -2413,6 +2411,7 @@ function SharedAppearanceImpactDialog({
 
 function MultiObjectInspector({
   document,
+  manager,
   objects,
   onUpdateObjects,
   onUpdateAppearances,
@@ -2424,6 +2423,7 @@ function MultiObjectInspector({
   onSetLayerState,
 }: {
   document: VectorDocument;
+  manager: OperationManager;
   objects: NetworkObject[];
   onUpdateObjects: (objectIds: EntityId[], updates: Partial<NetworkObject['transform']>) => void;
   onUpdateAppearances: (objectIds: EntityId[], updates: { opacity?: number; strokeWidth?: number; strokeVisible?: boolean; strokeAlignment?: 'center' | 'inside' | 'outside'; fillColor?: string }, continuous?: boolean) => void;
@@ -2469,7 +2469,7 @@ function MultiObjectInspector({
   );
 
   return (
-    <fieldset className="multi-object-inspector">
+    <fieldset className="multi-object-inspector di-multi-inspector">
       <legend className="sr-only">Multiple object properties</legend>
       <div className="panel-section multi-summary">
         <div className="multi-icon">{objects.length}</div>
@@ -2484,21 +2484,11 @@ function MultiObjectInspector({
           <MixedNumericField label="R°" value={rotation} onCommit={(value) => onUpdateObjects(ids, { rotation: value })} />
         </div>
       </div>
-      <div className="panel-section multi-align-controls">
-        <span className="section-label">ALIGN SELECTION</span>
-        <div className="parametric-button-grid" role="group" aria-label="Align selected objects">
-          <button type="button" onClick={() => onAlign(ids, 'left')}>Left</button>
-          <button type="button" onClick={() => onAlign(ids, 'center-x')}>Centre H</button>
-          <button type="button" onClick={() => onAlign(ids, 'right')}>Right</button>
-          <button type="button" onClick={() => onAlign(ids, 'top')}>Top</button>
-          <button type="button" onClick={() => onAlign(ids, 'center-y')}>Centre V</button>
-          <button type="button" onClick={() => onAlign(ids, 'bottom')}>Bottom</button>
-        </div>
-        <div className="transform-flip-actions" role="group" aria-label="Flip selected objects">
-          <button type="button" onClick={() => onFlip('horizontal')} title="Flip horizontal · Shift+H"><FlipHorizontalIcon />Flip horizontal<kbd>⇧H</kbd></button>
-          <button type="button" onClick={() => onFlip('vertical')} title="Flip vertical · Shift+V"><FlipVerticalIcon />Flip vertical<kbd>⇧V</kbd></button>
-        </div>
-      </div>
+      <section className="di-section">
+        <DesignAlignment disabled={unlocked.length < 2} onAlign={(alignment) => onAlign(ids, alignment)} onDistribute={unlocked.length >= 3 ? () => applyInspectorTransforms(manager, 'Distribute selected objects', verticalDistributionUpdates(document, ids)) : undefined} />
+        <div className="di-control-block"><span className="di-label">Flip</span><div className="di-multi-flips"><DesignIconButton icon="flip-x" label="Flip horizontal" onClick={() => onFlip('horizontal')} /><DesignIconButton icon="flip-y" label="Flip vertical" onClick={() => onFlip('vertical')} /></div></div>
+      </section>
+      <section className="di-section"><DesignSectionHead title="Layout" /><DesignFlow disabled={unlocked.length < 2} onArrange={(mode) => applyInspectorTransforms(manager, `Arrange selected objects ${mode}`, arrangementUpdates(document, ids, mode))} /></section>
       <div className="panel-section object-appearance-inspector">
         <span className="section-label">COMMON APPEARANCE</span>
         <div className="numeric-field-grid">
@@ -2548,22 +2538,6 @@ function MultiObjectInspector({
         </div>
       </div>
     </fieldset>
-  );
-}
-
-function FlipHorizontalIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M8 2v12M6 4 2 8l4 4M10 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function FlipVerticalIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-      <path d="M2 8h12M4 6l4-4 4 4M4 10l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   );
 }
 
@@ -2746,13 +2720,6 @@ function MixedNumericField({
   );
 }
 
-function EmptyInspector() {
-  return (
-    <div className="empty-inspector">
-      <p>Select a shape to edit its look, size and rules.</p>
-    </div>
-  );
-}
 
 function KeylineMultiNodeInspector({
   nodes,
