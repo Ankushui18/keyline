@@ -23,8 +23,10 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Changed
 
-- Selected objects now show eight resize handles: drag a corner or edge to resize, `Shift` keeps
-  the aspect ratio, and each drag is one undoable step. Rotation stays a numeric field for now.
+- Selected objects now show a quad frame with eight resize handles and a rotate control. Drag a
+  handle to resize (`Shift` keeps the aspect ratio) or the stem handle to rotate (`Shift` snaps to
+  15°). The frame follows the object's own axes, so both gestures are exact at any angle, and each
+  drag is one undoable step.
 
 - Arrow keys now nudge selected objects (1 px, `Shift` 10 px) as one undoable step, not only
   points in edit mode.

@@ -1,87 +1,195 @@
 /**
- * Direct-manipulation resize for whole objects.
+ * Direct-manipulation transforms for whole objects: the selection frame, resizing
+ * from its handles and rotating around its centre.
  *
- * A selected object already draws a bounding box, so the box is also where the
- * handles live. The maths stays in the document model: a resize is expressed as
- * an ordinary `UPDATE_OBJECT` transform, which means it undoes, serialises and
- * collaborates like every other edit and never rewrites geometry.
+ * The frame is a quad, not an axis-aligned box. For a single selected object the
+ * quad is the object's own local bounds carried through its transform, so the
+ * handles sit on the shape and rotate with it. Several objects share an
+ * axis-aligned quad, because they have no common axis of their own.
  *
- * What is exact: unrotated objects (any handle), and uniform scaling of rotated
- * objects. What is an approximation: non-uniform scaling of a rotated object,
- * because `rotate × scale` cannot express a world-axis squash — the transform is
- * scaled in the object's own axes and translated so the selection still tracks
- * the pointer. That limit is inherent to the transform model, not to this file.
+ * Both gestures commit ordinary `UPDATE_OBJECT` transforms inside one transaction,
+ * so they undo, serialise and collaborate exactly like a pointer drag, and no
+ * geometry is ever rewritten: a native arc stays an arc after a 37° rotation.
+ *
+ * Exactness: resizing and rotating a single object are exact at any angle, because
+ * the work happens in that object's own axes. For a multi-selection of rotated
+ * objects, non-uniform resizing scales each object in its own axes and positions
+ * it from the union frame, which is the usual approximation for editors whose
+ * transform is `rotate × scale` rather than a general matrix.
  */
 import type { VectorDocument } from './document';
-import { INTERACTION_BOUNDS_POLICY, boundsForPoints, objectBounds, objectBoundsForTransform, type GeometryBounds } from './object-geometry';
+import {
+  INTERACTION_BOUNDS_POLICY,
+  boundsForPoints,
+  objectBoundsForTransform,
+  type GeometryBounds,
+} from './object-geometry';
+import { objectTransformMatrix, rotationMatrix, transformPoint } from './transforms';
 import type { OperationInput } from './operations';
 import type { EntityId, ObjectTransform, Point } from './types';
 
-export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
-
-/** The eight handles, in the order artboards already use. */
-export const RESIZE_HANDLES: readonly ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+/** World-space offset of the rotate control above the frame, at 100% zoom. */
+const ROTATE_HANDLE_OFFSET = 26;
 
 /** Smallest span a resize may collapse a selection to, in document units. */
 const MIN_SPAN = 0.5;
 
-/** Handle positions for a frame, in world space. Shared by the renderer and hit testing. */
-export function resizeHandlePoints(frame: GeometryBounds): Array<{ handle: ResizeHandle; point: Point }> {
-  const { minX, minY, maxX, maxY } = frame;
-  const midX = (minX + maxX) / 2;
-  const midY = (minY + maxY) / 2;
-  return [
-    { handle: 'nw', point: { x: minX, y: minY } },
-    { handle: 'n', point: { x: midX, y: minY } },
-    { handle: 'ne', point: { x: maxX, y: minY } },
-    { handle: 'e', point: { x: maxX, y: midY } },
-    { handle: 'se', point: { x: maxX, y: maxY } },
-    { handle: 's', point: { x: midX, y: maxY } },
-    { handle: 'sw', point: { x: minX, y: maxY } },
-    { handle: 'w', point: { x: minX, y: midY } },
-  ];
+/** Rotation step used while `Shift` is held. */
+export const ROTATION_SNAP = 15;
+
+const IDENTITY_TRANSFORM: ObjectTransform = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 };
+
+export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+export type FrameHandle = ResizeHandle | 'rotate';
+
+/** The eight resize handles, in the order artboards already use. */
+export const RESIZE_HANDLES: readonly ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+
+/**
+ * A selection frame: four world-space corners in `nw, ne, se, sw` order.
+ * `oriented` records whether it follows one object's own axes.
+ */
+export interface SelectionFrame {
+  corners: [Point, Point, Point, Point];
+  rotation: number;
+  oriented: boolean;
 }
 
-/** Union of the interaction bounds of the given objects, or undefined when empty. */
-export function selectionFrame(document: VectorDocument, objectIds: Iterable<EntityId>): GeometryBounds | undefined {
-  const points: Point[] = [];
-  for (const objectId of objectIds) {
-    if (!document.getObject(objectId)) continue;
-    const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
-    points.push({ x: bounds.minX, y: bounds.minY }, { x: bounds.maxX, y: bounds.maxY });
+function quadFrame(corners: [Point, Point, Point, Point], oriented: boolean): SelectionFrame {
+  const rotation = Math.atan2(corners[1].y - corners[0].y, corners[1].x - corners[0].x) * 180 / Math.PI;
+  return { corners, rotation, oriented };
+}
+
+/** The axis-aligned frame of a bounds rectangle. */
+export function axisAlignedFrame(bounds: GeometryBounds): SelectionFrame {
+  return quadFrame([
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ], false);
+}
+
+/** A point inside the frame, addressed in frame coordinates (0-1 covers the box). */
+export function framePoint(frame: SelectionFrame, u: number, v: number): Point {
+  const [nw, ne, , sw] = frame.corners;
+  return {
+    x: nw.x + (ne.x - nw.x) * u + (sw.x - nw.x) * v,
+    y: nw.y + (ne.y - nw.y) * u + (sw.y - nw.y) * v,
+  };
+}
+
+export function frameCenter(frame: SelectionFrame): Point {
+  return framePoint(frame, 0.5, 0.5);
+}
+
+/** Converts a world point into frame coordinates. */
+export function projectToFrame(frame: SelectionFrame, point: Point): { u: number; v: number } {
+  const [nw, ne, , sw] = frame.corners;
+  const ux = ne.x - nw.x;
+  const uy = ne.y - nw.y;
+  const vx = sw.x - nw.x;
+  const vy = sw.y - nw.y;
+  const determinant = ux * vy - uy * vx;
+  if (Math.abs(determinant) < 1e-9) return { u: 0.5, v: 0.5 };
+  const px = point.x - nw.x;
+  const py = point.y - nw.y;
+  return {
+    u: (px * vy - py * vx) / determinant,
+    v: (ux * py - uy * px) / determinant,
+  };
+}
+
+/** Untransformed bounds of an object: the box the handles are attached to. */
+export function objectLocalBounds(document: VectorDocument, objectId: EntityId): GeometryBounds {
+  return objectBoundsForTransform(document, objectId, IDENTITY_TRANSFORM, INTERACTION_BOUNDS_POLICY);
+}
+
+/** An object's own frame: its local bounds carried through its transform. */
+export function objectFrame(document: VectorDocument, objectId: EntityId, transform?: ObjectTransform): SelectionFrame | undefined {
+  const object = document.getObject(objectId);
+  if (!object) return undefined;
+  const local = objectLocalBounds(document, objectId);
+  const matrix = objectTransformMatrix(transform ?? object.transform);
+  return quadFrame([
+    transformPoint({ x: local.minX, y: local.minY }, matrix),
+    transformPoint({ x: local.maxX, y: local.minY }, matrix),
+    transformPoint({ x: local.maxX, y: local.maxY }, matrix),
+    transformPoint({ x: local.minX, y: local.maxY }, matrix),
+  ], true);
+}
+
+/** The frame a selection should advertise: one object's own axes, or a shared box. */
+export function selectionFrame(document: VectorDocument, objectIds: Iterable<EntityId>): SelectionFrame | undefined {
+  const ids = [...objectIds].filter((objectId) => Boolean(document.getObject(objectId)));
+  if (ids.length === 0) return undefined;
+  if (ids.length === 1) return objectFrame(document, ids[0]);
+  const corners: Point[] = [];
+  for (const objectId of ids) {
+    const bounds = objectBoundsForTransform(document, objectId, document.getObject(objectId)!.transform, INTERACTION_BOUNDS_POLICY);
+    corners.push({ x: bounds.minX, y: bounds.minY }, { x: bounds.maxX, y: bounds.maxY });
   }
-  if (points.length === 0) return undefined;
-  return boundsForPoints(points);
+  const union = boundsForPoints(corners);
+  return axisAlignedFrame(union);
 }
 
-export interface ResizeTarget {
+/**
+ * Handle positions in world space, shared by the renderer and hit testing, so a
+ * handle is always drawn exactly where it can be grabbed.
+ */
+export function frameHandlePoints(frame: SelectionFrame, scale = 1): Array<{ handle: FrameHandle; point: Point }> {
+  const handles: Array<{ handle: FrameHandle; point: Point }> = [
+    { handle: 'nw', point: framePoint(frame, 0, 0) },
+    { handle: 'n', point: framePoint(frame, 0.5, 0) },
+    { handle: 'ne', point: framePoint(frame, 1, 0) },
+    { handle: 'e', point: framePoint(frame, 1, 0.5) },
+    { handle: 'se', point: framePoint(frame, 1, 1) },
+    { handle: 's', point: framePoint(frame, 0.5, 1) },
+    { handle: 'sw', point: framePoint(frame, 0, 1) },
+    { handle: 'w', point: framePoint(frame, 0, 0.5) },
+  ];
+  const edge = Math.hypot(frame.corners[3].x - frame.corners[0].x, frame.corners[3].y - frame.corners[0].y);
+  const vUnits = edge > 1e-6 ? ROTATE_HANDLE_OFFSET / Math.max(scale, 1e-9) / edge : 0.2;
+  handles.push({ handle: 'rotate', point: framePoint(frame, 0.5, -vUnits) });
+  return handles;
+}
+
+/** One object's starting state, captured when a gesture begins. */
+export interface TransformTarget {
   objectId: EntityId;
-  /** Transform captured when the gesture started; every frame is computed from it. */
   transform: ObjectTransform;
-  bounds: GeometryBounds;
+  localBounds: GeometryBounds;
 }
 
-/** The resizable part of a selection: existing, unlocked objects and their start state. */
-export function resizeTargets(document: VectorDocument, objectIds: Iterable<EntityId>): ResizeTarget[] {
-  const targets: ResizeTarget[] = [];
+/** The transformable part of a selection: existing, unlocked objects and their start state. */
+export function transformTargets(document: VectorDocument, objectIds: Iterable<EntityId>): TransformTarget[] {
+  const targets: TransformTarget[] = [];
   for (const objectId of objectIds) {
     const object = document.getObject(objectId);
     if (!object || document.isObjectLocked(objectId)) continue;
     targets.push({
       objectId,
       transform: { ...object.transform },
-      bounds: objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY),
+      localBounds: objectLocalBounds(document, objectId),
     });
   }
   return targets;
 }
 
-export interface ResizePlan {
-  handle: ResizeHandle;
+function targetFrame(target: TransformTarget, transform: ObjectTransform): SelectionFrame {
+  const matrix = objectTransformMatrix(transform);
+  return quadFrame([
+    transformPoint({ x: target.localBounds.minX, y: target.localBounds.minY }, matrix),
+    transformPoint({ x: target.localBounds.maxX, y: target.localBounds.minY }, matrix),
+    transformPoint({ x: target.localBounds.maxX, y: target.localBounds.maxY }, matrix),
+    transformPoint({ x: target.localBounds.minX, y: target.localBounds.maxY }, matrix),
+  ], true);
+}
+
+export interface TransformPlan {
+  handle: FrameHandle;
   objectIds: EntityId[];
   operations: OperationInput[];
-  /** Bounds the selection should have after the plan is applied. */
-  bounds: GeometryBounds;
 }
 
 export interface ResizeOptions {
@@ -89,11 +197,30 @@ export interface ResizeOptions {
   proportional?: boolean;
 }
 
-function scaleFactor(pointerAlongAxis: number, anchor: number, span: number, towardsPositive: boolean): number {
-  if (span <= 1e-9) return 1;
-  const raw = towardsPositive ? (pointerAlongAxis - anchor) / span : (anchor - pointerAlongAxis) / span;
-  if (!Number.isFinite(raw)) return 1;
-  return Math.max(raw, MIN_SPAN / span);
+function resizeFactors(
+  handle: ResizeHandle,
+  pointerInFrame: { u: number; v: number },
+  spanX: number,
+  spanY: number,
+): { anchorU: number; anchorV: number; scaleX: number; scaleY: number } {
+  const movesX = handle.includes('e') || handle.includes('w');
+  const movesY = handle.includes('n') || handle.includes('s');
+  const anchorU = handle.includes('e') ? 0 : handle.includes('w') ? 1 : 0.5;
+  const anchorV = handle.includes('s') ? 0 : handle.includes('n') ? 1 : 0.5;
+  const grabU = handle.includes('e') ? 1 : handle.includes('w') ? 0 : 0.5;
+  const grabV = handle.includes('s') ? 1 : handle.includes('n') ? 0 : 0.5;
+  // The clamp is a fraction of the frame, so a huge selection and a 4 px icon
+  // both stop at the same real-world minimum.
+  const minX = MIN_SPAN / Math.max(spanX, MIN_SPAN);
+  const minY = MIN_SPAN / Math.max(spanY, MIN_SPAN);
+  const rawX = movesX ? (pointerInFrame.u - anchorU) / (grabU - anchorU) : 1;
+  const rawY = movesY ? (pointerInFrame.v - anchorV) / (grabV - anchorV) : 1;
+  return {
+    anchorU,
+    anchorV,
+    scaleX: Number.isFinite(rawX) ? Math.max(rawX, minX) : 1,
+    scaleY: Number.isFinite(rawY) ? Math.max(rawY, minY) : 1,
+  };
 }
 
 /**
@@ -101,28 +228,19 @@ function scaleFactor(pointerAlongAxis: number, anchor: number, span: number, tow
  * values captured at gesture start, so repeated calls never compound.
  */
 export function prepareResizeObjects(
-  document: VectorDocument,
-  targets: ResizeTarget[],
-  frame: GeometryBounds,
+  targets: TransformTarget[],
+  frame: SelectionFrame,
   handle: ResizeHandle,
   pointer: Point,
   options: ResizeOptions = {},
-): ResizePlan | null {
+): TransformPlan | null {
   if (targets.length === 0) return null;
-  const movesX = handle.endsWith('e') || handle.endsWith('w');
-  const movesY = handle.startsWith('n') || handle.startsWith('s');
-  if (!movesX && !movesY) return null;
-
-  const anchorX = handle.endsWith('e') ? frame.minX : frame.maxX;
-  const anchorY = handle.startsWith('s') ? frame.minY : frame.maxY;
-
-  let scaleX = movesX
-    ? scaleFactor(pointer.x, anchorX, frame.width, handle.endsWith('e'))
-    : 1;
-  let scaleY = movesY
-    ? scaleFactor(pointer.y, anchorY, frame.height, handle.startsWith('s'))
-    : 1;
-  if (options.proportional && movesX && movesY) {
+  const spanX = Math.hypot(frame.corners[1].x - frame.corners[0].x, frame.corners[1].y - frame.corners[0].y);
+  const spanY = Math.hypot(frame.corners[3].x - frame.corners[0].x, frame.corners[3].y - frame.corners[0].y);
+  const { anchorU, anchorV, scaleX: rawX, scaleY: rawY } = resizeFactors(handle, projectToFrame(frame, pointer), spanX, spanY);
+  let scaleX = rawX;
+  let scaleY = rawY;
+  if (options.proportional && (handle.includes('e') || handle.includes('w')) && (handle.includes('n') || handle.includes('s'))) {
     // Follow whichever axis the pointer moved most, so the gesture never fights itself.
     const dominant = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
     scaleX = dominant;
@@ -130,44 +248,78 @@ export function prepareResizeObjects(
   }
 
   const operations: OperationInput[] = [];
-  const boundsList: GeometryBounds[] = [];
   for (const target of targets) {
-    const candidate: ObjectTransform = {
+    const startFrame = targetFrame(target, target.transform);
+    const startAnchor = framePoint(startFrame, anchorU, anchorV);
+    const anchorInSelection = projectToFrame(frame, startAnchor);
+    // The anchor point a resize holds still, expressed for this object.
+    const targetPoint = framePoint(
+      frame,
+      anchorU + (anchorInSelection.u - anchorU) * scaleX,
+      anchorV + (anchorInSelection.v - anchorV) * scaleY,
+    );
+    const scaled: ObjectTransform = {
       ...target.transform,
       scaleX: target.transform.scaleX * scaleX,
       scaleY: target.transform.scaleY * scaleY,
     };
-    const candidateBounds = objectBoundsForTransform(document, target.objectId, candidate, INTERACTION_BOUNDS_POLICY);
-    // Map the object's own bounds through the same anchor-fixed transform as the
-    // selection frame, then translate the scaled object onto that position.
-    const expectedMinX = movesX ? anchorX + (target.bounds.minX - anchorX) * scaleX : target.bounds.minX;
-    const expectedMinY = movesY ? anchorY + (target.bounds.minY - anchorY) * scaleY : target.bounds.minY;
-    const dx = expectedMinX - candidateBounds.minX;
-    const dy = expectedMinY - candidateBounds.minY;
-    const next: ObjectTransform = { ...candidate, x: candidate.x + dx, y: candidate.y + dy };
-    boundsList.push({
-      minX: candidateBounds.minX + dx,
-      minY: candidateBounds.minY + dy,
-      maxX: candidateBounds.maxX + dx,
-      maxY: candidateBounds.maxY + dy,
-      width: candidateBounds.width,
-      height: candidateBounds.height,
-    });
-    operations.push({
-      type: 'UPDATE_OBJECT',
-      payload: { objectId: target.objectId, updates: { transform: next } },
-    });
+    const scaledAnchor = framePoint(targetFrame(target, scaled), anchorU, anchorV);
+    const next: ObjectTransform = {
+      ...scaled,
+      x: scaled.x + (targetPoint.x - scaledAnchor.x),
+      y: scaled.y + (targetPoint.y - scaledAnchor.y),
+    };
+    operations.push({ type: 'UPDATE_OBJECT', payload: { objectId: target.objectId, updates: { transform: next } } });
   }
 
-  return {
-    handle,
-    objectIds: targets.map((target) => target.objectId),
-    operations,
-    bounds: boundsForPoints(boundsList.flatMap((bounds) => [
-      { x: bounds.minX, y: bounds.minY },
-      { x: bounds.maxX, y: bounds.maxY },
-    ])),
-  };
+  return { handle, objectIds: targets.map((target) => target.objectId), operations };
+}
+
+export interface RotateOptions {
+  /** `Shift`: snap to `ROTATION_SNAP` degree steps. */
+  snap?: boolean;
+}
+
+/**
+ * Rotation about the frame centre. Single objects snap their absolute rotation to
+ * the grid; multi-selections snap the applied delta, because the objects do not
+ * share a rotation to snap.
+ */
+export function prepareRotateObjects(
+  targets: TransformTarget[],
+  frame: SelectionFrame,
+  startPointer: Point,
+  pointer: Point,
+  options: RotateOptions = {},
+): TransformPlan | null {
+  if (targets.length === 0) return null;
+  const center = frameCenter(frame);
+  const startAngle = Math.atan2(startPointer.y - center.y, startPointer.x - center.x);
+  const angle = Math.atan2(pointer.y - center.y, pointer.x - center.x);
+  let delta = (angle - startAngle) * 180 / Math.PI;
+  delta = ((delta % 360) + 540) % 360 - 180;
+  if (options.snap) {
+    delta = targets.length === 1
+      ? Math.round((targets[0].transform.rotation + delta) / ROTATION_SNAP) * ROTATION_SNAP - targets[0].transform.rotation
+      : Math.round(delta / ROTATION_SNAP) * ROTATION_SNAP;
+  }
+  if (Math.abs(delta) < 1e-9) return null;
+
+  const rotation = rotationMatrix(delta * Math.PI / 180, center);
+  const operations: OperationInput[] = [];
+  for (const target of targets) {
+    const startCenter = frameCenter(targetFrame(target, target.transform));
+    const rotated: ObjectTransform = { ...target.transform, rotation: target.transform.rotation + delta };
+    const endCenter = frameCenter(targetFrame(target, rotated));
+    const wanted = transformPoint(startCenter, rotation);
+    const next: ObjectTransform = {
+      ...rotated,
+      x: rotated.x + (wanted.x - endCenter.x),
+      y: rotated.y + (wanted.y - endCenter.y),
+    };
+    operations.push({ type: 'UPDATE_OBJECT', payload: { objectId: target.objectId, updates: { transform: next } } });
+  }
+  return { handle: 'rotate', objectIds: targets.map((target) => target.objectId), operations };
 }
 
 export function resizeCursor(handle: ResizeHandle): string {

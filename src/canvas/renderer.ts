@@ -14,7 +14,7 @@ import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
-import { resizeHandlePoints } from '../core/object-resize';
+import { axisAlignedFrame, frameHandlePoints, objectFrame } from '../core/object-resize';
 import {
   parametricGroupsForRegion,
   parametricInstanceMatrices,
@@ -1111,19 +1111,18 @@ function drawObjectSelection(
   context.lineWidth = 1 / scale;
   context.lineCap = 'butt';
   context.setLineDash([]);
-  // The frame is accumulated from the bounds this loop already computes, so
-  // drawing handles costs no extra geometry work per frame.
-  let frameMinX = Infinity;
-  let frameMinY = Infinity;
-  let frameMaxX = -Infinity;
-  let frameMaxY = -Infinity;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const single = objectIds.size === 1;
   for (const objectId of objectIds) {
     const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
     if (bounds.width > 0 || bounds.height > 0) {
-      frameMinX = Math.min(frameMinX, bounds.minX);
-      frameMinY = Math.min(frameMinY, bounds.minY);
-      frameMaxX = Math.max(frameMaxX, bounds.maxX);
-      frameMaxY = Math.max(frameMaxY, bounds.maxY);
+      minX = Math.min(minX, bounds.minX);
+      minY = Math.min(minY, bounds.minY);
+      maxX = Math.max(maxX, bounds.maxX);
+      maxY = Math.max(maxY, bounds.maxY);
     }
     const line = straightLineSelectionPoints(document, objectId);
     if (line) {
@@ -1135,33 +1134,53 @@ function drawObjectSelection(
       context.stroke();
       continue;
     }
+    // A single selection draws its own oriented frame below instead, so a rotated
+    // shape is not boxed twice.
+    if (single) continue;
     if (bounds.width <= 0 && bounds.height <= 0) continue;
     context.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
   }
 
-  // The selection frame carries the resize handles, exactly where they are hit
-  // tested (core/object-resize). Drawn after the per-object boxes so a
-  // multi-selection still shows which shape is which.
-  if (frameMaxX > frameMinX || frameMaxY > frameMinY) {
-    const frame = {
-      minX: frameMinX,
-      minY: frameMinY,
-      maxX: frameMaxX,
-      maxY: frameMaxY,
-      width: frameMaxX - frameMinX,
-      height: frameMaxY - frameMinY,
-    };
-    for (const { point } of resizeHandlePoints(frame)) {
-      const radius = 3.5 / scale;
+  // The frame owns the handles, drawn exactly where they are hit tested
+  // (core/object-resize). One object rotates the frame onto its own axes.
+  const frame = single
+    ? objectFrame(document, [...objectIds][0])
+    : maxX > minX || maxY > minY
+      ? axisAlignedFrame({ minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY })
+      : undefined;
+  if (frame) {
+    const [nw, ne, se, sw] = frame.corners;
+    context.beginPath();
+    context.moveTo(nw.x, nw.y);
+    context.lineTo(ne.x, ne.y);
+    context.lineTo(se.x, se.y);
+    context.lineTo(sw.x, sw.y);
+    context.closePath();
+    context.lineWidth = 1.5 / scale;
+    context.strokeStyle = COLORS.selected;
+    context.stroke();
+
+    const handles = frameHandlePoints(frame, scale);
+    const rotate = handles.find((item) => item.handle === 'rotate');
+    if (rotate) {
+      // The rotate control sits outside the box on a short stem so it never
+      // competes with the corner handles for the same pixel.
+      const stem = handles.find((item) => item.handle === 'n')?.point ?? frame.corners[0];
       context.beginPath();
-      context.rect(point.x - radius, point.y - radius, radius * 2, radius * 2);
-      context.fillStyle = COLORS.inverse;
-      context.fill();
-      context.lineWidth = 2.5 / scale;
-      context.strokeStyle = COLORS.inverse;
-      context.stroke();
-      context.lineWidth = 1.25 / scale;
+      context.moveTo(stem.x, stem.y);
+      context.lineTo(rotate.point.x, rotate.point.y);
+      context.lineWidth = 1 / scale;
       context.strokeStyle = COLORS.selected;
+      context.stroke();
+    }
+    for (const { handle, point } of handles) {
+      const radius = (handle === 'rotate' ? 4 : 3.5) / scale;
+      context.beginPath();
+      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.fillStyle = handle === 'rotate' ? COLORS.selected : COLORS.inverse;
+      context.fill();
+      context.lineWidth = 1.5 / scale;
+      context.strokeStyle = handle === 'rotate' ? COLORS.inverse : COLORS.selected;
       context.stroke();
     }
   }

@@ -49,15 +49,19 @@ import {
   type HandleHit,
 } from '../tools/bend-tool';
 import { closestPointOnSegment, pointInPolygon, segmentCurve } from '../core/geometry';
-import { INTERACTION_BOUNDS_POLICY, objectBounds, type GeometryBounds } from '../core/object-geometry';
+import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
 import {
+  frameCenter,
+  frameHandlePoints,
   prepareResizeObjects,
+  prepareRotateObjects,
   resizeCursor,
-  resizeHandlePoints,
-  resizeTargets,
   selectionFrame,
+  transformTargets,
+  type FrameHandle,
   type ResizeHandle,
-  type ResizeTarget,
+  type SelectionFrame,
+  type TransformTarget,
 } from '../core/object-resize';
 import { prepareDuplicateArtboard } from '../core/artboard-operations';
 import { prepareDuplicateObject } from '../core/object-operations';
@@ -131,7 +135,8 @@ type Gesture =
       duplicateOnDrag: boolean;
     }
   | { kind: 'resize-artboard'; pointerId: number; startScreen: Point; startWorld: Point; artboardId: EntityId; handle: ArtboardResizeHandle; frame: { x: number; y: number; width: number; height: number }; moving: boolean }
-  | { kind: 'resize-object'; pointerId: number; startScreen: Point; handle: ResizeHandle; frame: GeometryBounds; targets: ResizeTarget[]; moving: boolean }
+  | { kind: 'resize-object'; pointerId: number; startScreen: Point; handle: ResizeHandle; frame: SelectionFrame; targets: TransformTarget[]; moving: boolean }
+  | { kind: 'rotate-object'; pointerId: number; startScreen: Point; startWorld: Point; center: Point; frame: SelectionFrame; targets: TransformTarget[]; moving: boolean }
   | { kind: 'parametric-control'; pointerId: number; startScreen: Point; lastWorld: Point; groupId: EntityId; moving: boolean }
   | {
       kind: 'pen'; pointerId: number; startScreen: Point;
@@ -470,7 +475,7 @@ export function VectorCanvas({
         }
         const gesture = gestureRef.current;
         if (gesture?.kind === 'width' ||
-          ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'resize-object' || gesture?.kind === 'bend-handle') && gesture.moving)) {
+          ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'resize-object' || gesture?.kind === 'rotate-object' || gesture?.kind === 'bend-handle') && gesture.moving)) {
           manager.rollbackTransaction();
         }
         gestureRef.current = null;
@@ -1077,26 +1082,38 @@ export function VectorCanvas({
       // Object handles win over artboard handles: the selection you can see is the
       // one you grab, and a selected artboard clears the object selection anyway.
       const objectHandle = selectedArtboardIdsRef.current.size === 0
-        ? hitTestObjectResizeHandle(
+        ? hitTestObjectFrameHandle(
             manager.document,
             selectionRef.current.objectIds,
             world,
             8 / viewport.scale,
+            viewport.scale,
           )
         : undefined;
       if (objectHandle) {
-        const targets = resizeTargets(manager.document, selectionRef.current.objectIds);
+        const targets = transformTargets(manager.document, selectionRef.current.objectIds);
         const frame = selectionFrame(manager.document, targets.map((target) => target.objectId));
         if (frame) {
-          gestureRef.current = {
-            kind: 'resize-object',
-            pointerId: event.pointerId,
-            startScreen: screen,
-            handle: objectHandle,
-            frame,
-            targets,
-            moving: false,
-          };
+          gestureRef.current = objectHandle === 'rotate'
+            ? {
+                kind: 'rotate-object',
+                pointerId: event.pointerId,
+                startScreen: screen,
+                startWorld: world,
+                center: frameCenter(frame),
+                frame,
+                targets,
+                moving: false,
+              }
+            : {
+                kind: 'resize-object',
+                pointerId: event.pointerId,
+                startScreen: screen,
+                handle: objectHandle,
+                frame,
+                targets,
+                moving: false,
+              };
           canvas.setPointerCapture(event.pointerId);
           event.preventDefault();
           return;
@@ -1308,6 +1325,30 @@ export function VectorCanvas({
       requestRender();
       return;
     }
+    if (gesture.kind === 'rotate-object') {
+      if (!gesture.moving) {
+        if (screenDistance(screen, gesture.startScreen) < 2) return;
+        manager.beginTransaction(gesture.targets.length > 1 ? 'Rotate objects' : 'Rotate object');
+        gesture.moving = true;
+      }
+      const plan = prepareRotateObjects(
+        gesture.targets,
+        gesture.frame,
+        gesture.startWorld,
+        world,
+        { snap: event.shiftKey },
+      );
+      if (!plan) return;
+      for (const operation of plan.operations) {
+        if (!executeSafely(operation)) {
+          manager.rollbackTransaction();
+          gestureRef.current = null;
+          return;
+        }
+      }
+      requestRender();
+      return;
+    }
     if (gesture.kind === 'resize-object') {
       if (!gesture.moving) {
         if (screenDistance(screen, gesture.startScreen) < 2) return;
@@ -1317,7 +1358,6 @@ export function VectorCanvas({
       // Every frame is computed from the transforms captured at pointer-down, so
       // dragging back and forth never compounds scale.
       const plan = prepareResizeObjects(
-        manager.document,
         gesture.targets,
         gesture.frame,
         gesture.handle,
@@ -1959,7 +1999,7 @@ export function VectorCanvas({
           selectionRef.current.editingObjectId,
         ));
       }
-    } else if ((gesture.kind === 'move' || gesture.kind === 'move-object' || gesture.kind === 'move-artboard' || gesture.kind === 'resize-artboard' || gesture.kind === 'resize-object' || gesture.kind === 'parametric-control') && gesture.moving) {
+    } else if ((gesture.kind === 'move' || gesture.kind === 'move-object' || gesture.kind === 'move-artboard' || gesture.kind === 'resize-artboard' || gesture.kind === 'resize-object' || gesture.kind === 'rotate-object' || gesture.kind === 'parametric-control') && gesture.moving) {
       manager.commitTransaction();
     } else if (gesture.kind === 'move-artboard' && gesture.duplicateOnDrag) {
       const selected = manager.document.getArtboard(gesture.artboardIds[0]);
@@ -2136,7 +2176,7 @@ export function VectorCanvas({
   const handlePointerCancel = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const gesture = gestureRef.current;
     if (gesture?.kind === 'width' || gesture?.kind === 'eraser' ||
-      ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'resize-object' || gesture?.kind === 'parametric-control' || gesture?.kind === 'bend-handle') && gesture.moving)) {
+      ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'resize-object' || gesture?.kind === 'rotate-object' || gesture?.kind === 'parametric-control' || gesture?.kind === 'bend-handle') && gesture.moving)) {
       manager.rollbackTransaction();
     }
     gestureRef.current = null;
@@ -2151,11 +2191,13 @@ export function VectorCanvas({
     const canvas = canvasRef.current;
     if (canvas && toolRef.current === 'select' && selectionRef.current.mode === 'object') {
       const objectHandle = selectedArtboardIdsRef.current.size === 0
-        ? hitTestObjectResizeHandle(manager.document, selectionRef.current.objectIds, world, 8 / viewportRef.current.scale)
+        ? hitTestObjectFrameHandle(manager.document, selectionRef.current.objectIds, world, 8 / viewportRef.current.scale, viewportRef.current.scale)
         : undefined;
       const artboardHit = hitTestArtboard(manager.document, world, viewportRef.current.scale, selectedArtboardIdsRef.current);
-      canvas.style.cursor = objectHandle
-        ? resizeCursor(objectHandle)
+      canvas.style.cursor = objectHandle === 'rotate'
+        ? 'grab'
+        : objectHandle
+          ? resizeCursor(objectHandle)
         : artboardHit
           ? isArtboardResizeHandle(artboardHit.part)
             ? artboardResizeCursor(artboardHit.part)
@@ -2814,20 +2856,21 @@ function toolHint(tool: ToolId, selection: SelectionState, selectedArtboardCount
   if (tool === 'offset') return <><span className="hint-dot cut" />Click a path to offset <kbd>Alt</kbd> opposite side</>;
   if (tool === 'lasso') return <><span className="hint-dot select" />Draw around nodes <kbd>Shift</kbd> add to selection</>;
   if (tool === 'eraser') return <><span className="hint-dot cut" />Click and drag to erase with the current weight and tip shape</>;
-  return <><span className="hint-dot select" />Drag objects to move <kbd>Handles</kbd> resize <kbd>Shift</kbd> keep ratio <kbd>Drag empty space</kbd> marquee</>;
+  return <><span className="hint-dot select" />Drag objects to move <kbd>Handles</kbd> resize <kbd>⤾</kbd> rotate <kbd>Shift</kbd> snap <kbd>Drag empty space</kbd> marquee</>;
 }
 
-function hitTestObjectResizeHandle(
+function hitTestObjectFrameHandle(
   document: VectorDocument,
   objectIds: ReadonlySet<EntityId>,
   point: Point,
   tolerance: number,
-): ResizeHandle | undefined {
+  scale: number,
+): FrameHandle | undefined {
   // Locked objects show no handles: a grabbed handle that cannot move anything
   // would be a dead zone over the shape.
-  const frame = selectionFrame(document, resizeTargets(document, objectIds).map((target) => target.objectId));
+  const frame = selectionFrame(document, transformTargets(document, objectIds).map((target) => target.objectId));
   if (!frame) return undefined;
-  return resizeHandlePoints(frame)
+  return frameHandlePoints(frame, scale)
     .find((item) => Math.abs(point.x - item.point.x) <= tolerance && Math.abs(point.y - item.point.y) <= tolerance)
     ?.handle;
 }

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { VectorDocument } from './document';
 import { createEntityId } from './ids';
-import { INTERACTION_BOUNDS_POLICY, objectBounds, type GeometryBounds } from './object-geometry';
-import { prepareResizeObjects, resizeHandlePoints, resizeTargets, selectionFrame } from './object-resize';
+import type { GeometryBounds } from './object-geometry';
+import {
+  frameCenter,
+  frameHandlePoints,
+  framePoint,
+  prepareResizeObjects,
+  prepareRotateObjects,
+  selectionFrame,
+  transformTargets,
+  type SelectionFrame,
+} from './object-resize';
 import { OperationManager } from './operations';
 import type { OperationInput } from './operations';
 import type { EntityId, NetworkObject, Segment, VectorNode, VectorPath } from './types';
@@ -12,8 +21,14 @@ function addRectangle(
   manager: OperationManager,
   width = 100,
   height = 50,
+  offsetX = 0,
 ): NetworkObject {
-  const corners = [{ x: 0, y: 0 }, { x: width, y: 0 }, { x: width, y: height }, { x: 0, y: height }];
+  const corners = [
+    { x: offsetX, y: 0 },
+    { x: offsetX + width, y: 0 },
+    { x: offsetX + width, y: height },
+    { x: offsetX, y: height },
+  ];
   const nodes = corners.map((position): VectorNode => ({ id: createEntityId(), position, constraintIds: [] }));
   const segments = nodes.map((node, index): Segment => ({
     id: createEntityId(),
@@ -32,13 +47,15 @@ function addRectangle(
 }
 
 function apply(manager: OperationManager, operations: OperationInput[]): void {
-  manager.beginTransaction('Resize objects');
+  manager.beginTransaction('Transform objects');
   for (const operation of operations) manager.execute(operation);
   manager.commitTransaction();
 }
 
-function boundsOf(document: VectorDocument, objectId: EntityId): GeometryBounds {
-  return objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
+const span = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(b.x - a.x, b.y - a.y);
+
+function frameOf(document: VectorDocument, objectIds: EntityId[]): SelectionFrame {
+  return selectionFrame(document, objectIds)!;
 }
 
 function setup(rotation = 0) {
@@ -51,96 +68,178 @@ function setup(rotation = 0) {
       payload: { objectId: object.id, updates: { transform: { ...object.transform, rotation } } },
     });
   }
-  const targets = resizeTargets(document, [object.id]);
-  const frame = selectionFrame(document, [object.id])!;
-  return { document, manager, object: document.getObject(object.id)!, targets, frame };
+  const targets = transformTargets(document, [object.id]);
+  return { document, manager, objectId: object.id, targets, frame: frameOf(document, [object.id]) };
 }
 
-describe('object resize', () => {
-  it('places eight handles on the selection frame in world space', () => {
-    const frame: GeometryBounds = { minX: 0, minY: 0, maxX: 100, maxY: 50, width: 100, height: 50 };
-    expect(resizeHandlePoints(frame).map((item) => item.handle)).toEqual(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']);
-    expect(resizeHandlePoints(frame).find((item) => item.handle === 'e')?.point).toEqual({ x: 100, y: 25 });
-    expect(resizeHandlePoints(frame).find((item) => item.handle === 'nw')?.point).toEqual({ x: 0, y: 0 });
+function boundsOf(document: VectorDocument, objectId: EntityId): GeometryBounds {
+  const frame = frameOf(document, [objectId]);
+  const xs = frame.corners.map((point) => point.x);
+  const ys = frame.corners.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  return { minX, minY, maxX: Math.max(...xs), maxY: Math.max(...ys), width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
+}
+
+describe('selection frame', () => {
+  it('addresses handles in frame coordinates', () => {
+    const { frame } = setup();
+    expect(framePoint(frame, 0, 0)).toEqual({ x: 0, y: 0 });
+    expect(framePoint(frame, 1, 0.5)).toEqual({ x: 100, y: 25 });
+    expect(frameCenter(frame)).toEqual({ x: 50, y: 25 });
+    const handles = frameHandlePoints(frame, 1);
+    expect(handles.map((item) => item.handle)).toEqual(['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'rotate']);
+    expect(handles.find((item) => item.handle === 'e')?.point).toEqual({ x: 100, y: 25 });
+    // The rotate control sits outside the box, above the top edge.
+    expect(handles.find((item) => item.handle === 'rotate')!.point.y).toBeLessThan(0);
   });
 
+  it('follows a single object’s own axes and records its rotation', () => {
+    const { frame } = setup(30);
+    expect(frame.oriented).toBe(true);
+    expect(frame.rotation).toBeCloseTo(30);
+    expect(span(frame.corners[0], frame.corners[1])).toBeCloseTo(100);
+    expect(span(frame.corners[0], frame.corners[3])).toBeCloseTo(50);
+  });
+
+  it('falls back to a shared axis-aligned frame for several objects', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    const first = addRectangle(document, manager);
+    const second = addRectangle(document, manager, 20, 20, 200);
+    const frame = selectionFrame(document, [first.id, second.id])!;
+    expect(frame.oriented).toBe(false);
+    expect(frame.rotation).toBe(0);
+    expect(frame.corners[0]).toEqual({ x: 0, y: 0 });
+    expect(frame.corners[2]).toEqual({ x: 220, y: 50 });
+  });
+});
+
+describe('object resize', () => {
   it('resizes an unrotated shape from an edge handle and keeps the opposite edge fixed', () => {
-    const { document, manager, object, targets, frame } = setup();
-    expect(frame).toMatchObject({ minX: 0, minY: 0, width: 100, height: 50 });
-    const plan = prepareResizeObjects(document, targets, frame, 'e', { x: 150, y: 25 })!;
+    const { document, manager, objectId, targets, frame } = setup();
+    const plan = prepareResizeObjects(targets, frame, 'e', { x: 150, y: 25 })!;
     apply(manager, plan.operations);
-    const bounds = boundsOf(document, object.id);
+    const bounds = boundsOf(document, objectId);
     expect(bounds.minX).toBeCloseTo(0);
     expect(bounds.width).toBeCloseTo(150);
     expect(bounds.height).toBeCloseTo(50);
   });
 
   it('keeps the aspect ratio on a corner handle when proportional', () => {
-    const { document, manager, object, targets, frame } = setup();
-    const plan = prepareResizeObjects(document, targets, frame, 'se', { x: 150, y: 100 }, { proportional: true })!;
+    const { document, manager, objectId, targets, frame } = setup();
+    const plan = prepareResizeObjects(targets, frame, 'se', { x: 150, y: 100 }, { proportional: true })!;
     apply(manager, plan.operations);
-    const bounds = boundsOf(document, object.id);
+    const bounds = boundsOf(document, objectId);
     // The pointer is 1.5x wide and 2x tall, so the dominant 2x wins on both axes.
     expect(bounds.width).toBeCloseTo(200);
     expect(bounds.height).toBeCloseTo(100);
-    expect(bounds.width / bounds.height).toBeCloseTo(2); // the original 100x50 ratio
   });
 
-  it('scales a rotated shape uniformly about the opposite corner', () => {
-    const { document, manager, object, targets, frame } = setup(90);
-    const plan = prepareResizeObjects(document, targets, frame, 'se', { x: frame.minX + frame.width * 2, y: frame.minY + frame.height * 2 }, { proportional: true })!;
+  it('resizes a rotated shape exactly in its own axes', () => {
+    const { document, manager, objectId, targets, frame } = setup(35);
+    const before = frame;
+    const plan = prepareResizeObjects(targets, frame, 'e', framePoint(before, 2, 0.5))!;
     apply(manager, plan.operations);
-    const bounds = boundsOf(document, object.id);
-    expect(bounds.width).toBeCloseTo(frame.width * 2);
-    expect(bounds.height).toBeCloseTo(frame.height * 2);
-    expect(bounds.minX).toBeCloseTo(frame.minX);
-    expect(bounds.minY).toBeCloseTo(frame.minY);
+    const after = frameOf(document, [objectId]);
+    // The near corner does not move, the grabbed edge doubles, the other edge holds.
+    expect(span(after.corners[0], before.corners[0])).toBeCloseTo(0);
+    expect(span(after.corners[0], after.corners[1])).toBeCloseTo(200);
+    expect(span(after.corners[0], after.corners[3])).toBeCloseTo(50);
   });
 
   it('never collapses a selection past the minimum span', () => {
-    const { document, manager, object, targets, frame } = setup();
-    const plan = prepareResizeObjects(document, targets, frame, 'e', { x: 0, y: 25 })!;
+    const { document, manager, objectId, targets, frame } = setup();
+    const plan = prepareResizeObjects(targets, frame, 'e', { x: 0, y: 25 })!;
     apply(manager, plan.operations);
-    expect(boundsOf(document, object.id).width).toBeCloseTo(0.5);
+    expect(boundsOf(document, objectId).width).toBeCloseTo(0.5);
   });
 
   it('is idempotent: applying the same pointer position twice does not compound', () => {
-    const { document, manager, object, targets, frame } = setup();
+    const { document, manager, objectId, targets, frame } = setup();
     const pointer = { x: 175, y: 60 };
-    const plan = prepareResizeObjects(document, targets, frame, 'se', pointer)!;
+    const plan = prepareResizeObjects(targets, frame, 'se', pointer)!;
     apply(manager, plan.operations);
-    const once = document.getObject(object.id)!.transform;
-    const again = prepareResizeObjects(document, targets, frame, 'se', pointer)!;
-    // The second plan is built from the same captured baseline, so it must land
-    // on identical transforms rather than doubling the scale.
+    const once = document.getObject(objectId)!.transform;
+    const again = prepareResizeObjects(targets, frame, 'se', pointer)!;
+    // The second plan is built from the same captured baseline, so it must land on
+    // identical transforms rather than doubling the scale.
     expect(again.operations).toEqual(plan.operations);
     apply(manager, again.operations);
-    expect(document.getObject(object.id)!.transform).toEqual(once);
+    expect(document.getObject(objectId)!.transform).toEqual(once);
   });
 
   it('ignores locked objects', () => {
-    const { document, manager, object } = setup();
-    const layer = document.getLayerForObject(object.id)!;
+    const { document, manager, objectId } = setup();
+    const layer = document.getLayerForObject(objectId)!;
     manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: layer.id, updates: { locked: true } } });
-    expect(resizeTargets(document, [object.id])).toHaveLength(0);
-    expect(prepareResizeObjects(document, [], { minX: 0, minY: 0, maxX: 1, maxY: 1, width: 1, height: 1 }, 'e', { x: 2, y: 0 })).toBeNull();
-    expect(selectionFrame(document, [object.id])).toBeDefined();
+    expect(transformTargets(document, [objectId])).toHaveLength(0);
+    expect(prepareResizeObjects([], frameOf(document, [objectId]), 'e', { x: 2, y: 0 })).toBeNull();
   });
 
-  it('moves a multi-object selection as one plan with one operation per object', () => {
-    const { document, manager, object, frame } = setup();
-    const second = addRectangle(document, manager, 20, 20);
-    manager.execute({
-      type: 'UPDATE_OBJECT',
-      payload: { objectId: second.id, updates: { transform: { ...second.transform, x: 200 } } },
-    });
-    const allTargets = resizeTargets(document, [object.id, second.id]);
-    const allFrame = selectionFrame(document, [object.id, second.id])!;
-    const plan = prepareResizeObjects(document, allTargets, allFrame, 'e', { x: allFrame.maxX + 100, y: 0 }, { proportional: true })!;
+  it('resizes a multi-object selection with one operation per object', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    const first = addRectangle(document, manager);
+    const second = addRectangle(document, manager, 20, 20, 200);
+    const targets = transformTargets(document, [first.id, second.id]);
+    const frame = frameOf(document, [first.id, second.id]);
+    const plan = prepareResizeObjects(targets, frame, 'e', { x: frame.corners[2].x + 100, y: 25 }, { proportional: true })!;
     expect(plan.operations).toHaveLength(2);
     apply(manager, plan.operations);
-    expect(boundsOf(document, object.id).width).toBeGreaterThan(100);
+    expect(boundsOf(document, first.id).width).toBeGreaterThan(100);
     expect(boundsOf(document, second.id).width).toBeGreaterThan(20);
-    expect(frame.width).toBe(100);
+  });
+});
+
+describe('object rotation', () => {
+  it('rotates a single object around the frame centre', () => {
+    const { document, manager, objectId, targets, frame } = setup();
+    const center = frameCenter(frame);
+    const plan = prepareRotateObjects(targets, frame, { x: center.x + 40, y: center.y }, { x: center.x, y: center.y + 40 })!;
+    apply(manager, plan.operations);
+    expect(document.getObject(objectId)!.transform.rotation).toBeCloseTo(90);
+    const bounds = boundsOf(document, objectId);
+    expect(bounds.width).toBeCloseTo(50);
+    expect(bounds.height).toBeCloseTo(100);
+    expect(bounds.minX + bounds.width / 2).toBeCloseTo(center.x);
+    expect(bounds.minY + bounds.height / 2).toBeCloseTo(center.y);
+  });
+
+  it('snaps the absolute rotation to 15 degree steps with shift', () => {
+    const { document, manager, objectId, targets, frame } = setup();
+    const center = frameCenter(frame);
+    const radius = 40;
+    const start = { x: center.x + radius, y: center.y };
+    const angle = 20 * Math.PI / 180;
+    const pointer = { x: center.x + Math.cos(angle) * radius, y: center.y + Math.sin(angle) * radius };
+    const plan = prepareRotateObjects(targets, frame, start, pointer, { snap: true })!;
+    apply(manager, plan.operations);
+    expect(document.getObject(objectId)!.transform.rotation).toBeCloseTo(15);
+  });
+
+  it('returns no plan when the pointer has not moved', () => {
+    const { targets, frame } = setup();
+    const center = frameCenter(frame);
+    expect(prepareRotateObjects(targets, frame, center, center)).toBeNull();
+  });
+
+  it('rotates a multi-selection about the shared centre, keeping relative positions', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    const first = addRectangle(document, manager);
+    const second = addRectangle(document, manager, 20, 20, 200);
+    const targets = transformTargets(document, [first.id, second.id]);
+    const frame = frameOf(document, [first.id, second.id]);
+    const center = frameCenter(frame);
+    const beforeFirst = frameCenter(frameOf(document, [first.id]));
+    const plan = prepareRotateObjects(targets, frame, { x: center.x + 100, y: center.y }, { x: center.x, y: center.y + 100 })!;
+    apply(manager, plan.operations);
+    expect(document.getObject(first.id)!.transform.rotation).toBeCloseTo(90);
+    expect(document.getObject(second.id)!.transform.rotation).toBeCloseTo(90);
+    const afterFirst = frameCenter(frameOf(document, [first.id]));
+    // The quarter turn about the shared centre moves each object with the group.
+    expect(afterFirst.x).toBeCloseTo(center.x - (beforeFirst.y - center.y));
+    expect(afterFirst.y).toBeCloseTo(center.y + (beforeFirst.x - center.x));
   });
 });

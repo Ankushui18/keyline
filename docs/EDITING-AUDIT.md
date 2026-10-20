@@ -76,8 +76,8 @@ or where it would have to be added.
 | Drag to move | yes, `Alt`-drag duplicates | `VectorCanvas.tsx:1704` | works |
 | Arrow-key nudge, objects | yes, 1 px / `Shift` 10 px, one undo step | `App.tsx:1843`, `core/object-operations.ts:253` | **added in this pass** |
 | Arrow-key nudge, points | yes | `App.tsx:1871` | works |
-| Drag a corner to **resize** an object | yes — eight handles on the selection frame, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
-| Rotate handle | **no** — rotation is a numeric field | `ui/PropertiesPanel.tsx:1508` | **missing (next)** |
+| Drag a corner to **resize** an object | yes — eight handles on a frame drawn on the object's own axes, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
+| Rotate handle | yes — stem handle above the frame, `Shift` snaps to 15° | `src/core/object-resize.ts` (`prepareRotateObjects`) | **shipped in this pass** |
 | Double-click a shape | enters point editing (also `Enter`) | `VectorCanvas.tsx:621` | works |
 | Double-click **enters a group** | **no** — clicks resolve to the leaf object; groups are selectable only in the Layers panel | `ui/LayersPanel.tsx:452`, isolation at `core/document.ts:317` | **missing** |
 | `Ctrl/⌘ G` / ungroup | only when a layer row has focus | `ui/LayersPanel.tsx:452-500` | partial |
@@ -106,16 +106,9 @@ next to the existing artboard one. A drag commits ordinary `UPDATE_OBJECT`
 transforms inside one transaction, so it undoes, autosaves and collaborates like
 every other edit, and geometry is never rewritten.
 
-Two behaviours worth knowing:
-
-- **`Shift`** on a corner keeps the selection's aspect ratio.
-- **Rotated objects.** Scaling a rotated shape non-uniformly cannot be expressed
-  as `rotate × scale` — a world-axis squash would require shear. The transform is
-  therefore scaled in the object's own axes and translated so the selection still
-  tracks the pointer. Uniform scaling of a rotated object is exact; non-uniform
-  scaling of one is an approximation. That limit belongs to the transform model,
-  not to the gesture, and it is the reason a rotate handle and a local-frame
-  selection box are the next step.
+Behaviour worth knowing: **`Shift`** on a corner keeps the selection's aspect
+ratio, and the frame follows the object's own axes, so handles stay on a rotated
+shape instead of boxing it.
 
 ### 3.2 Groups cannot be entered on the canvas
 
@@ -132,15 +125,22 @@ double-click descend one level and the next one enter point editing.
 renderer outline, move/resize on a group, layer-panel sync.
 **Do it after 3.1**, because group bounds reuse the object-handle work.
 
-### 3.3 Rotation is not a direct manipulation
+### 3.3 Rotation — done
 
-Rotation exists in the transform (`types.ts:257`) and as a number field
-(`PropertiesPanel.tsx:1508`), but there is no handle and no gesture.
+Rotation lived only in the transform (`types.ts:257`) and a number field
+(`PropertiesPanel.tsx:1508`). It is now a gesture: a round control on a stem above
+the frame, dragging turns the selection about the frame centre, and `Shift` snaps
+to 15°.
 
-**Smallest change:** a rotation zone just outside the corner handles added in 3.1,
-snapping to 15° with `Shift`. Commit is `UPDATE_OBJECT` with `rotation`. Doing it
-together with a local-frame box (handles rotated with the object) also removes the
-non-uniform approximation described in 3.1.
+Snapping differs by selection on purpose. One object snaps its *absolute* rotation
+onto the grid, so "make this 45°" is reachable by dragging. A multi-selection snaps
+the *applied delta*, because the objects do not share an angle to snap.
+
+This also removed the approximation in 3.1: the frame is now a quad on the object's
+own axes, so a single object resizes and rotates exactly at any angle. The only
+remaining approximation is non-uniform resizing of several rotated objects at
+once, where each object is scaled in its own axes — unavoidable while the
+transform is `rotate × scale` rather than a general matrix.
 
 ### 3.4 Typography and gradients are absent, not weak
 
@@ -170,7 +170,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 
 | Step | Work | Unlocks |
 |---|---|---|
-| 1 | ~~Object resize handles~~ (done), then rotate (3.3) | the editor stops contradicting its own selection UI |
+| 1 | ~~Object resize handles and the rotate control~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | Canvas group selection and one-level entry (3.2) | nested documents, real design files |
 | 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
 | 4 | Text and gradients (3.4) | typography and illustration, the two missing media |
@@ -185,9 +185,10 @@ quality gain, and it needs no new model concepts.
 
 Three changes, all small and all verified by the existing gates:
 
-- **Object resize handles.** Eight handles on the selection frame; drag to resize,
-  `Shift` keeps the ratio, each drag is one transaction. New module
-  `src/core/object-resize.ts` with 8 unit tests.
+- **Resize and rotate.** A quad frame on the object's own axes with eight resize
+  handles and a rotate stem; `Shift` keeps the ratio when resizing and snaps to 15°
+  when rotating; each gesture is one transaction. New module
+  `src/core/object-resize.ts` with 14 unit tests.
 - **Object nudge.** Arrow keys move the selection (1 px, `Shift` 10 px) as one
   undoable transaction, through the new `prepareNudgeObjects` plan in
   `src/core/object-operations.ts`. Previously arrows only worked in point editing.
