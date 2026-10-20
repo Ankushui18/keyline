@@ -6,10 +6,52 @@ Release Slice 1 focuses this foundation on precision icon work: transactional fr
 
 ## Run
 
+Requires Node.js **20.19+ or 22.12+** (Node 22 LTS is recommended).
+
 ```bash
-npm install
+npm ci
 npm run dev
 ```
+
+The app binds to `0.0.0.0:5173`; the development collaboration relay binds to loopback on port `1234`. Browser WebSockets use the app's same-origin `/collaboration` proxy, including hosted previews. Both services start and stop together, and a startup failure stops the other service rather than leaving an orphan process.
+
+For a production-build preview:
+
+```bash
+npm run build
+npm run preview
+```
+
+Run the complete build, TypeScript/unit tests, real Wasm smoke test, and WebSocket integration suite with `npm run check`. See [AUDIT.md](AUDIT.md) for the audit findings, fixes, and verification evidence.
+
+Optional shell environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `COLLABORATION_PORT` | Relay port, used by both the runner and Vite proxy; default `1234`. |
+| `COLLABORATION_HOST` | Relay bind address; default `127.0.0.1`. Do not expose it publicly without deployment hardening. |
+| `COLLABORATION_ALLOWED_ORIGINS` | Comma-separated exact browser origins for a separately exposed relay. |
+| `VITE_COLLABORATION_URL` | Explicit WebSocket base URL, including `/collaboration`, when deploying the relay separately. |
+| `VITE_ALLOWED_HOSTS` | Additional comma-separated app hostnames; localhost, IP addresses and Arena `.e2b.app` previews are already supported. |
+
+Browser checks in an environment with the Playwright CLI and Chromium already available:
+
+```bash
+# Start npm run dev in another terminal first.
+playwright-cli -s=arena open http://127.0.0.1:5173 --browser=chromium
+npm run test:browser
+npm run test:design # compact-sidebar controls, layout, resizing and accessibility
+npm run test:review # palette, icon rendering and single-artboard onboarding regressions
+playwright-cli -s=arena close
+```
+
+The right sidebar keeps **Layers above Design**, with separately scrolling panels and a draggable, keyboard-accessible divider. The compact Design inspector follows the supplied layout while retaining the original app palette; it does not introduce a separate sidebar color theme. Position, rotation/flip, dimensions with aspect lock, opacity, corner radii, fills and strokes edit the real document. Frame and multi-selection Flow buttons perform one-shot arrangements, not persistent auto-layout. Unsupported frame clipping, frame rotation and frame corner rounding are explicitly disabled. Sidebar width and split height persist on the device.
+
+`npm run test:design` saves its browser results and screenshots to `audit/design-sidebar-*`.
+
+First icon start reuses only the untouched, automatically generated starter artboard, so the chosen icon frame is the only artboard. Subsequent and intentionally blank frames remain visible. Previously saved icon-only files with the exact unused starter left by the old onboarding are repaired conservatively in an undoable transaction; frames with artwork, custom dimensions, names, background, layer structure or appearance are preserved. Reloading a chosen empty frame does not reopen first-visit onboarding. Undo/Redo use 16px filled glyphs in 32px click targets, and the cursor retains its authored shape without an additional CSS stroke. `npm run test:review` saves its results to `audit/review-results.json`.
+
+The browser runner uses isolated contexts and synthetic drawings. It covers reload persistence, undo/redo, SVG downloads, denied clipboard access, modal focus, blocked local storage, live/offline collaboration, and automated WCAG A/AA checks. Results are saved to `audit/browser-results.json`.
 
 Production and verification commands:
 
@@ -134,6 +176,14 @@ Opening a URL with `?room=...` creates a Yjs session. Every committed semantic `
 - Awareness broadcasts named cursors and graph-level node/segment selections.
 - The toolbar reports connecting, synced, offline, and error states.
 - `npm run dev` and `npm run preview` start both the app and collaboration service. Set `VITE_COLLABORATION_URL` to an explicit WebSocket base URL when deploying them separately.
+- Joining a room preserves a separate local file ID; a peer's snapshot cannot replace another local file's storage identity.
+- Turning off the share switch **disconnects this device**. It does not revoke an existing room link or remove copies held by peers. The dialog labels this behavior explicitly.
+
+### Collaboration deployment boundary
+
+The bundled relay is a bounded **development/preview** service, not an authenticated multi-tenant backend. Anyone with the room link can edit. Room names are validated; browser origins are checked; oversized messages are rejected; connection and room counts are capped. Idle room data is held in memory for five minutes, then discarded; a relay restart also clears it. Connected clients retain local Yjs state in IndexedDB and can republish it on reconnect.
+
+Production deployment still needs TLS, authentication/authorization if private rooms are required, durable room storage, operational rate limits, and an explicit policy for link revocation. Do not treat the UI's disconnect switch as server-side access control.
 
 ## Canvas 2D and WebGL2
 
