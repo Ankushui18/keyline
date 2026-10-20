@@ -25,6 +25,7 @@ import { createEntityId } from './core/ids';
 import { copyTextToClipboard } from './core/browser-clipboard';
 import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
+import { canEditObject, editableInspectorObjects } from './app/inspector-actions';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
 import { prepareDeleteObject, prepareFlipObjects, prepareNudgeObjects } from './core/object-operations';
 import { DEFAULT_DOCUMENT_NAME, DocumentPersistence, listDocuments, loadDocumentById, markStoredDocumentImported, saveDocument, type SaveStatus } from './core/store';
@@ -469,7 +470,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   }, [announce, document, manager]);
 
   const updateObject = useCallback((objectId: EntityId, updates: Partial<NetworkObject>) => {
-    if (document.isObjectLocked(objectId) || !document.isObjectVisible(objectId)) return;
+    if (!canEditObject(document, objectId)) return;
     const layer = document.getLayerForObject(objectId);
     const syncName = typeof updates.name === 'string' && layer && updates.name !== layer.name;
     if (syncName) manager.beginTransaction('Rename object');
@@ -488,7 +489,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   const updateAppearance = useCallback((appearanceId: EntityId, updates: Partial<Appearance>) => {
     const owner = [...document.objects.values()].find((object) => object.appearanceId === appearanceId);
     const appearance = document.getAppearance(appearanceId);
-    if (!owner || !appearance || document.isObjectLocked(owner.id) || !document.isObjectVisible(owner.id)) return;
+    if (!owner || !appearance || !canEditObject(document, owner.id)) return;
     if (owner.appearanceRuleId) {
       const rule = document.getAppearanceRule(owner.appearanceRuleId);
       if (!rule) return;
@@ -523,10 +524,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   }, [announce, manager]);
 
   const updateObjects = useCallback((objectIds: EntityId[], updates: Partial<NetworkObject['transform']>) => {
-    const objects = objectIds
-      .map((id) => document.getObject(id))
-      .filter((object): object is NetworkObject => object !== undefined)
-      .filter((object) => document.isObjectVisible(object.id) && !document.isObjectLocked(object.id));
+    const objects = editableInspectorObjects(document, objectIds);
     if (objects.length === 0) return;
     try {
       manager.beginTransaction(objects.length > 1 ? 'Update objects' : 'Update object');
@@ -562,10 +560,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     updates: AppearanceUpdates,
     continuous = false,
   ) => {
-    const objects = objectIds
-      .map((id) => document.getObject(id))
-      .filter((object): object is NetworkObject => object !== undefined)
-      .filter((object) => document.isObjectVisible(object.id) && !document.isObjectLocked(object.id));
+    const objects = editableInspectorObjects(document, objectIds);
     if (objects.length === 0) return;
     try {
       if (!continuous) manager.beginTransaction(objects.length > 1 ? 'Update object appearances' : 'Update object appearance');

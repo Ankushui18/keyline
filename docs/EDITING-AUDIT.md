@@ -194,6 +194,18 @@ rendering the panel in its frame, single-selection and multi-selection states:
    implemented by the renderer. None of those are bugs to "fix" by enabling the
    control; they are limits the panel now names.
 
+`src/ui/panel-controls.test.tsx` covers the other half of the rule: a control that *is*
+enabled must reach the document. It clicks and types into every enabled control in the object,
+hidden-object, multi-selection, frame and point-editing inspectors plus seventeen tool sections,
+and fails if the control neither mutates the document nor calls its callback with a payload. Its
+handlers mirror `App.tsx`, including the editability rule, so a control the app silently drops
+cannot pass.
+
+That audit found one real dead path: hiding a layer removed it from hit testing, and every
+inspector handler also refused hidden objects, so a hidden shape kept a fully enabled inspector
+whose edits went nowhere. Hiding is a view state, so editability is now lock-only
+(`src/app/inspector-actions.ts`), shared by the four inspector handlers and `prepareFlipObjects`.
+
 The canvas root is the awkward case. It has no bounds, so a lone shape outside every
 frame has nothing to align against, while two or more such shapes align to their
 combined bounds. That distinction is expressed once, in `canAlignObjects`, rather

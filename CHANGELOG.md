@@ -34,8 +34,22 @@ and the project uses semantic versioning once it publishes releases.
   and caching object→layer lookups against a document revision counter that every mutator bumps.
   This is the resolution step only; a browser frame-time benchmark is still outstanding.
 
+- **Every enabled control in the right panel is now tested to reach the document.**
+  `src/ui/panel-controls.test.tsx` renders the inspector in nine states — object, hidden
+  object, multi-selection, frame, point editing and seventeen tool sections — clicks and types
+  into every control that is not disabled, and fails if that control neither mutates the
+  document nor calls its callback with a payload. The callbacks it wires mirror `App.tsx`,
+  including its editability rule, so a control the app would silently drop cannot pass.
+
 ### Fixed
 
+- **A hidden shape kept a fully enabled inspector whose edits went nowhere.** Hiding a layer
+  removed it from hit testing, but every inspector handler also refused hidden objects, so
+  position, size, rotation, fills and stroke changes were discarded without a word: the panel
+  looked live and the document never changed. Hiding is a view state, so the editability rule
+  in `src/app/inspector-actions.ts` is now lock-only, shared by `updateObject`,
+  `updateAppearance`, `updateObjects` and `updateObjectAppearances`, and matched by
+  `prepareFlipObjects`. Locked shapes remain read-only and keep their notice.
 - Clicking now selects the shape that is actually painted on top. Hit testing walked objects in
   insertion order while the renderer paints in layer order, so after reordering a layer the click and
   the picture disagreed. Both now resolve through one paint order.
