@@ -46,10 +46,18 @@ export function DesignIcon({ name, size = 16 }: { name: DesignIconName; size?: n
   return <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICON_PATHS[name]} /></svg>;
 }
 
-export function DesignIconButton({ icon, label, onClick, pressed, disabled, className = '' }: {
-  icon: DesignIconName; label: string; onClick?: () => void; pressed?: boolean; disabled?: boolean; className?: string;
+/** A disabled control must never look broken: `disabledReason` turns its tooltip into the why. */
+export function disabledTitle(label: string, disabledReason?: string) {
+  return disabledReason ? `${label} — ${disabledReason}` : label;
+}
+
+export function DesignIconButton({ icon, label, onClick, pressed, disabled, disabledReason, className = '' }: {
+  icon: DesignIconName; label: string; onClick?: () => void; pressed?: boolean; disabled?: boolean;
+  /** Shown in the tooltip when the button is disabled, so it reads as unavailable rather than broken. */
+  disabledReason?: string; className?: string;
 }) {
-  return <button type="button" className={`di-icon-button ${className}`} aria-label={label} title={label} aria-pressed={pressed} disabled={disabled} onClick={onClick}><DesignIcon name={icon} /></button>;
+  const title = disabled ? disabledTitle(label, disabledReason) : label;
+  return <button type="button" className={`di-icon-button ${className}`} aria-label={label} title={title} aria-pressed={pressed} disabled={disabled} onClick={onClick}><DesignIcon name={icon} /></button>;
 }
 
 export function DesignSectionHead({ title, children }: { title: string; children?: ReactNode }) {
@@ -65,9 +73,11 @@ const parseValue = (text: string, current: number) => {
 };
 
 /** Compact expression-aware field. Escape cancels; arrows step; blur/Enter commit once. */
-export function DesignNumberField({ label, prefix, icon, suffix, value, min, max, disabled, onCommit }: {
+export function DesignNumberField({ label, prefix, icon, suffix, value, min, max, disabled, disabledReason, onCommit }: {
   label: string; prefix?: string; icon?: DesignIconName; suffix?: string;
-  value: number; min?: number; max?: number; disabled?: boolean; onCommit: (value: number) => void;
+  value: number; min?: number; max?: number; disabled?: boolean;
+  /** Shown in the tooltip when the field is disabled, so it reads as unavailable rather than broken. */
+  disabledReason?: string; onCommit: (value: number) => void;
 }) {
   const [draft, setDraft] = useState(formatValue(value));
   const editing = useRef(false);
@@ -86,11 +96,12 @@ export function DesignNumberField({ label, prefix, icon, suffix, value, min, max
     setDraft(formatValue(result));
   };
   return (
-    <label className={`di-number-field${disabled ? ' is-disabled' : ''}`} title={label}>
+    <label className={`di-number-field${disabled ? ' is-disabled' : ''}`} title={disabled ? disabledTitle(label, disabledReason) : label}>
       <span className="di-field-prefix" aria-hidden="true">{icon ? <DesignIcon name={icon} size={14} /> : prefix}</span>
       <input
         type="text" inputMode="decimal" role="spinbutton" autoComplete="off" spellCheck={false}
         aria-label={label} aria-valuenow={value} aria-valuemin={min} aria-valuemax={max}
+        title={disabled ? disabledTitle(label, disabledReason) : undefined}
         value={editing.current ? draft : formatValue(value)} disabled={disabled}
         onFocus={(event) => { editing.current = true; cancelled.current = false; setDraft(formatValue(value)); event.currentTarget.select(); }}
         onChange={(event) => setDraft(event.target.value)} onBlur={commit}
@@ -117,24 +128,31 @@ const ALIGNMENTS: Array<{ icon: ObjectAlignment; label: string }> = [
   { icon: 'top', label: 'Align top' }, { icon: 'center-y', label: 'Align vertical centers' }, { icon: 'bottom', label: 'Align bottom' },
 ];
 
-export function DesignAlignment({ onAlign, onDistribute, disabled }: {
+export function DesignAlignment({ onAlign, onDistribute, disabled, disabledReason, distributeDisabledReason }: {
   onAlign: (alignment: ObjectAlignment) => void; onDistribute?: () => void; disabled?: boolean;
+  /** Tooltip suffix explaining why the alignment buttons are unavailable. */
+  disabledReason?: string;
+  /** Tooltip suffix explaining why distribution is unavailable. Falls back to `disabledReason`. */
+  distributeDisabledReason?: string;
 }) {
+  const distributeDisabled = disabled || !onDistribute;
   return <div className="di-control-block"><span className="di-label">Alignment</span><div className="di-alignment-row" role="group" aria-label="Alignment">
-    <div className="di-segment-group">{ALIGNMENTS.slice(0, 3).map(({ icon, label }) => <DesignIconButton key={icon} icon={icon} label={label} onClick={() => onAlign(icon)} disabled={disabled} />)}</div>
-    <div className="di-segment-group">{ALIGNMENTS.slice(3).map(({ icon, label }) => <DesignIconButton key={icon} icon={icon} label={label} onClick={() => onAlign(icon)} disabled={disabled} />)}</div>
-    <DesignIconButton icon="distribute-y" label="Distribute vertically" onClick={onDistribute} disabled={disabled || !onDistribute} />
+    <div className="di-segment-group">{ALIGNMENTS.slice(0, 3).map(({ icon, label }) => <DesignIconButton key={icon} icon={icon} label={label} onClick={() => onAlign(icon)} disabled={disabled} disabledReason={disabledReason} />)}</div>
+    <div className="di-segment-group">{ALIGNMENTS.slice(3).map(({ icon, label }) => <DesignIconButton key={icon} icon={icon} label={label} onClick={() => onAlign(icon)} disabled={disabled} disabledReason={disabledReason} />)}</div>
+    <DesignIconButton icon="distribute-y" label="Distribute vertically" onClick={onDistribute} disabled={distributeDisabled} disabledReason={distributeDisabledReason ?? disabledReason} />
   </div></div>;
 }
 
 /** Arrangement is a one-shot geometry operation, not a persistent auto-layout setting. */
-export function DesignFlow({ onArrange, disabled }: {
+export function DesignFlow({ onArrange, disabled, disabledReason }: {
   onArrange: (mode: 'horizontal' | 'vertical' | 'grid') => void; disabled?: boolean;
+  /** Tooltip suffix explaining why the arrange buttons are unavailable. */
+  disabledReason?: string;
 }) {
   return <div className="di-control-block"><span className="di-label">Flow</span><div className="di-flow-row" role="group" aria-label="Arrange layout">
     <span className="di-freeform" role="img" aria-label="Freeform layout" title="Freeform layout"><DesignIcon name="freeform" /></span>
-    <DesignIconButton icon="vertical" label="Arrange vertically" onClick={() => onArrange('vertical')} disabled={disabled} />
-    <DesignIconButton icon="horizontal" label="Arrange horizontally" onClick={() => onArrange('horizontal')} disabled={disabled} />
-    <DesignIconButton icon="grid" label="Arrange in a grid" onClick={() => onArrange('grid')} disabled={disabled} />
+    <DesignIconButton icon="vertical" label="Arrange vertically" onClick={() => onArrange('vertical')} disabled={disabled} disabledReason={disabledReason} />
+    <DesignIconButton icon="horizontal" label="Arrange horizontally" onClick={() => onArrange('horizontal')} disabled={disabled} disabledReason={disabledReason} />
+    <DesignIconButton icon="grid" label="Arrange in a grid" onClick={() => onArrange('grid')} disabled={disabled} disabledReason={disabledReason} />
   </div></div>;
 }

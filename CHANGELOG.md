@@ -7,6 +7,15 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Fixed
 
+- Inspector controls that could never run now say why in their tooltip (frame rotation, frame flips,
+  frame corner radius, `Clip content`, distribution with fewer than three layers, arrangement with
+  fewer than two) instead of reading as broken buttons.
+- A frame holding exactly one shape can now be aligned: the alignment row was gated on two or more
+  frame contents, even though aligning a single shape to its frame is well defined. Availability is
+  now derived from the same visible-and-unlocked set the commands act on, so an enabled control always
+  changes something. Distribution also skips objects it would not move, so it never opens an empty
+  transaction.
+
 - Rotating from the inspector (the `Rotation` field, the 90° button, or `R°` on a multi-selection)
   now turns the selection about its centre. It used to write the angle straight into the
   transform, which rotates about the object's local origin — usually a corner — so a single

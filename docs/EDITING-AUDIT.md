@@ -151,7 +151,37 @@ remaining approximation is non-uniform resizing of several rotated objects at
 once, where each object is scaled in its own axes — unavoidable while the
 transform is `rotate × scale` rather than a general matrix.
 
-### 3.4 Typography and gradients are absent, not weak
+### 3.4 The inspector's unavailable controls now read as unavailable
+
+The panel is denser than the interaction model behind it. With nothing selected it
+shows 37 controls, and before this pass 16 of them were greyed out with the same
+tooltip they carry when enabled — so a button that could never run was
+indistinguishable from one that had failed to react.
+
+Three rules now hold, and `src/ui/PropertiesPanel.states.test.tsx` enforces them by
+rendering the panel in its frame, single-selection and multi-selection states:
+
+1. **Availability is derived from the set the command acts on.** `canAlignObjects`,
+   `canArrangeObjects`, `canDistributeObjects` and `editableObjectIds` in
+   `src/core/inspector-layout.ts` measure visible, unlocked objects — the same set
+   `alignmentUpdates` and friends move. A frame holding one shape can now be aligned
+   to that frame; it used to be gated on two or more contents even though one shape
+   aligning to its frame is well defined.
+2. **Every disabled control states its reason** in `title`, via the `disabledReason`
+   prop on `DesignIconButton`, `DesignNumberField`, `DesignAlignment` and
+   `DesignFlow`. The tooltip reads `Align left — this frame has no visible, unlocked
+   shapes to align`, not just `Align left`.
+3. **Genuinely unbuilt capabilities stay disabled, but say so.** Frames stay
+   axis-aligned, cannot be flipped, have square corners, and `Clip content` is not
+   implemented by the renderer. None of those are bugs to "fix" by enabling the
+   control; they are limits the panel now names.
+
+The canvas root is the awkward case. It has no bounds, so a lone shape outside every
+frame has nothing to align against, while two or more such shapes align to their
+combined bounds. That distinction is expressed once, in `canAlignObjects`, rather
+than re-derived in each inspector branch.
+
+### 3.5 Typography and gradients are absent, not weak
 
 There is no text entity and no gradient fill type. These are feature projects, not
 interaction fixes, and they should be sequenced after the interaction layer —
@@ -182,7 +212,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | Canvas group selection and one-level entry (3.2) | nested documents, real design files |
 | 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
-| 4 | Text and gradients (3.4) | typography and illustration, the two missing media |
+| 4 | Text and gradients (3.5) | typography and illustration, the two missing media |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived
@@ -192,7 +222,7 @@ quality gain, and it needs no new model concepts.
 
 ## 6. Shipped in this pass
 
-Three changes, all small and all verified by the existing gates:
+Four changes, all small and all verified by the existing gates:
 
 - **Resize and rotate.** A quad frame on the object's own axes with eight resize
   handles and a rotate zone just outside each corner; `Shift` keeps the ratio when
@@ -204,6 +234,11 @@ Three changes, all small and all verified by the existing gates:
 - **Wheel pans the canvas.** Plain wheel or two-finger scroll pans, `Shift` +
   wheel pans horizontally, `Ctrl/⌘` + wheel or pinch zooms at the pointer, and
   `Ctrl/⌘ +` / `-` steps the zoom. See `wheelIntent` in `src/canvas/viewport.ts`.
+- **Truthful inspector availability.** Every disabled control in the right panel
+  names its reason in its tooltip, availability comes from the visible-and-unlocked
+  set the commands act on, and a frame holding a single shape can be aligned.
+  `src/ui/PropertiesPanel.states.test.tsx` renders the panel in three selection
+  states and fails if any disabled control is unexplained.
 
 Everything else in sections 3 and 5 is proposed, not built.
 
@@ -213,7 +248,8 @@ Everything else in sections 3 and 5 is proposed, not built.
 
 - `npm test` — the interaction tests named in section 3 live next to the code they
   cover (`src/tools/select-tool.test.ts`, `src/core/object-resize.test.ts`,
-  `src/core/object-workflow.test.ts`, `src/canvas/viewport.test.ts`).
+  `src/core/object-workflow.test.ts`, `src/canvas/viewport.test.ts`,
+  `src/core/inspector-layout.test.ts`, `src/ui/PropertiesPanel.states.test.tsx`).
 - `npm run test:conformance` — proves the shell the handles will be drawn over is
   internally consistent.
 - Read `src/canvas/VectorCanvas.tsx:651-1200` — the whole pointer-down decision

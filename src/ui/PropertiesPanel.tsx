@@ -14,7 +14,11 @@ import {
 import { evaluateSegment } from '../core/geometry';
 import { FamilyQaDialog } from './FamilyQaDialog';
 import { evaluateNumericExpression } from '../core/numeric-expression';
-import { alignmentUpdates, arrangementUpdates, resizedObjectTransform, verticalDistributionUpdates, type InspectorTransformUpdate, type ObjectAlignment } from '../core/inspector-layout';
+import {
+  alignmentUpdates, arrangementUpdates, canAlignObjects, canArrangeObjects, canDistributeObjects,
+  resizedObjectTransform, verticalDistributionUpdates,
+  type InspectorTransformUpdate, type ObjectAlignment,
+} from '../core/inspector-layout';
 import { DesignAlignment, DesignFlow, DesignIcon, DesignIconButton, DesignNumberField, DesignSectionHead } from './DesignControls';
 import type { OperationManager, SegmentRoleUpdate } from '../core/operations';
 import { parametricSourceObjectId, validateParametricGroup } from '../core/parametric';
@@ -1099,7 +1103,7 @@ function DrawingStyleInspector({
         {tool === 'pen' && (
           <div className="drawing-fill-row">
             <label className="checkbox-row"><input type="checkbox" checked={style.fillEnabled} onChange={(event) => onChange({ fillEnabled: event.target.checked })} /><span>Fill closed paths</span></label>
-            <input type="color" aria-label="Drawing fill color" value={style.fillColor} disabled={!style.fillEnabled} onChange={(event) => onChange({ fillColor: event.target.value })} />
+            <input type="color" aria-label="Drawing fill color" title={style.fillEnabled ? 'Drawing fill color' : 'Drawing fill color — turn on “Fill closed paths” first'} value={style.fillColor} disabled={!style.fillEnabled} onChange={(event) => onChange({ fillColor: event.target.value })} />
           </div>
         )}
         <p>{tool === 'pen'
@@ -1256,6 +1260,19 @@ function ArtboardFrameInspector({
     .filter((object) => document.isObjectVisible(object.id) && !document.isObjectLocked(object.id))
     .filter((object) => (document.getNetwork(object.networkId)?.nodeIds.length ?? 0) > 0)
     .map((object) => object.id);
+  // Availability is derived from the same set the commands act on, so an enabled control
+  // always changes something and a disabled one always explains itself.
+  const alignReason = contentIds.length === 0
+    ? 'this frame has no visible, unlocked shapes to align'
+    : artboard.isCanvasRoot
+      ? 'the canvas root has no bounds; select 2 or more shapes to align them to each other'
+      : undefined;
+  const distributeReason = contentIds.length < 3
+    ? 'distribution needs 3 or more visible, unlocked shapes'
+    : undefined;
+  const arrangeReason = contentIds.length < 2
+    ? 'arranging needs 2 or more visible, unlocked shapes'
+    : undefined;
   const background = /^#([a-f0-9]{6})([a-f0-9]{2})?$/i.exec(artboard.background);
   const backgroundColor = background ? `#${background[1]}` : DEFAULT_ARTBOARD_BACKGROUND;
   const backgroundOpacity = background?.[2] ? Number.parseInt(background[2], 16) / 255 : 1;
@@ -1286,27 +1303,37 @@ function ArtboardFrameInspector({
           {menuOpen && (
             <div role="menu" className="di-frame-popover" onMouseLeave={() => setMenuOpen(false)}>
               <button type="button" role="menuitem" className="duplicate-artboard-button" onClick={() => { setMenuOpen(false); onDuplicate(); }}>Duplicate frame</button>
-              <button type="button" role="menuitem" className="delete-artboard-button" disabled={Boolean(artboard.isCanvasRoot)} onClick={() => { setMenuOpen(false); onDelete(); }}>Delete frame</button>
+              <button type="button" role="menuitem" className="delete-artboard-button" title={artboard.isCanvasRoot ? 'Delete frame — the canvas root cannot be deleted' : 'Delete frame'} disabled={Boolean(artboard.isCanvasRoot)} onClick={() => { setMenuOpen(false); onDelete(); }}>Delete frame</button>
             </div>
           )}
         </div>
       </div>
       <section className="di-section di-position-section">
         <DesignAlignment
-          disabled={contentIds.length < 2}
+          disabled={!canAlignObjects(document, contentIds)}
+          disabledReason={alignReason}
+          distributeDisabledReason={distributeReason}
           onAlign={(alignment) => {
             // Frame selection aligns its contents, never the frame against itself.
             applyInspectorTransforms(manager, 'Align frame contents', alignmentUpdates(document, contentIds, alignment));
           }}
-          onDistribute={contentIds.length >= 3 ? () => applyInspectorTransforms(manager, 'Distribute frame contents', verticalDistributionUpdates(document, contentIds)) : undefined}
+          onDistribute={canDistributeObjects(document, contentIds) ? () => applyInspectorTransforms(manager, 'Distribute frame contents', verticalDistributionUpdates(document, contentIds)) : undefined}
         />
         <div className="di-control-block"><span className="di-label">Position</span><div className="di-two-columns di-with-trailing-space">
           <DesignNumberField label="Artboard X position" prefix="X" value={artboard.frame.x} onCommit={(value) => moveFrame('x', value)} />
           <DesignNumberField label="Artboard Y position" prefix="Y" value={artboard.frame.y} onCommit={(value) => moveFrame('y', value)} />
         </div></div>
         <div className="di-control-block"><span className="di-label">Rotation</span><div className="di-rotation-row">
-          <DesignNumberField label="Frame rotation (frames are axis-aligned)" icon="corner" suffix="°" value={0} disabled onCommit={() => {}} />
-          <div className="di-segment-group"><DesignIconButton icon="rotate" label="Frames are axis-aligned" disabled /><DesignIconButton icon="flip-x" label="Select a shape to flip horizontally" disabled /><DesignIconButton icon="flip-y" label="Select a shape to flip vertically" disabled /></div>
+          <DesignNumberField
+            label="Frame rotation" icon="corner" suffix="°" value={0} disabled
+            disabledReason="frames stay axis-aligned; rotate the shapes inside instead"
+            onCommit={() => {}}
+          />
+          <div className="di-segment-group">
+            <DesignIconButton icon="rotate" label="Frames are axis-aligned" disabled disabledReason="rotate the shapes inside the frame instead" />
+            <DesignIconButton icon="flip-x" label="Select a shape to flip horizontally" disabled disabledReason="frames cannot be flipped" />
+            <DesignIconButton icon="flip-y" label="Select a shape to flip vertically" disabled disabledReason="frames cannot be flipped" />
+          </div>
         </div></div>
       </section>
       <section className="di-section di-layout-section">
@@ -1314,7 +1341,11 @@ function ArtboardFrameInspector({
           <DesignIconButton icon="reset" label="Reset frame to 24 × 24" onClick={() => manager.execute({ type: 'UPDATE_ARTBOARD_DIMENSIONS', payload: { artboardId: artboard.id, width: 24, height: 24 } })} />
           <DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Lock aspect ratio" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} />
         </DesignSectionHead>
-        <DesignFlow disabled={contentIds.length < 2} onArrange={(mode) => applyInspectorTransforms(manager, `Arrange frame contents ${mode}`, arrangementUpdates(document, contentIds, mode))} />
+        <DesignFlow
+          disabled={!canArrangeObjects(document, contentIds)}
+          disabledReason={arrangeReason}
+          onArrange={(mode) => applyInspectorTransforms(manager, `Arrange frame contents ${mode}`, arrangementUpdates(document, contentIds, mode))}
+        />
         <div className="di-control-block"><span className="di-label">Dimensions</span><div className="di-dimension-row">
           <div className="di-two-columns">
             <label className="di-number-field"><span className="di-field-prefix" aria-hidden="true">W</span><input data-dimension="width" aria-label="Artboard width" type="number" min="1" step="1" value={widthDraft} onFocus={(event) => { beginEdit('width'); event.currentTarget.select(); }} onChange={(event) => applyDimension('width', event.target.value)} onBlur={finishEdit} onKeyDown={handleDimensionKeyDown} /></label>
@@ -1322,11 +1353,11 @@ function ArtboardFrameInspector({
           </div>
           <DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Constrain frame proportions" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} />
         </div></div>
-        <label className="di-checkbox is-unavailable" title="Artboard clipping is not yet supported by the canvas renderer"><input type="checkbox" checked={artboard.clipContent} disabled readOnly /><span>Clip content</span></label>
+        <label className="di-checkbox is-unavailable" title="Artboard clipping is not yet supported by the canvas renderer"><input type="checkbox" aria-label="Clip content" title="Clip content — frame clipping is not supported by the canvas renderer yet" checked={artboard.clipContent} disabled readOnly /><span>Clip content</span></label>
       </section>
       <section className="di-section di-appearance-section">
         <DesignSectionHead title="Appearance"><DesignIconButton icon={backgroundOpacity > 0 ? 'eye' : 'eye-off'} label={backgroundOpacity > 0 ? 'Hide frame background' : 'Show frame background'} onClick={() => { if (backgroundOpacity > 0) lastBackgroundOpacity.current = backgroundOpacity; setBackground(backgroundColor, backgroundOpacity > 0 ? 0 : lastBackgroundOpacity.current); }} /></DesignSectionHead>
-        <div className="di-two-columns di-with-trailing-space"><div className="di-control-block"><span className="di-label">Opacity</span><DesignNumberField label="Frame background opacity" icon="opacity" suffix="%" value={Math.round(backgroundOpacity * 100)} min={0} max={100} onCommit={(value) => setBackground(backgroundColor, value / 100)} /></div><div className="di-control-block"><span className="di-label">Corner radius</span><DesignNumberField label="Frame corner radius (not supported)" icon="corners" value={0} disabled onCommit={() => {}} /></div></div>
+        <div className="di-two-columns di-with-trailing-space"><div className="di-control-block"><span className="di-label">Opacity</span><DesignNumberField label="Frame background opacity" icon="opacity" suffix="%" value={Math.round(backgroundOpacity * 100)} min={0} max={100} onCommit={(value) => setBackground(backgroundColor, value / 100)} /></div><div className="di-control-block"><span className="di-label">Corner radius</span><DesignNumberField label="Frame corner radius" icon="corners" value={0} disabled disabledReason="frames have square corners; use a rectangle shape for rounded corners" onCommit={() => {}} /></div></div>
       </section>
       <section className="di-section di-fill-section">
         <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add frame background" onClick={() => setBackground(backgroundColor, 1)} /></DesignSectionHead>
@@ -1517,7 +1548,16 @@ function ObjectInspector({
         <DesignIconButton icon="edit" label="Edit points" onClick={onEnterEdit} />
       </div>
       <section className="di-section di-position-section">
-        <DesignAlignment onAlign={onAlign} disabled={constructionOnly || !owningFrame || Boolean(owningFrame.isCanvasRoot)} />
+        <DesignAlignment
+          onAlign={onAlign}
+          disabled={constructionOnly || !canAlignObjects(document, [object.id])}
+          disabledReason={constructionOnly
+            ? 'construction geometry cannot be aligned'
+            : !owningFrame || owningFrame.isCanvasRoot
+              ? 'this shape sits outside every frame, so there is nothing to align it to'
+              : undefined}
+          distributeDisabledReason="distribution needs 3 or more visible, unlocked shapes"
+        />
         <div className="di-control-block"><span className="di-label">Position</span><div className="di-two-columns di-with-trailing-space">
           <DesignNumberField label="Object X position" prefix="X" value={bounds.minX - frameOrigin.x} onCommit={(value) => updateTransform({ x: object.transform.x + value + frameOrigin.x - bounds.minX })} />
           <DesignNumberField label="Object Y position" prefix="Y" value={bounds.minY - frameOrigin.y} onCommit={(value) => updateTransform({ y: object.transform.y + value + frameOrigin.y - bounds.minY })} />
@@ -1535,16 +1575,32 @@ function ObjectInspector({
         </div><DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Constrain proportions" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} /></div></div>
       </section>
       {appearance && <section className="di-section di-appearance-section">
-        <DesignSectionHead title="Appearance"><DesignIconButton icon="eye" label="Hide object" onClick={onHide} /><DesignIconButton icon="fill" label={fills.some((fill) => fill.visible) ? 'Hide all fills' : 'Show all fills'} disabled={fills.length === 0 || constructionOnly} onClick={() => { const visible = !fills.some((fill) => fill.visible); setFills(fills.map((fill) => ({ ...fill, visible }))); }} /></DesignSectionHead>
+        <DesignSectionHead title="Appearance"><DesignIconButton icon="eye" label="Hide object" onClick={onHide} /><DesignIconButton
+          icon="fill"
+          label={fills.some((fill) => fill.visible) ? 'Hide all fills' : 'Show all fills'}
+          disabled={fills.length === 0 || constructionOnly}
+          disabledReason={constructionOnly ? 'construction geometry has no fills' : 'this shape has no fills'}
+          onClick={() => { const visible = !fills.some((fill) => fill.visible); setFills(fills.map((fill) => ({ ...fill, visible }))); }}
+        /></DesignSectionHead>
         <div className="di-appearance-row"><div className="di-two-columns">
           <div className="di-control-block"><span className="di-label">Opacity</span><DesignNumberField label="Object opacity" icon="opacity" suffix="%" value={appearance.opacity * 100} min={0} max={100} onCommit={(value) => onUpdateAppearance(appearance.id, { opacity: value / 100 })} /></div>
-          <div className="di-control-block"><span className="di-label">Corner radius</span><DesignNumberField label={canRound ? 'Corner radius' : 'Corner radius (unavailable for this path)'} icon="corners" value={roundedAvg} min={0} disabled={!canRound || perCorner} onCommit={(value) => applyRadii(slots.map(() => value))} /></div>
-        </div><DesignIconButton icon="corners" label="Independent corners" pressed={perCorner} disabled={!canRound} onClick={() => setPerCorner((value) => !value)} /></div>
+          <div className="di-control-block"><span className="di-label">Corner radius</span><DesignNumberField
+            label="Corner radius"
+            icon="corners"
+            value={roundedAvg}
+            min={0}
+            disabled={!canRound || perCorner}
+            disabledReason={perCorner
+              ? 'per-corner radii are edited below'
+              : 'only closed paths with corner points can be rounded'}
+            onCommit={(value) => applyRadii(slots.map(() => value))}
+          /></div>
+        </div><DesignIconButton icon="corners" label="Independent corners" pressed={perCorner} disabled={!canRound} disabledReason="only closed paths with corner points can be rounded" onClick={() => setPerCorner((value) => !value)} /></div>
         {canRound && perCorner && <div className="di-corner-grid">{slots.map((corner, index) => <DesignNumberField key={corner.nodeId} label={typeof corner.slot === 'string' ? `${slotLabels[corner.slot]} corner radius` : `Corner ${index + 1} radius`} prefix={typeof corner.slot === 'string' ? slotLabels[corner.slot].split(' ').map((word) => word[0]).join('') : String(index + 1)} value={remembered?.[index] ?? 0} min={0} onCommit={(value) => applyRadii(slots.map((_c, i) => i === index ? value : (remembered?.[i] ?? 0)))} />)}</div>}
         {cornerNote && <p className="di-note" role="note">{cornerNote}</p>}
       </section>}
       {appearance && <section className="di-section di-fill-section">
-        <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add fill" disabled={constructionOnly} onClick={() => setFills([...fills, { type: 'solid', color: fills.length ? DEFAULT_FIRST_FILL : DEFAULT_FILL_COLOR, opacity: 1, visible: true }])} /></DesignSectionHead>
+        <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add fill" disabled={constructionOnly} disabledReason="construction geometry has no fills" onClick={() => setFills([...fills, { type: 'solid', color: fills.length ? DEFAULT_FIRST_FILL : DEFAULT_FILL_COLOR, opacity: 1, visible: true }])} /></DesignSectionHead>
         {constructionOnly ? <p className="di-note">Fill is unavailable for construction geometry.</p> : fills.length === 0 ? <p className="di-note">No fill</p> : fills.map((fill, index) => <PaintRow key={index} label="Fill" color={fill.color} opacity={fill.opacity ?? 1} visible={fill.visible} onColor={(color) => patchFill(index, { color })} onOpacity={(opacity) => patchFill(index, { opacity })} onToggle={() => patchFill(index, { visible: !fill.visible })} onRemove={() => setFills(fills.filter((_item, i) => i !== index))} />)}
       </section>}
       {appearance && (
@@ -1715,6 +1771,10 @@ function GeometryFamilyInspector({
               <button
                 type="button"
                 className="primary-panel-action"
+                aria-label="Review geometry impact"
+                title={component.variants.length === 0
+                  ? 'Review geometry impact — create a variant first, there is nothing else to update'
+                  : 'Review geometry impact'}
                 disabled={component.variants.length === 0}
                 onClick={openImpact}
               >Review geometry impact</button>
@@ -2161,7 +2221,7 @@ function SharedAppearanceRuleInspector({
               <span>Linked to {usageCount} {usageCount === 1 ? 'object' : 'objects'}</span>
             </div>
             <p>Appearance edits update every object using this style. Geometry stays independent.</p>
-            <button type="button" className="primary-panel-action" onClick={() => setImpactOpen(true)}>Review change impact</button>
+            <button type="button" className="primary-panel-action" aria-label="Review change impact" onClick={() => setImpactOpen(true)}>Review change impact</button>
             <div className="inline-button-row">
               <button type="button" onClick={onDetach}>Detach selected</button>
               <button type="button" className="danger-button" onClick={() => onDelete(commonRule.id)}>Delete style</button>
@@ -2178,7 +2238,7 @@ function SharedAppearanceRuleInspector({
                     {rules.map((rule) => <option key={rule.id} value={rule.id}>{rule.name}</option>)}
                   </select>
                 </label>
-                <button type="button" disabled={!selectedRuleId} onClick={() => onApply(selectedRuleId)}>Apply</button>
+                <button type="button" title={selectedRuleId ? 'Apply this style' : 'Apply — choose an existing style first'} disabled={!selectedRuleId} onClick={() => onApply(selectedRuleId)}>Apply</button>
               </div>
             )}
             <label className="field-stack">
@@ -2198,6 +2258,8 @@ function SharedAppearanceRuleInspector({
             <button
               type="button"
               className="primary-panel-action"
+              aria-label="Create from selection"
+              title={newName.trim() ? 'Create a shared style from the selection' : 'Create from selection — type a style name first'}
               disabled={!newName.trim()}
               onClick={() => {
                 onCreate(newName);
@@ -2523,10 +2585,20 @@ function MultiObjectInspector({
         </div>
       </div>
       <section className="di-section">
-        <DesignAlignment disabled={unlocked.length < 2} onAlign={(alignment) => onAlign(ids, alignment)} onDistribute={unlocked.length >= 3 ? () => applyInspectorTransforms(manager, 'Distribute selected objects', verticalDistributionUpdates(document, ids)) : undefined} />
+        <DesignAlignment
+          disabled={!canAlignObjects(document, ids)}
+          disabledReason="alignment needs 2 or more visible, unlocked objects"
+          distributeDisabledReason="distribution needs 3 or more visible, unlocked objects"
+          onAlign={(alignment) => onAlign(ids, alignment)}
+          onDistribute={canDistributeObjects(document, ids) ? () => applyInspectorTransforms(manager, 'Distribute selected objects', verticalDistributionUpdates(document, ids)) : undefined}
+        />
         <div className="di-control-block"><span className="di-label">Flip</span><div className="di-multi-flips"><DesignIconButton icon="flip-x" label="Flip horizontal" onClick={() => onFlip('horizontal')} /><DesignIconButton icon="flip-y" label="Flip vertical" onClick={() => onFlip('vertical')} /></div></div>
       </section>
-      <section className="di-section"><DesignSectionHead title="Layout" /><DesignFlow disabled={unlocked.length < 2} onArrange={(mode) => applyInspectorTransforms(manager, `Arrange selected objects ${mode}`, arrangementUpdates(document, ids, mode))} /></section>
+      <section className="di-section"><DesignSectionHead title="Layout" /><DesignFlow
+          disabled={!canArrangeObjects(document, ids)}
+          disabledReason="arranging needs 2 or more visible, unlocked objects"
+          onArrange={(mode) => applyInspectorTransforms(manager, `Arrange selected objects ${mode}`, arrangementUpdates(document, ids, mode))}
+        /></section>
       <div className="panel-section object-appearance-inspector">
         <span className="section-label">COMMON APPEARANCE</span>
         <div className="numeric-field-grid">
