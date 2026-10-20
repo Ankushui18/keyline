@@ -113,7 +113,7 @@
   background: #13181e;
   border-bottom: 1px solid #292f3a;
 }
-.delivery-file-summary code { color: #9cabc0; font: 10px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.delivery-file-summary code { color: #9cabc0; font: 10px/1.4 'Geist', system-ui, sans-serif; }
 .delivery-file-summary span { color: #748095; font-size: 9px; }
 .export-preview:has(.delivery-file-summary) { grid-template-rows: auto 180px auto minmax(0, 1fr); }
 .delivery-footer { min-height: 61px; }

@@ -167,7 +167,7 @@
   border-radius: 8px;
 }
 .keyline-position-grid .coordinate-field > span { color: #8a8d95; }
-.keyline-position-grid .coordinate-field input { width: 100%; min-width: 0; padding: 0; color: #ececee; text-align: right; background: transparent; border: 0; font: 13px 'Geist Mono', monospace; }
+.keyline-position-grid .coordinate-field input { width: 100%; min-width: 0; padding: 0; color: #ececee; text-align: right; background: transparent; border: 0; font: 13px 'Geist', system-ui, sans-serif; }
 .keyline-corner-control { display: flex; padding: 3px; background: #17181a; border: 1px solid #2e3036; border-radius: 9px; }
 .keyline-corner-control button { flex: 1; height: 28px; color: #ececee; background: transparent; border: 0; border-radius: 7px; }
 .keyline-corner-control button.is-active { background: #2c2e33; font-weight: 500; }
@@ -189,7 +189,7 @@
 .keyline-suggestion-actions .is-primary { color: #fff; background: #0871c7; font-weight: 600; }
 .keyline-suggestion-actions .is-primary:hover { background: #0b7bd6; }
 .keyline-locked-rules { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: #c9cbd1; border: 1px solid #2e3036; border-radius: 10px; }
-.keyline-locked-rules output { color: #8a8d95; font: 12px 'Geist Mono', monospace; }
+.keyline-locked-rules output { color: #8a8d95; font: 12px 'Geist', system-ui, sans-serif; }
 .properties-panel:has(.keyline-node-inspector) > :not(.panel-heading):not(.keyline-node-inspector):not(.panel-help) { display: none; }
 .properties-panel:has(.keyline-node-inspector) .panel-help { display: none; }
 

@@ -1,21 +1,11 @@
 import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
-import { ChevronDownIcon } from '@primer/octicons-react/ChevronDownIcon';
-import { ChevronRightIcon } from '@primer/octicons-react/ChevronRightIcon';
-import { ChevronUpIcon } from '@primer/octicons-react/ChevronUpIcon';
-import { DuplicateIcon } from '@primer/octicons-react/DuplicateIcon';
-import { EyeClosedIcon } from '@primer/octicons-react/EyeClosedIcon';
-import { EyeIcon } from '@primer/octicons-react/EyeIcon';
-import { FileDirectoryIcon } from '@primer/octicons-react/FileDirectoryIcon';
-import { LockIcon } from '@primer/octicons-react/LockIcon';
-import { PlusIcon } from '@primer/octicons-react/PlusIcon';
-import { RowsIcon } from '@primer/octicons-react/RowsIcon';
 import { StackIcon } from '@primer/octicons-react/StackIcon';
-import { TrashIcon } from '@primer/octicons-react/TrashIcon';
-import { UnlockIcon } from '@primer/octicons-react/UnlockIcon';
 import type { VectorDocument } from '../core/document';
+import { evaluateSegment } from '../core/geometry';
 import { createEntityId } from '../core/ids';
 import { prepareDeleteObject, prepareDuplicateObject } from '../core/object-operations';
 import type { OperationManager } from '../core/operations';
+import { realArtboards } from '../core/real-content';
 import { objectConstructionComposition } from '../core/segment-semantics';
 import type { EntityId, LayerNode } from '../core/types';
 
@@ -37,8 +27,36 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
   const [draftName, setDraftName] = useState('');
   const [renamingLocation, setRenamingLocation] = useState<'page' | 'artboard'>();
   const [locationName, setLocationName] = useState('');
+  const realFrameIds = new Set(realArtboards(document).map((item) => item.id));
+  const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [collapsedFrames, setCollapsedFrames] = useState<Set<EntityId>>(new Set());
+  const [frameSelected, setFrameSelected] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number; kind: 'layer' | 'frame' | 'page'; id?: EntityId }>();
   const artboard = document.activeArtboard;
-  const displayLayerIds = artboard.layerIds.filter((layerId) => !isEmptyStarterLayer(document, layerId));
+  // Every frame of the page, in order, with its real (non-placeholder) layers. The hidden canvas root has no row of its own.
+  const sections = document.activePage.artboardIds
+    .map((id) => document.getArtboard(id))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .filter((item) => item.isCanvasRoot || realFrameIds.has(item.id))
+    .map((item) => ({ artboard: item, layerIds: item.layerIds.filter((layerId) => !isEmptyStarterLayer(document, layerId)) }));
+  const needle = query.trim().toLowerCase();
+  const matchSet = (() => {
+    if (!needle) return undefined;
+    const keep = new Set<EntityId>();
+    const visit = (layerId: EntityId): boolean => {
+      const layer = document.getLayer(layerId);
+      if (!layer) return false;
+      let hit = layer.name.toLowerCase().includes(needle);
+      for (const childId of layer.childIds) if (visit(childId)) hit = true;
+      if (hit) keep.add(layer.id);
+      return hit;
+    };
+    sections.forEach((section) => section.layerIds.forEach(visit));
+    return keep;
+  })();
+  const frameVisible = (item: (typeof sections)[number]) =>
+    !needle || item.artboard.name.toLowerCase().includes(needle) || item.layerIds.some((id) => matchSet?.has(id));
 
   useEffect(() => {
     const existing = new Set([...selectedLayerIds].filter((id) => document.getLayer(id)));
@@ -49,11 +67,14 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
     const ids: EntityId[] = [];
     const visit = (layerId: EntityId) => {
       const layer = document.getLayer(layerId);
-      if (!layer) return;
+      if (!layer || (matchSet && !matchSet.has(layerId))) return;
       ids.push(layer.id);
-      if (layer.kind !== 'object' && layer.expanded) layer.childIds.forEach(visit);
+      if (layer.kind !== 'object' && (layer.expanded || matchSet)) layer.childIds.forEach(visit);
     };
-    displayLayerIds.forEach(visit);
+    for (const section of sections) {
+      if (!frameVisible(section)) continue;
+      if (section.artboard.isCanvasRoot || !collapsedFrames.has(section.artboard.id) || matchSet) section.layerIds.forEach(visit);
+    }
     return ids;
   })();
 
@@ -71,6 +92,11 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
 
   const selectLayer = (layerId: EntityId, event: Pick<ReactMouseEvent, 'shiftKey' | 'metaKey' | 'ctrlKey'>) => {
     let next: Set<EntityId>;
+    setFrameSelected(false);
+    const owner = document.getLayer(layerId)?.artboardId;
+    if (owner && owner !== document.activeArtboardId) {
+      manager.execute({ type: 'SET_ACTIVE_LOCATION', payload: { pageId: document.activePageId, artboardId: owner } });
+    }
     if (event.shiftKey && selectionAnchorId && visibleLayerIds.includes(selectionAnchorId)) {
       const start = visibleLayerIds.indexOf(selectionAnchorId);
       const end = visibleLayerIds.indexOf(layerId);
@@ -121,6 +147,10 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
           },
         });
       }
+    } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'g') {
+      if (event.shiftKey) ungroupSelected(); else groupSelected();
+    } else if (event.key === 'Delete' || event.key === 'Backspace') {
+      deleteSelected();
     } else if (event.key === 'ArrowDown') targetId = visibleLayerIds[Math.min(visibleLayerIds.length - 1, index + 1)];
     else if (event.key === 'ArrowUp') targetId = visibleLayerIds[Math.max(0, index - 1)];
     else if (event.key === 'Home') targetId = visibleLayerIds[0];
@@ -309,12 +339,6 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
     }
     return false;
   };
-  const moveTargets = [...document.layers.values()].filter((layer) =>
-    layer.artboardId === artboard.id &&
-    layer.kind !== 'object' &&
-    !selectedLayerIds.has(layer.id) &&
-    !selectedRoots.some((root) => isDescendantOf(layer.id, root.id)));
-
   const dropLayer = (sourceId: EntityId, target: LayerNode, position: 'before' | 'inside' | 'after') => {
     const source = document.getLayer(sourceId);
     if (!source || source.id === target.id || isDescendantOf(target.id, source.id)) return;
@@ -336,28 +360,6 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
     setDraggingLayerId(undefined);
     onSelectLayers(new Set([source.id]));
     focusLayer(source.id);
-  };
-
-  const moveSelectedTo = (parentId: EntityId | undefined) => {
-    if (selectedRoots.length === 0) return;
-    const parent = parentId ? document.getLayer(parentId) : undefined;
-    const targetIds = parent?.childIds ?? document.getArtboard(artboard.id)?.layerIds ?? [];
-    try {
-      manager.beginTransaction(selectedRoots.length > 1 ? 'Move layers' : 'Move layer');
-      selectedRoots.forEach((layer, offset) => manager.execute({
-        type: 'MOVE_LAYER',
-        payload: {
-          layerId: layer.id,
-          parentId,
-          artboardId: artboard.id,
-          index: targetIds.length + offset,
-        },
-      }));
-      manager.commitTransaction();
-    } catch (error) {
-      manager.rollbackTransaction();
-      console.warn('Moving layers failed.', error);
-    }
   };
 
   const duplicateSubtree = (sourceId: EntityId, parentId: EntityId | undefined, index: number): EntityId | undefined => {
@@ -502,159 +504,306 @@ export function LayersPanel({ document, manager, selectedLayerIds, onSelectLayer
 
   const activePageIndex = document.pages.findIndex((item) => item.id === document.activePageId);
   const activeArtboardIndex = document.activePage.artboardIds.indexOf(document.activeArtboardId);
+  const realFrames = sections.filter((section) => !section.artboard.isCanvasRoot);
+  const looseSections = sections.filter((section) => section.artboard.isCanvasRoot);
+  const nothingToShow = sections.every((section) => section.layerIds.length === 0) && realFrames.length === 0;
+  const canGroup = selectedLayers.length > 0 && sameParentSelection;
+  const canUngroup = selectedLayers.length === 1 && selectedLayer !== undefined && selectedLayer.kind !== 'object';
+  const closeMenu = () => setMenu(undefined);
+
+  useEffect(() => {
+    if (!menu) return undefined;
+    const close = () => setMenu(undefined);
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenu(undefined); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('blur', close);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('blur', close);
+    };
+  }, [menu]);
+
+  // ⌘G groups, ⌘⇧G ungroups, wherever focus is (not while typing in a field).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'g' || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      if (event.shiftKey ? !canUngroup : !canGroup) return;
+      event.preventDefault();
+      if (event.shiftKey) ungroupSelected(); else groupSelected();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const toggleFrame = (artboardId: EntityId) => setCollapsedFrames((current) => {
+    const next = new Set(current);
+    if (next.has(artboardId)) next.delete(artboardId); else next.add(artboardId);
+    return next;
+  });
+
+  const activateFrame = (artboardId: EntityId) => {
+    if (artboardId !== document.activeArtboardId) {
+      manager.execute({ type: 'SET_ACTIVE_LOCATION', payload: { pageId: document.activePageId, artboardId } });
+    }
+    onSelectLayers(new Set());
+    setFrameSelected(true);
+  };
+
+  const dropOnFrame = (sourceId: EntityId, artboardId: EntityId) => {
+    const source = document.getLayer(sourceId);
+    const target = document.getArtboard(artboardId);
+    if (!source || !target) return;
+    manager.execute({
+      type: 'MOVE_LAYER',
+      payload: { layerId: source.id, parentId: undefined, artboardId, index: target.layerIds.length },
+    });
+    setDraggingLayerId(undefined);
+    onSelectLayers(new Set([source.id]));
+  };
+
+  const commitFrameRename = (artboardId: EntityId) => {
+    const name = draftName.trim();
+    const target = document.getArtboard(artboardId);
+    if (name && target && name !== target.name) {
+      manager.execute({ type: 'UPDATE_ARTBOARD', payload: { artboardId, updates: { name } } });
+    }
+    setRenamingId(undefined);
+  };
+
+  const deleteFrame = (artboardId: EntityId) => {
+    if (artboardId !== document.activeArtboardId) {
+      manager.execute({ type: 'SET_ACTIVE_LOCATION', payload: { pageId: document.activePageId, artboardId } });
+    }
+    removeActiveArtboard();
+  };
+  const duplicateFrame = (artboardId: EntityId) => {
+    if (artboardId !== document.activeArtboardId) {
+      manager.execute({ type: 'SET_ACTIVE_LOCATION', payload: { pageId: document.activePageId, artboardId } });
+    }
+    onDuplicateArtboard();
+  };
+
+  const rowProps = {
+    document, manager, selectedLayerIds,
+    focusedLayerId: activeFocusedLayerId, renamingId, draftName, onDraftName: setDraftName,
+    onSelect: selectLayer, onFocusLayer: focusLayer, onFrameLayer, onKeyDown: handleLayerKeyDown,
+    draggingLayerId, onDragStart: setDraggingLayerId, onDragEnd: () => setDraggingLayerId(undefined),
+    onDropLayer: dropLayer,
+    onStartRename: (layer: LayerNode) => {
+      window.setTimeout(() => { setRenamingId(layer.id); setDraftName(layer.name); }, 50);
+    },
+    onCommitRename: commitRename,
+    onCancelRename: () => {
+      const layerId = renamingId;
+      setRenamingId(undefined);
+      if (layerId) focusLayer(layerId);
+    },
+    visibleSet: matchSet,
+    onContextMenu: (layer: LayerNode, event: ReactMouseEvent) => {
+      event.preventDefault();
+      if (!selectedLayerIds.has(layer.id)) selectLayer(layer.id, { shiftKey: false, metaKey: false, ctrlKey: false });
+      setMenu({ x: event.clientX, y: event.clientY, kind: 'layer', id: layer.id });
+    },
+  };
+
+  const menuLayer = menu?.kind === 'layer' && menu.id ? document.getLayer(menu.id) : undefined;
+  const menuFrame = menu?.kind === 'frame' && menu.id ? document.getArtboard(menu.id) : undefined;
+  const run = (action: () => void) => () => { closeMenu(); action(); };
 
   return (
-    <section className="layers-panel" aria-label="Document layers">
-      <div className="layers-panel-heading">
-        <div>
-          <span className="eyebrow">DOCUMENT</span>
-          <h2>Layers</h2>
-        </div>
-        <div className="layers-heading-meta">
-          <span className="layers-location-summary">{document.activePage.name} / {artboard.name}</span>
-          <div className="layers-heading-actions">
-            <button type="button" title="Add layer" aria-label="Add layer" onClick={() => addContainer('layer')}><PlusIcon size={16} /></button>
-            <button type="button" title="Add group" aria-label="Add group" onClick={() => addContainer('group')}><FileDirectoryIcon size={16} /></button>
-          </div>
-        </div>
-      </div>
-
-      <div className="document-location">
-        <div className="location-selectors">
-          {renamingLocation === 'page' ? (
-            <input autoFocus aria-label="Page name" value={locationName} onChange={(event) => setLocationName(event.target.value)} onBlur={commitLocationRename} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') setRenamingLocation(undefined); }} />
-          ) : (
-            <select
-              aria-label="Active page"
-              value={document.activePageId}
-              onChange={(event) => {
-                const page = document.getPage(event.target.value);
-                const artboardId = page?.artboardIds[0];
-                if (page && artboardId) manager.execute({ type: 'SET_ACTIVE_LOCATION', payload: { pageId: page.id, artboardId } });
-              }}
-            >
-              {document.pages.map((page) => <option value={page.id} key={page.id}>{page.name}</option>)}
-            </select>
-          )}
-          <span>/</span>
-          {renamingLocation === 'artboard' ? (
-            <input autoFocus aria-label="Artboard name" value={locationName} onChange={(event) => setLocationName(event.target.value)} onBlur={commitLocationRename} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') setRenamingLocation(undefined); }} />
-          ) : (
-            <select
-              aria-label="Active artboard"
-              value={document.activeArtboardId}
-              onChange={(event) => manager.execute({
-                type: 'SET_ACTIVE_LOCATION',
-                payload: { pageId: document.activePageId, artboardId: event.target.value },
-              })}
-            >
-              {document.activePage.artboardIds.map((id) => {
-                const item = document.getArtboard(id);
-                return item ? <option value={item.id} key={item.id}>{item.name}</option> : null;
-              })}
-            </select>
-          )}
-        </div>
-        <div className="location-actions" aria-label="Page and artboard actions">
-          <details>
-            <summary>Page</summary>
-            <div className="location-action-menu">
-              <button type="button" onClick={addPage}><PlusIcon size={12} />Add page</button>
-              <button type="button" onClick={() => { setRenamingLocation('page'); setLocationName(document.activePage.name); }}>Rename page</button>
-              <button type="button" title={activePageIndex <= 0 ? 'Page is already first' : undefined} disabled={activePageIndex <= 0} onClick={() => movePage(-1)}><ChevronUpIcon size={12} />Move page up</button>
-              <button type="button" title={activePageIndex >= document.pages.length - 1 ? 'Page is already last' : undefined} disabled={activePageIndex >= document.pages.length - 1} onClick={() => movePage(1)}><ChevronDownIcon size={12} />Move page down</button>
-            </div>
-          </details>
-          <details>
-            <summary>Artboard</summary>
-            <div className="location-action-menu">
-              <button type="button" onClick={addArtboard}><PlusIcon size={12} />Add artboard</button>
-              <button type="button" disabled={Boolean(artboard.isCanvasRoot)} onClick={onDuplicateArtboard}><DuplicateIcon size={12} />Duplicate artboard</button>
-              <button type="button" onClick={() => { setRenamingLocation('artboard'); setLocationName(artboard.name); }}>Rename artboard</button>
-              <button type="button" title={activeArtboardIndex <= 0 ? 'Artboard is already first' : undefined} disabled={activeArtboardIndex <= 0} onClick={() => moveArtboard(-1)}><ChevronUpIcon size={12} />Move artboard up</button>
-              <button type="button" title={activeArtboardIndex >= document.activePage.artboardIds.length - 1 ? 'Artboard is already last' : undefined} disabled={activeArtboardIndex >= document.activePage.artboardIds.length - 1} onClick={() => moveArtboard(1)}><ChevronDownIcon size={12} />Move artboard down</button>
-              <button
-                type="button"
-                disabled={Boolean(artboard.isCanvasRoot)}
-                title={artboard.isCanvasRoot ? 'The Canvas is the page-level container.' : 'Delete artboard and its contents'}
-                onClick={removeActiveArtboard}
-              ><TrashIcon size={12} />Delete artboard</button>
-            </div>
-          </details>
+    <section className="lp" aria-label="Document layers">
+      <div className="lp-head">
+        <h2>Layers</h2>
+        <div className="lp-head-actions">
+          <button type="button" className={`lp-icon${searchOpen ? ' is-on' : ''}`} title="Search layers" aria-label="Search layers" aria-pressed={searchOpen} onClick={() => { setSearchOpen((value) => !value); if (searchOpen) setQuery(''); }}><LpIcon name="search" /></button>
+          <button type="button" className="lp-icon" title="New frame" aria-label="New frame" onClick={addArtboard}><LpIcon name="frame" /></button>
+          <button type="button" className="lp-icon" title="New group" aria-label="New group" onClick={() => addContainer('group')}><LpIcon name="plus" /></button>
+          <button type="button" className="lp-icon" title="Page options" aria-label="Page options" onClick={(event) => {
+            event.stopPropagation();
+            const rect = event.currentTarget.getBoundingClientRect();
+            setMenu({ x: rect.right - 188, y: rect.bottom + 4, kind: 'page' });
+          }} onPointerDown={(event) => event.stopPropagation()}><LpIcon name="more" /></button>
         </div>
       </div>
-
-      <div
-        className="layer-tree"
-        role={displayLayerIds.length > 0 ? 'tree' : 'status'}
-        aria-multiselectable={displayLayerIds.length > 0 ? 'true' : undefined}
-        aria-label={displayLayerIds.length > 0 ? `${artboard.name} layers` : undefined}
-      >
-        {displayLayerIds.length === 0 ? (
-          <p className="empty-layer-tree">{artboard.isCanvasRoot ? 'The canvas has no layers yet. Draw an object or add a frame to begin.' : 'This artboard has no layers yet. Draw a shape or add a layer to begin.'}</p>
-        ) : displayLayerIds.map((layerId) => (
-          <LayerRow
-            key={layerId}
-            document={document}
-            manager={manager}
-            layerId={layerId}
-            depth={0}
-            selectedLayerIds={selectedLayerIds}
-            focusedLayerId={activeFocusedLayerId}
-            renamingId={renamingId}
-            draftName={draftName}
-            onDraftName={setDraftName}
-            onSelect={selectLayer}
-            onFocusLayer={focusLayer}
-            onFrameLayer={onFrameLayer}
-            onKeyDown={handleLayerKeyDown}
-            draggingLayerId={draggingLayerId}
-            onDragStart={setDraggingLayerId}
-            onDragEnd={() => setDraggingLayerId(undefined)}
-            onDropLayer={dropLayer}
-            onStartRename={(layer) => {
-              window.setTimeout(() => {
-                setRenamingId(layer.id);
-                setDraftName(layer.name);
-              }, 50);
-            }}
-            onCommitRename={commitRename}
-            onCancelRename={() => {
-              const layerId = renamingId;
-              setRenamingId(undefined);
-              if (layerId) focusLayer(layerId);
-            }}
-            onMove={move}
-          />
-        ))}
-      </div>
-      <div className="layer-footer-actions" aria-label="Layer actions">
-        <button type="button" disabled={selectedRoots.length === 0} onClick={duplicateSelected} title="Duplicate selected layer subtrees"><DuplicateIcon size={13} />Duplicate</button>
-        <button type="button" disabled={selectedRoots.length === 0} onClick={deleteSelected} title="Delete selected layer subtrees"><TrashIcon size={13} /></button>
-        <button type="button" disabled={!selectedLayer || !sameParentSelection} onClick={groupSelected}><FileDirectoryIcon size={13} />Group</button>
-        <button type="button" disabled={selectedLayers.length !== 1 || !selectedLayer || selectedLayer.kind === 'object'} onClick={ungroupSelected}>Ungroup</button>
-        <button type="button" disabled={(selectedLayers.length !== 1 || !selectedLayer) && !document.isolatedLayerId} onClick={toggleIsolation}>
-          {document.isolatedLayerId ? 'Exit isolate' : 'Isolate'}
-        </button>
-        <label className="move-layer-field">
-          <span>Move to</span>
+      <div className="lp-page-row">
+        {renamingLocation === 'page' ? (
+          <input autoFocus aria-label="Page name" value={locationName} onChange={(event) => setLocationName(event.target.value)} onBlur={commitLocationRename} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') setRenamingLocation(undefined); }} />
+        ) : (
           <select
-            aria-label="Move selected layers to"
-            value=""
-            disabled={selectedRoots.length === 0}
+            aria-label="Active page"
+            value={document.activePageId}
             onChange={(event) => {
-              const value = event.target.value;
-              if (value) moveSelectedTo(value === '__root__' ? undefined : value);
+              const page = document.getPage(event.target.value);
+              const artboardId = page?.artboardIds[0];
+              if (page && artboardId) manager.execute({ type: 'SET_ACTIVE_LOCATION', payload: { pageId: page.id, artboardId } });
+              onSelectLayers(new Set());
             }}
           >
-            <option value="" disabled>Choose…</option>
-            <option value="__root__">Artboard root</option>
-            {moveTargets.map((layer) => <option key={layer.id} value={layer.id}>{layer.name}</option>)}
+            {document.pages.map((page) => <option value={page.id} key={page.id}>{page.name}</option>)}
           </select>
-        </label>
+        )}
       </div>
+      {searchOpen && (
+        <div className="lp-search">
+          <LpIcon name="search" />
+          <input autoFocus value={query} placeholder="Find a layer" aria-label="Find a layer" onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setQuery(''); setSearchOpen(false); } }} />
+          {query && <button type="button" className="lp-icon" aria-label="Clear search" onClick={() => setQuery('')}>×</button>}
+        </div>
+      )}
+
+      <div
+        className="lp-tree"
+        role={nothingToShow ? 'status' : 'tree'}
+        aria-multiselectable={nothingToShow ? undefined : 'true'}
+        aria-label={nothingToShow ? undefined : `${document.activePage.name} layers`}
+        onClick={(event) => { if (event.target === event.currentTarget) { onSelectLayers(new Set()); setFrameSelected(false); } }}
+      >
+        {nothingToShow ? (
+          <p className="lp-empty">Nothing here yet. Draw a shape, or press + to add a frame.</p>
+        ) : (
+          <>
+            {looseSections.map((section) => section.layerIds.filter((id) => !matchSet || matchSet.has(id)).map((layerId) => (
+              <LayerRow key={layerId} {...rowProps} layerId={layerId} depth={0} />
+            )))}
+            {realFrames.filter(frameVisible).map((section) => {
+              const frame = section.artboard;
+              const collapsed = collapsedFrames.has(frame.id) && !matchSet;
+              const active = frame.id === document.activeArtboardId;
+              const selectedFrame = active && frameSelected && selectedLayerIds.size === 0;
+              const children = section.layerIds.filter((id) => !matchSet || matchSet.has(id));
+              return (
+                <div className="lp-branch" key={frame.id}>
+                  <div
+                    className={`lp-row lp-frame${selectedFrame ? ' is-selected' : ''}${active ? ' is-active' : ''}`}
+                    role="treeitem"
+                    aria-level={1}
+                    aria-selected={selectedFrame}
+                    aria-expanded={!collapsed}
+                    aria-label={`${frame.name}, frame`}
+                    tabIndex={0}
+                    onClick={(event) => {
+                      if (event.detail >= 2) { setRenamingId(frame.id); setDraftName(frame.name); return; }
+                      activateFrame(frame.id);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === 'F2') { setRenamingId(frame.id); setDraftName(frame.name); event.preventDefault(); }
+                      else if (event.key === 'ArrowLeft' && !collapsed) { toggleFrame(frame.id); event.preventDefault(); }
+                      else if (event.key === 'ArrowRight' && collapsed) { toggleFrame(frame.id); event.preventDefault(); }
+                      else if (event.key === ' ') { activateFrame(frame.id); event.preventDefault(); }
+                    }}
+                    onContextMenu={(event) => { event.preventDefault(); activateFrame(frame.id); setMenu({ x: event.clientX, y: event.clientY, kind: 'frame', id: frame.id }); }}
+                    onDragOver={(event) => { if (draggingLayerId) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; } }}
+                    onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const sourceId = draggingLayerId ?? event.dataTransfer.getData('text/plain'); if (sourceId) dropOnFrame(sourceId, frame.id); }}
+                  >
+                    <button type="button" className="lp-chevron" aria-label={collapsed ? 'Expand frame' : 'Collapse frame'} tabIndex={-1} onClick={(event) => { event.stopPropagation(); toggleFrame(frame.id); }}>
+                      <LpIcon name={collapsed ? 'right' : 'down'} />
+                    </button>
+                    <span className="lp-kind"><LpIcon name="frame" /></span>
+                    {renamingId === frame.id ? (
+                      <input className="lp-name-input" autoFocus value={draftName} aria-label="Frame name" onChange={(event) => setDraftName(event.target.value)} onClick={(event) => event.stopPropagation()} onBlur={() => commitFrameRename(frame.id)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { event.stopPropagation(); setRenamingId(undefined); } }} />
+                    ) : <span className="lp-name" title={frame.name}>{frame.name}</span>}
+                    <span className="lp-meta">{frame.frame.width}×{frame.frame.height}</span>
+                  </div>
+                  {!collapsed && (
+                    <div role="group">
+                      {children.length === 0
+                        ? <p className="lp-empty lp-empty-frame">Empty frame</p>
+                        : children.map((layerId) => <LayerRow key={layerId} {...rowProps} layerId={layerId} depth={1} />)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {needle && visibleLayerIds.length === 0 && <p className="lp-empty">No layer called “{query}”.</p>}
+          </>
+        )}
+      </div>
+
+      {selectedRoots.length > 0 && (
+        <div className="lp-selection-bar" role="toolbar" aria-label="Layer actions">
+          <span>{selectedRoots.length === 1 ? '1 selected' : `${selectedRoots.length} selected`}</span>
+          <span className="lp-bar-actions">
+            <button type="button" disabled={!canGroup} onClick={groupSelected} title={`Group · ${MOD}G`}><LpIcon name="group" />Group</button>
+            <button type="button" disabled={!canUngroup} onClick={ungroupSelected} title={`Ungroup · ${MOD}⇧G`}>Ungroup</button>
+            <button type="button" onClick={duplicateSelected} title="Duplicate" aria-label="Duplicate"><LpIcon name="copy" /></button>
+            <button type="button" onClick={deleteSelected} title="Delete" aria-label="Delete"><LpIcon name="trash" /></button>
+          </span>
+        </div>
+      )}
+
+      {menu && (
+        <div className="lp-menu" role="menu" style={{ left: Math.min(menu.x, window.innerWidth - 204), top: Math.min(menu.y, window.innerHeight - 330) }} onPointerDown={(event) => event.stopPropagation()}>
+          {menu.kind === 'layer' && menuLayer && (
+            <>
+              <button type="button" role="menuitem" onClick={run(() => { setRenamingId(menuLayer.id); setDraftName(menuLayer.name); })}>Rename<kbd>F2</kbd></button>
+              <button type="button" role="menuitem" disabled={!canGroup} onClick={run(groupSelected)}>Group selection<kbd>{MOD}G</kbd></button>
+              <button type="button" role="menuitem" disabled={!canUngroup} onClick={run(ungroupSelected)}>Ungroup<kbd>{MOD}⇧G</kbd></button>
+              <hr />
+              <button type="button" role="menuitem" onClick={run(duplicateSelected)}>Duplicate</button>
+              <button type="button" role="menuitem" onClick={run(() => move(menuLayer, -1))}>Bring forward<kbd>⌥↑</kbd></button>
+              <button type="button" role="menuitem" onClick={run(() => move(menuLayer, 1))}>Send backward<kbd>⌥↓</kbd></button>
+              <hr />
+              <button type="button" role="menuitem" onClick={run(() => onFrameLayer(menuLayer.id))}>Zoom to it<kbd>F</kbd></button>
+              <button type="button" role="menuitem" disabled={selectedLayers.length !== 1} onClick={run(toggleIsolation)}>{document.isolatedLayerId ? 'Exit isolate' : 'Isolate'}</button>
+              <button type="button" role="menuitem" onClick={run(() => manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: menuLayer.id, updates: { locked: !menuLayer.locked } } }))}>{menuLayer.locked ? 'Unlock' : 'Lock'}<kbd>L</kbd></button>
+              <button type="button" role="menuitem" onClick={run(() => manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: menuLayer.id, updates: { visible: !menuLayer.visible } } }))}>{menuLayer.visible ? 'Hide' : 'Show'}<kbd>H</kbd></button>
+              <hr />
+              <button type="button" role="menuitem" className="is-danger" onClick={run(deleteSelected)}>Delete<kbd>⌫</kbd></button>
+            </>
+          )}
+          {menu.kind === 'frame' && menuFrame && (
+            <>
+              <button type="button" role="menuitem" onClick={run(() => { setRenamingId(menuFrame.id); setDraftName(menuFrame.name); })}>Rename frame<kbd>F2</kbd></button>
+              <button type="button" role="menuitem" onClick={run(() => duplicateFrame(menuFrame.id))}>Duplicate frame</button>
+              <button type="button" role="menuitem" disabled={activeArtboardIndex <= 0} onClick={run(() => moveArtboard(-1))}>Move up</button>
+              <button type="button" role="menuitem" disabled={activeArtboardIndex >= document.activePage.artboardIds.length - 1} onClick={run(() => moveArtboard(1))}>Move down</button>
+              <hr />
+              <button type="button" role="menuitem" className="is-danger" onClick={run(() => deleteFrame(menuFrame.id))}>Delete frame and contents</button>
+            </>
+          )}
+          {menu.kind === 'page' && (
+            <>
+              <button type="button" role="menuitem" onClick={run(addArtboard)}>New frame</button>
+              <button type="button" role="menuitem" onClick={run(() => addContainer('group'))}>New group</button>
+              <button type="button" role="menuitem" onClick={run(() => addContainer('layer'))}>New layer</button>
+              <hr />
+              <button type="button" role="menuitem" onClick={run(addPage)}>Add page</button>
+              <button type="button" role="menuitem" onClick={run(() => { setRenamingLocation('page'); setLocationName(document.activePage.name); })}>Rename page</button>
+              <button type="button" role="menuitem" disabled={activePageIndex <= 0} onClick={run(() => movePage(-1))}>Move page up</button>
+              <button type="button" role="menuitem" disabled={activePageIndex >= document.pages.length - 1} onClick={run(() => movePage(1))}>Move page down</button>
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
+}
+
+const MOD = typeof navigator !== 'undefined' && /mac/i.test(navigator.platform) ? '⌘' : 'Ctrl+';
+
+type LpIconName = 'search' | 'frame' | 'plus' | 'more' | 'right' | 'down' | 'group' | 'layer' | 'repeat' | 'copy' | 'trash' | 'lock' | 'eye' | 'eyeOff';
+const LP_PATHS: Record<LpIconName, string> = {
+  search: 'M7 12a5 5 0 100-10 5 5 0 000 10zM14 14l-3.5-3.5',
+  frame: 'M5.5 1.5v13M10.5 1.5v13M1.5 5.5h13M1.5 10.5h13',
+  plus: 'M8 3v10M3 8h10',
+  more: 'M3.5 8h.01M8 8h.01M12.5 8h.01',
+  right: 'M6 3.5 10.5 8 6 12.5',
+  down: 'M3.5 6 8 10.5 12.5 6',
+  group: 'M2.5 5V3.5a1 1 0 011-1H5M11 2.5h1.5a1 1 0 011 1V5M13.5 11v1.5a1 1 0 01-1 1H11M5 13.5H3.5a1 1 0 01-1-1V11M5.5 5.5h5v5h-5z',
+  layer: 'M8 2 14 5.2 8 8.4 2 5.2 8 2zM2 8.2l6 3.2 6-3.2M2 11l6 3.2 6-3.2',
+  repeat: 'M13 8a5 5 0 11-1.6-3.7M13 2.5v3h-3',
+  copy: 'M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3',
+  trash: 'M3 4.5h10M6.5 4.5v-2h3v2M4.5 4.5l.6 9h5.8l.6-9',
+  lock: 'M4.5 7.5h7v6h-7zM6 7.5v-2a2 2 0 014 0v2',
+  eye: 'M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 9.8a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6z',
+  eyeOff: 'M2 2l12 12M6.4 4a6 6 0 011.6-.5c4 0 6.5 4.5 6.5 4.5a11 11 0 01-2 2.5M4 5.5C2.5 6.8 1.5 8 1.5 8S4 12.5 8 12.5c.9 0 1.7-.2 2.4-.5',
+};
+function LpIcon({ name, size = 14 }: { name: LpIconName; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={LP_PATHS[name]} /></svg>;
 }
 
 interface LayerRowProps {
@@ -666,6 +815,7 @@ interface LayerRowProps {
   focusedLayerId?: EntityId;
   renamingId?: EntityId;
   draftName: string;
+  visibleSet?: Set<EntityId>;
   onDraftName: (name: string) => void;
   onSelect: (layerId: EntityId, event: ReactMouseEvent) => void;
   onFocusLayer: (layerId: EntityId) => void;
@@ -678,20 +828,38 @@ interface LayerRowProps {
   onStartRename: (layer: LayerNode) => void;
   onCommitRename: (layer: LayerNode) => void;
   onCancelRename: () => void;
-  onMove: (layer: LayerNode, direction: -1 | 1) => void;
+  onContextMenu: (layer: LayerNode, event: ReactMouseEvent) => void;
 }
 
-function NamedObjectIcon({ name, construction }: { name: string; construction: boolean }) {
+/** A 14 px drawing of the object's real outline, so the row looks like what it is. */
+function ObjectShapeIcon({ document, objectId, construction }: { document: VectorDocument; objectId?: EntityId; construction: boolean }) {
   if (construction) {
     return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 1.5v11" stroke="currentColor" strokeWidth="1.4" strokeDasharray="2 2" strokeLinecap="round" /></svg>;
   }
-  if (/triangle/i.test(name)) {
-    return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2 12 12H2L7 2Z" stroke="currentColor" strokeWidth="1.3" /></svg>;
+  const object = objectId ? document.getObject(objectId) : undefined;
+  const network = object ? document.getNetwork(object.networkId) : undefined;
+  const lines: Array<Array<{ x: number; y: number }>> = [];
+  if (network) {
+    for (const pathId of network.pathIds) {
+      for (const segmentId of document.getPath(pathId)?.segmentIds ?? []) {
+        const segment = document.getSegment(segmentId);
+        if (!segment || segment.role !== 'geometry') continue;
+        const steps = segment.type === 'line' ? 1 : 12;
+        lines.push(Array.from({ length: steps + 1 }, (_value, index) => evaluateSegment(document, segment, index / steps)));
+      }
+    }
   }
-  if (/ring/i.test(name)) {
-    return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.3" /></svg>;
-  }
-  return <StackIcon size={14} />;
+  const all = lines.flat();
+  if (all.length === 0) return <StackIcon size={14} />;
+  const minX = Math.min(...all.map((point) => point.x));
+  const maxX = Math.max(...all.map((point) => point.x));
+  const minY = Math.min(...all.map((point) => point.y));
+  const maxY = Math.max(...all.map((point) => point.y));
+  const scale = 10 / Math.max(maxX - minX, maxY - minY, 0.0001);
+  const offsetX = 2 + (10 - (maxX - minX) * scale) / 2;
+  const offsetY = 2 + (10 - (maxY - minY) * scale) / 2;
+  const d = lines.map((line) => line.map((point, index) => `${index === 0 ? 'M' : 'L'}${((point.x - minX) * scale + offsetX).toFixed(2)} ${((point.y - minY) * scale + offsetY).toFixed(2)}`).join('')).join('');
+  return <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d={d} stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
 function isEmptyStarterLayer(document: VectorDocument, layerId: EntityId): boolean {
@@ -712,65 +880,68 @@ function duplicateLayerName(name: string): string {
   if (!match) return `${name} copy`;
   return `${match[1]} copy ${Number(match[2] ?? 1) + 1}`;
 }
-
 function LayerRow(props: LayerRowProps) {
-  const { document, manager, layerId, depth, selectedLayerIds, focusedLayerId, renamingId, draftName,
-    onDraftName, onSelect, onFocusLayer, onFrameLayer, onKeyDown, draggingLayerId, onDragStart, onDragEnd, onDropLayer,
-    onStartRename, onCommitRename, onCancelRename, onMove } = props;
+  const { document, manager, layerId, depth, selectedLayerIds, focusedLayerId, renamingId, draftName, visibleSet,
+    onDraftName, onSelect, onFocusLayer, onKeyDown, draggingLayerId, onDragStart, onDragEnd, onDropLayer,
+    onStartRename, onCommitRename, onCancelRename, onContextMenu, onFrameLayer } = props;
+  const [dropHint, setDropHint] = useState<'before' | 'inside' | 'after'>();
   const layer = document.getLayer(layerId);
   if (!layer) return null;
-  const expandable = layer.kind !== 'object' && layer.childIds.length > 0;
+  const isContainer = layer.kind !== 'object';
+  const expandable = isContainer && layer.childIds.length > 0;
+  const open = Boolean(visibleSet) || layer.expanded;
   const selected = selectedLayerIds.has(layer.id);
   const constructionComposition = layer.kind === 'object' && layer.objectId
     ? objectConstructionComposition(document, layer.objectId)
     : undefined;
   const semanticLabel = constructionComposition === 'construction-only'
     ? 'construction-only object'
-    : constructionComposition === 'mixed'
-      ? 'object containing construction geometry'
-      : layer.kind;
-  const siblings = layer.parentId
-    ? document.getLayer(layer.parentId)?.childIds ?? []
-    : document.getArtboard(layer.artboardId)?.layerIds ?? [];
-  const siblingIndex = siblings.indexOf(layer.id);
+    : constructionComposition === 'mixed' ? 'object containing construction geometry' : layer.kind;
+  const children = layer.childIds.filter((id) => !visibleSet || visibleSet.has(id));
 
   return (
-    <div className="layer-branch">
+    <div className="lp-branch">
       <div
-        className={`layer-row${selected ? ' is-selected' : ''}${!layer.visible ? ' is-hidden' : ''}${draggingLayerId === layer.id ? ' is-dragging' : ''}`}
-        style={{ '--layer-depth': depth } as React.CSSProperties}
+        className={`lp-row${selected ? ' is-selected' : ''}${!layer.visible ? ' is-hidden' : ''}${layer.locked ? ' is-locked' : ''}${draggingLayerId === layer.id ? ' is-dragging' : ''}${dropHint ? ` drop-${dropHint}` : ''}`}
+        style={{ '--lp-depth': depth } as React.CSSProperties}
         role="treeitem"
         data-layer-id={layer.id}
+        draggable={renamingId !== layer.id}
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', layer.id);
+          onDragStart(layer.id);
+        }}
+        onDragEnd={() => { setDropHint(undefined); onDragEnd(); }}
+        onDragLeave={() => setDropHint(undefined)}
         onDragOver={(event) => {
           if (!draggingLayerId || draggingLayerId === layer.id) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = 'move';
+          const rect = event.currentTarget.getBoundingClientRect();
+          const ratio = (event.clientY - rect.top) / Math.max(1, rect.height);
+          setDropHint(isContainer && ratio >= 0.3 && ratio <= 0.7 ? 'inside' : ratio < 0.5 ? 'before' : 'after');
         }}
         onDrop={(event) => {
           event.preventDefault();
           event.stopPropagation();
           const sourceId = draggingLayerId ?? event.dataTransfer.getData('text/plain');
-          if (!sourceId) return;
-          const rect = event.currentTarget.getBoundingClientRect();
-          const ratio = (event.clientY - rect.top) / Math.max(1, rect.height);
-          const position = layer.kind !== 'object' && ratio >= 0.3 && ratio <= 0.7
-            ? 'inside'
-            : ratio < 0.5 ? 'before' : 'after';
-          onDropLayer(sourceId, layer, position);
+          const position = dropHint ?? 'after';
+          setDropHint(undefined);
+          if (sourceId) onDropLayer(sourceId, layer, position);
         }}
         tabIndex={focusedLayerId === layer.id ? 0 : -1}
         aria-level={depth + 1}
         aria-label={`${layer.name}, ${semanticLabel}`}
         aria-selected={selected}
-        aria-expanded={layer.kind === 'object' ? undefined : layer.expanded}
-        onFocus={(event) => {
-          if (event.target === event.currentTarget) onFocusLayer(layer.id);
-        }}
+        aria-expanded={isContainer ? layer.expanded : undefined}
+        onFocus={(event) => { if (event.target === event.currentTarget) onFocusLayer(layer.id); }}
         onKeyDown={(event) => onKeyDown(layer, event)}
+        onContextMenu={(event) => onContextMenu(layer, event)}
         onClick={(event) => {
           event.currentTarget.focus();
           if (event.detail >= 2) {
-            onStartRename(layer);
+            if (isContainer) onStartRename(layer); else onFrameLayer(layer.id);
             return;
           }
           onSelect(layer.id, event);
@@ -778,56 +949,29 @@ function LayerRow(props: LayerRowProps) {
       >
         <button
           type="button"
-          className="layer-disclosure"
-          aria-label={layer.expanded ? 'Collapse layer' : 'Expand layer'}
+          className="lp-chevron"
+          aria-label={open ? 'Collapse layer' : 'Expand layer'}
+          tabIndex={-1}
           disabled={!expandable}
           onClick={(event) => {
             event.stopPropagation();
-            if (expandable) manager.execute({
-              type: 'UPDATE_LAYER',
-              payload: { layerId: layer.id, updates: { expanded: !layer.expanded } },
-            });
+            if (expandable) manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: layer.id, updates: { expanded: !layer.expanded } } });
           }}
-        >
-          {expandable ? (layer.expanded ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />) : null}
-        </button>
-        <span
-          className="layer-kind-icon layer-drag-handle"
-          aria-hidden="true"
-          title={`${constructionComposition === 'construction-only' ? 'Construction-only object · ' : ''}Drag to reorder or reparent · Double-click to zoom to layer`}
-          draggable={renamingId !== layer.id}
-          onClick={(event) => {
-            event.stopPropagation();
-            if (event.detail === 1) {
-              onFocusLayer(layer.id);
-              onSelect(layer.id, event);
-            }
-          }}
-          onDoubleClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onFrameLayer(layer.id);
-          }}
-          onDragStart={(event) => {
-            event.stopPropagation();
-            event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', layer.id);
-            onDragStart(layer.id);
-          }}
-          onDragEnd={onDragEnd}
-        >
+        >{expandable ? <LpIcon name={open ? 'down' : 'right'} /> : null}</button>
+        <span className="lp-kind" title={constructionComposition === 'construction-only' ? 'Construction-only object' : undefined}>
           {layer.kind === 'object'
-            ? <NamedObjectIcon name={layer.name} construction={constructionComposition === 'construction-only'} />
-            : layer.kind === 'group' ? <FileDirectoryIcon size={14} /> : <RowsIcon size={14} />}
+            ? <ObjectShapeIcon document={document} objectId={layer.objectId} construction={constructionComposition === 'construction-only'} />
+            : layer.kind === 'group' ? <LpIcon name="group" /> : <LpIcon name="layer" />}
         </span>
         {renamingId === layer.id ? (
           <input
-            className="layer-name-input"
+            className="lp-name-input"
             autoFocus
             value={draftName}
             aria-label="Layer name"
             onChange={(event) => onDraftName(event.target.value)}
             onClick={(event) => event.stopPropagation()}
+            onFocus={(event) => event.currentTarget.select()}
             onBlur={() => onCommitRename(layer)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -842,48 +986,35 @@ function LayerRow(props: LayerRowProps) {
               }
             }}
           />
-        ) : <span className="layer-name" title={layer.name}>{layer.name}</span>}
-        
-        {constructionComposition === 'construction-only' && <span className="layer-reference-meta">hidden in export</span>}
-        {constructionComposition === 'mixed' && (
-          <span
-            className="layer-construction-badge"
-            title="Contains construction geometry"
-            aria-label="Contains construction geometry"
-          >C</span>
-        )}
-        {selected && selectedLayerIds.size === 1 && (
-          <span className="layer-order-actions">
-            <button type="button" disabled={siblingIndex <= 0} title={siblingIndex <= 0 ? 'Layer is already first' : 'Move up'} aria-label="Move layer up" onClick={(event) => { event.stopPropagation(); onMove(layer, -1); }}><ChevronUpIcon size={12} /></button>
-            <button type="button" disabled={siblingIndex < 0 || siblingIndex >= siblings.length - 1} title={siblingIndex >= siblings.length - 1 ? 'Layer is already last' : 'Move down'} aria-label="Move layer down" onClick={(event) => { event.stopPropagation(); onMove(layer, 1); }}><ChevronDownIcon size={12} /></button>
-          </span>
-        )}
+        ) : <span className="lp-name" title={layer.name}>{layer.name}</span>}
+        {constructionComposition === 'construction-only' && <span className="lp-meta">guide</span>}
+        {constructionComposition === 'mixed' && <span className="lp-meta" title="Contains construction geometry">C</span>}
         <button
           type="button"
-          className="layer-state-button"
+          className={`lp-state${layer.locked ? ' is-set' : ''}`}
           title={layer.locked ? 'Unlock' : 'Lock'}
           aria-label={layer.locked ? 'Unlock layer' : 'Lock layer'}
+          tabIndex={-1}
           onClick={(event) => {
             event.stopPropagation();
             manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: layer.id, updates: { locked: !layer.locked } } });
           }}
-        >{layer.locked ? <LockIcon size={13} /> : <UnlockIcon size={13} />}</button>
+        ><LpIcon name="lock" /></button>
         <button
           type="button"
-          className="layer-state-button"
+          className={`lp-state${!layer.visible ? ' is-set' : ''}`}
           title={layer.visible ? 'Hide' : 'Show'}
           aria-label={layer.visible ? 'Hide layer' : 'Show layer'}
+          tabIndex={-1}
           onClick={(event) => {
             event.stopPropagation();
             manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: layer.id, updates: { visible: !layer.visible } } });
           }}
-        >{layer.visible ? <EyeIcon size={14} /> : <EyeClosedIcon size={14} />}</button>
+        ><LpIcon name={layer.visible ? 'eye' : 'eyeOff'} /></button>
       </div>
-      {layer.kind !== 'object' && layer.expanded && layer.childIds.length > 0 && (
+      {isContainer && open && children.length > 0 && (
         <div role="group">
-          {layer.childIds.map((childId) => (
-            <LayerRow {...props} key={childId} layerId={childId} depth={depth + 1} />
-          ))}
+          {children.map((childId) => <LayerRow {...props} key={childId} layerId={childId} depth={depth + 1} />)}
         </div>
       )}
     </div>

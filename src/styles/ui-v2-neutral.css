@@ -368,7 +368,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: var(--bgColor-default);
   border: 0;
   border-left: 1px solid var(--borderColor-default);
-  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 10px 'Geist', system-ui, sans-serif;
 }
 .appearance-color-row { display: grid; grid-template-columns: auto 28px minmax(0, 1fr); align-items: center; gap: 8px; color: var(--fgColor-muted); font-size: 11px; }
 .appearance-color-row input { width: 28px; height: 26px; padding: 2px; background: var(--bgColor-muted); border: 1px solid var(--borderColor-default); border-radius: 5px; }

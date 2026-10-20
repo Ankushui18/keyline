@@ -1,0 +1,39 @@
+/* Final pass: brings the shell back to the Phase 1 design boards. Loaded last on purpose. */
+.canvas-tool-rail .canvas-flyout-tool { display: flex; align-items: center; gap: 10px; }
+.canvas-tool-rail .canvas-flyout-tool .canvas-flyout-tool-icon:empty { display: none; }
+.canvas-tool-rail .canvas-flyout-tool .canvas-flyout-tool-copy { flex: 1 1 auto; }
+.canvas-tool-rail .canvas-flyout-tool kbd { margin-left: auto; font: 11px 'Geist', system-ui, sans-serif; color: #8a8d95; }
+.keyline-node-inspector { display: flex; flex-direction: column; gap: 14px; }
+.keyline-position-grid .coordinate-field { padding: 0 10px; gap: 8px; }
+.keyline-position-grid .coordinate-field > span { width: auto; min-width: 0; height: auto; padding: 0; background: transparent; border: 0; border-radius: 0; font: 13px 'Geist', sans-serif; color: #8a8d95; }
+
+/* Inspector shell */
+.properties-panel { font: 13px/1.4 'Geist', system-ui, sans-serif; }
+.properties-panel .panel-heading { padding: 14px 14px 0; }
+.properties-panel .panel-heading h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.frame-card { margin: 14px; display: flex; flex-direction: column; gap: 12px; }
+.frame-card-head { display: flex; align-items: center; justify-content: space-between; }
+.frame-card-head > div:first-child { display: flex; flex-direction: column; }
+.frame-card-head strong { font-size: 14px; font-weight: 600; }
+.frame-card-head small { color: #8a8d95; font-size: 12px; }
+.frame-card-menu { position: relative; }
+.frame-card-menu > button { width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #a0a3ab; font-size: 16px; letter-spacing: 1px; cursor: pointer; }
+.frame-card-menu > button:hover { background: #2c2e33; color: #fff; }
+.frame-card-popover { position: absolute; z-index: 10; right: 0; top: 32px; width: 160px; padding: 4px; background: #26272b; border: 1px solid #3a3c42; border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .45); display: flex; flex-direction: column; }
+.frame-card-popover button { height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #ececee; text-align: left; font: inherit; cursor: pointer; }
+.frame-card-popover button:hover:not(:disabled) { background: #2f3036; }
+.frame-card-popover .delete-artboard-button { color: #ef747c; }
+.frame-card-popover button:disabled { color: #5c5f67; cursor: default; }
+.frame-card-block { display: flex; flex-direction: column; gap: 8px; }
+.frame-card-label { color: #8a8d95; font-size: 12px; }
+.frame-size-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.frame-size-chips button { height: 32px; border: 1px solid #2e3036; border-radius: 8px; background: #17181a; color: #ececee; font: 13px 'Geist', system-ui, sans-serif; cursor: pointer; }
+.frame-size-chips button:hover { background: #26272b; }
+.frame-size-chips button.is-active { border-color: #0d99ff; background: #12233a; }
+.frame-dimension-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.frame-field { height: 32px; display: flex; align-items: center; gap: 8px; padding: 0 10px; background: #17181a; border: 1px solid #2e3036; border-radius: 8px; color: #8a8d95; }
+.frame-field:focus-within { border-color: #0d99ff; }
+.frame-field input { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: #ececee; text-align: right; font: 13px 'Geist', system-ui, sans-serif; outline: none; -moz-appearance: textfield; }
+.frame-field input::-webkit-outer-spin-button, .frame-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.empty-inspector { margin: 0 14px 14px; padding: 14px; border: 1px dashed #3a3c42; border-radius: 10px; color: #a0a3ab; }
+.empty-inspector p { margin: 0; }

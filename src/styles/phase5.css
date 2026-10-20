@@ -27,7 +27,7 @@
   border-radius: 5px;
   background: #1d222b;
   color: #8f9caf;
-  font: 750 9px/1 ui-monospace, SFMono-Regular, monospace;
+  font: 750 9px/1 'Geist', system-ui, sans-serif;
   cursor: pointer;
 }
 .renderer-button.is-webgl { color: #8fb6ff; border-color: #4c69a1; background: #202c42; box-shadow: inset 0 0 0 1px rgba(104,160,255,.08); }
@@ -99,7 +99,7 @@
 .export-preview { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); background: #11151a; }
 .export-preview-heading { display: flex; justify-content: space-between; padding: 9px 12px; border-bottom: 1px solid #292f3a; color: #aab5c7; font-size: 11px; }
 .export-preview-heading code { color: #748196; }
-.export-preview textarea { width: 100%; height: 100%; resize: none; border: 0; outline: 0; padding: 13px; background: #0f1318; color: #a9bbd6; font: 10px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.export-preview textarea { width: 100%; height: 100%; resize: none; border: 0; outline: 0; padding: 13px; background: #0f1318; color: #a9bbd6; font: 10px/1.55 'Geist', system-ui, sans-serif; }
 .svg-preview { max-height: 180px; display: grid; place-items: center; overflow: hidden; padding: 12px; border-bottom: 1px solid #292f3a; background: repeating-conic-gradient(#1d222b 0 25%, #191e26 0 50%) 50% / 18px 18px; }
 .svg-preview svg { max-width: 100%; max-height: 155px; }
 .export-preview:has(.svg-preview) { grid-template-rows: auto 180px minmax(0, 1fr); }

@@ -18,7 +18,7 @@
 .dashboard-search svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; flex: none; }
 .dashboard-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: #ececee; font: inherit; outline: none; }
 .dashboard-search:focus-within { border-color: #0d99ff; }
-.dashboard-search kbd { font: 11px 'Geist Mono', monospace; background: #26272b; padding: 1px 6px; border-radius: 4px; }
+.dashboard-search kbd { font: 11px 'Geist', system-ui, sans-serif; background: #26272b; padding: 1px 6px; border-radius: 4px; }
 .dashboard-spacer { flex: 1; }
 .dashboard-device-note { color: #8a8d95; }
 .dashboard-button { height: 34px; padding: 0 14px; border: 1px solid #2e3036; background: transparent; border-radius: 8px; }

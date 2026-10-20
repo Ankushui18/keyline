@@ -1,0 +1,59 @@
+/* Layers panel: frames → groups → shapes, Figma-style. */
+.lp { display: flex; flex-direction: column; min-height: 0; height: 100%; overflow: hidden; background: #1F2023; color: #ECECEE; font-size: 12px; border-bottom: 1px solid #2E3036; position: relative; }
+.lp-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 4px 14px; }
+.lp-head h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.lp-head-actions { display: flex; gap: 2px; }
+.lp .lp-icon, .lp .lp-state, .lp .lp-chevron { width: 24px; height: 24px; display: inline-grid; place-items: center; border: 0; background: transparent; color: #A0A3AB; border-radius: 5px; padding: 0; cursor: pointer; font: inherit; }
+.lp .lp-icon:hover, .lp .lp-state:hover { background: #2C2E33; color: #ECECEE; }
+.lp .lp-icon.is-on { background: #0D99FF33; color: #0D99FF; }
+.lp-page-row { padding: 0 10px 6px 14px; }
+.lp-page-row select, .lp-page-row input { width: 100%; height: 26px; background: #17181A; color: #ECECEE; border: 1px solid #2E3036; border-radius: 6px; padding: 0 8px; font: inherit; }
+.lp-search { display: flex; align-items: center; gap: 6px; margin: 0 10px 6px 14px; padding: 0 4px 0 8px; height: 28px; background: #17181A; border: 1px solid #2E3036; border-radius: 6px; color: #8A8D95; }
+.lp-search:focus-within { border-color: #0D99FF; }
+.lp-search input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: #ECECEE; font: inherit; }
+.lp-tree { flex: 1 1 auto; overflow: auto; min-height: 0; padding: 2px 6px 8px; border-top: 1px solid #2E3036; }
+.lp-empty { margin: 10px 8px; color: #8A8D95; line-height: 1.45; }
+.lp-empty-frame { margin: 2px 0 4px 44px; font-size: 11px; }
+.lp-row { position: relative; display: flex; align-items: center; gap: 2px; height: 28px; padding: 0 4px 0 calc(4px + var(--lp-depth, 0) * 16px); border-radius: 6px; cursor: default; user-select: none; }
+.lp-row:hover { background: #2A2C31; }
+.lp-row.is-selected { background: #0D99FF26; }
+.lp-row.is-selected:hover { background: #0D99FF33; }
+.lp-row:focus-visible { outline: 2px solid #0D99FF; outline-offset: -2px; }
+.lp-row.is-dragging { opacity: .4; }
+.lp-row.drop-inside { background: #0D99FF22; box-shadow: inset 0 0 0 1px #0D99FF; }
+.lp-row.drop-before::before, .lp-row.drop-after::after { content: ''; position: absolute; left: 8px; right: 8px; height: 2px; background: #0D99FF; border-radius: 2px; }
+.lp-row.drop-before::before { top: -1px; } .lp-row.drop-after::after { bottom: -1px; }
+.lp-row.is-hidden .lp-name, .lp-row.is-hidden .lp-kind { opacity: .45; }
+.lp-frame { font-weight: 600; margin-top: 2px; }
+.lp-frame.is-active:not(.is-selected) .lp-name { color: #ECECEE; }
+.lp-chevron { width: 18px !important; height: 18px !important; flex: none; }
+.lp-chevron:disabled { cursor: default; }
+.lp-kind { width: 20px; flex: none; display: inline-grid; place-items: center; color: #A0A3AB; }
+.lp-row.is-selected .lp-kind { color: #0D99FF; }
+.lp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 4px; }
+.lp-name-input { flex: 1; min-width: 0; height: 22px; margin-left: 2px; background: #17181A; color: #ECECEE; border: 1px solid #0D99FF; border-radius: 4px; padding: 0 6px; font: inherit; }
+.lp-meta { color: #8A8D95; font-size: 11px; font-weight: 400; font-family: 'Geist', system-ui, sans-serif; padding-right: 4px; }
+.lp-state { opacity: 0; width: 22px !important; height: 22px !important; flex: none; }
+.lp-row:hover .lp-state, .lp-row:focus-within .lp-state, .lp-state.is-set { opacity: 1; }
+.lp-state.is-set { color: #E8A33D; }
+.lp-frame .lp-state { display: none; }
+.lp-selection-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px 6px 14px; border-top: 1px solid #2E3036; color: #8A8D95; }
+.lp-bar-actions { display: flex; gap: 4px; }
+.lp-bar-actions button { height: 26px; min-width: 26px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid #2E3036; background: transparent; color: #ECECEE; border-radius: 6px; font: inherit; cursor: pointer; }
+.lp-bar-actions button:hover:not(:disabled) { background: #2C2E33; }
+.lp-bar-actions button:disabled { opacity: .4; cursor: default; }
+.lp-menu { position: fixed; z-index: 60; width: 200px; padding: 4px; background: #2A2C31; border: 1px solid #3A3D44; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.45); display: flex; flex-direction: column; }
+.lp-menu button { display: flex; align-items: center; justify-content: space-between; height: 28px; padding: 0 8px; border: 0; background: transparent; color: #ECECEE; border-radius: 5px; font: inherit; text-align: left; cursor: pointer; }
+.lp-menu button:hover:not(:disabled) { background: #0D99FF; color: #fff; }
+.lp-menu button:disabled { opacity: .4; cursor: default; }
+.lp-menu button.is-danger:hover:not(:disabled) { background: #D8504D; }
+.lp-menu kbd { font: 11px 'Geist', system-ui, sans-serif; opacity: .6; }
+.lp-menu hr { border: 0; border-top: 1px solid #3A3D44; margin: 4px 2px; }
+
+.right-sidebar.mode-split { grid-template-rows: minmax(230px, 40%) minmax(0, 1fr) !important; }
+.right-sidebar > .lp { grid-row: auto; }
+.lp-search input:focus, .lp-search input:focus-visible { outline: 0; box-shadow: none; }
+
+/* One typeface everywhere: Geist. Numbers line up with tabular figures instead of switching to a second font. */
+:root, button, input, select, textarea, kbd, code, samp, pre { font-family: 'Geist', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+input, kbd, code, output, .lp-meta, .paint-hex, .paint-opacity input, [class*="number"], [class*="numeric"] { font-variant-numeric: tabular-nums; }

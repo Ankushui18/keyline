@@ -1,3 +1,4 @@
+import { drawnObjectsForArtboard } from '../core/real-content';
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { VectorDocument } from '../core/document';
 import { createEntityId } from '../core/ids';
@@ -149,8 +150,17 @@ export function ExportDialog({
         exportBoundsMode: settings.boundsMode,
         backgroundColor: settings.includeBackground ? previewArtboard.background : undefined,
         includeMetadata: false,
+        ...(inheritColor ? { strokeColor: 'currentColor', fillColor: 'currentColor' } : {}),
       })
     : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" width="1" height="1"/>';
+  const drawnStyles = previewArtboard
+    ? drawnObjectsForArtboard(document, previewArtboard.id).flatMap((object) => {
+      const stroke = document.getAppearance(object.appearanceId)?.stroke;
+      return stroke?.visible ? [stroke] : [];
+    })
+    : [];
+  const drawnColours = [...new Set(drawnStyles.map((stroke) => stroke.color.replace('#', '').toUpperCase()))];
+  const drawnWidths = [...new Set(drawnStyles.map((stroke) => Math.round(stroke.width * 100) / 100))];
   const previewViewBox = previewSvg.match(/\bviewBox="([^"]+)"/)?.[1] ?? 'Unavailable';
   const variables = [...document.exportVariables.values()].sort((a, b) => a.name.localeCompare(b.name));
   const excludedConstructionLines = constructionLinesExcludedCount(document);
@@ -273,6 +283,7 @@ export function ExportDialog({
             exportBoundsMode: settings.boundsMode,
             backgroundColor: settings.includeBackground ? artboard.background : undefined,
             includeMetadata: false,
+            ...(inheritColor ? { strokeColor: 'currentColor', fillColor: 'currentColor' } : {}),
           });
           files.push({ filename: target.filename, data: svg });
         } else {
@@ -352,6 +363,15 @@ export function ExportDialog({
     ? format
     : settings.formats.length === 1 && settings.formats[0] === 'png' ? 'png' : 'svg';
   const activeName = previewArtboard?.name ?? 'Icon 24';
+  // A fill needs a closed shape. Count filled shapes that still have an open path.
+  const openFilledCount = previewArtboard
+    ? drawnObjectsForArtboard(document, previewArtboard.id).filter((object) => {
+      const hasFill = document.getAppearance(object.appearanceId)?.fills.some((fill) => fill.visible !== false);
+      const network = document.getNetwork(object.networkId);
+      const hasOpenPath = network?.pathIds.some((pathId) => document.getPath(pathId)?.isClosed === false);
+      return Boolean(hasFill && hasOpenPath);
+    }).length
+    : 0;
 
   return (
     <div className="modal-backdrop keyline-export-backdrop" role="presentation" onMouseDown={(event) => {
@@ -410,12 +430,12 @@ export function ExportDialog({
                   <button type="button" className={!inheritColor ? 'is-active' : ''} onClick={() => setInheritColor(false)}>
                     <i />
                     <strong>Keep drawn colours</strong>
-                    <small>#14181F</small>
+                    <small>{drawnColours.length === 0 ? 'No lines drawn' : drawnColours.length === 1 ? `#${drawnColours[0]}` : `${drawnColours.length} colours`}</small>
                   </button>
                 </div>
                 <div className="keyline-wiring-option">
-                  <span>Wiring for code</span>
-                  <div><strong>Stroke width</strong><code>prop · 1.5</code></div>
+                  <span>Line width in this file</span>
+                  <div><strong>Stroke width</strong><code>{drawnWidths.length === 0 ? 'none' : drawnWidths.length === 1 ? `${drawnWidths[0]} px` : 'mixed'}</code></div>
                 </div>
                 <button type="button" className="keyline-export-advanced-trigger" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((open) => !open)}>
                   Advanced: bounds, background, file name <span>{advancedOpen ? '⌃' : '⌄'}</span>
@@ -451,8 +471,9 @@ export function ExportDialog({
             {excludedConstructionLines > 0 && <span>{excludedConstructionLines} construction lines excluded</span>}
             {error && <span className="delivery-error" role="alert">{error}</span>}
             {!error && plan.collisions.length > 0 && <span className="delivery-error" role="alert">Filename collision: {plan.collisions.join(', ')}</span>}
+            {!error && openFilledCount > 0 && <span className="delivery-warning" role="status">{openFilledCount} open {openFilledCount === 1 ? 'path won’t' : 'paths won’t'} fill. Close {openFilledCount === 1 ? 'it' : 'them'}, or export as lines.</span>}
             {!error && progress && <span>{progress}</span>}
-            {!error && !progress && <span>{deliveryFileCount || 1} icon · {plan.targets[0]?.filename ?? `${activeName.toLowerCase().replaceAll(' ', '-')}.svg`}</span>}
+            {!error && !progress && openFilledCount === 0 && <span>{deliveryFileCount || 1} icon · {plan.targets[0]?.filename ?? `${activeName.toLowerCase().replaceAll(' ', '-')}.svg`}</span>}
           </div>
           <button className="secondary-button" onClick={() => {
             void navigator.clipboard.writeText(codeContent).then(() => {

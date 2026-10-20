@@ -33,7 +33,7 @@
 .kd-status.is-synced i { background: #7fd1a0; }
 .kd-status.is-error i { background: #ef747c; }
 .kd-copy { display: flex; gap: 8px; align-items: center; }
-.kd-copy code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px 12px; background: #17181a; border: 1px solid #2e3036; border-radius: 8px; color: #a0a3ab; font: 12px 'Geist Mono', monospace; }
+.kd-copy code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 8px 12px; background: #17181a; border: 1px solid #2e3036; border-radius: 8px; color: #a0a3ab; font: 12px 'Geist', system-ui, sans-serif; }
 .kd-copy button { height: 34px; padding: 0 14px; border: 1px solid #2e3036; background: transparent; border-radius: 8px; }
 .kd-people { display: flex; flex-direction: column; }
 .kd-people > div { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #2e3036; }
@@ -59,7 +59,7 @@
 .kd-row > span:first-child { display: flex; flex-direction: column; gap: 2px; }
 .kd-row small { color: #a0a3ab; }
 .kd-number, .kd-row select { height: 32px; padding: 0 8px; border: 1px solid #2e3036; border-radius: 8px; background: #17181a; color: #ececee; }
-.kd-number { width: 84px; font-family: 'Geist Mono', monospace; text-align: right; }
+.kd-number { width: 84px; font-family: 'Geist', system-ui, sans-serif; text-align: right; }
 .kd-number-wrap { display: flex; align-items: center; gap: 6px; }
 .kd-number-wrap em { color: #8a8d95; font-style: normal; width: 22px; }
 .kd-segmented { display: flex; padding: 2px; background: #17181a; border-radius: 8px; }
@@ -72,7 +72,7 @@
 .kd-shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px 28px; }
 .kd-shortcuts h3 { margin: 12px 0 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #8a8d95; }
 .kd-shortcut { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #2e3036; }
-.kd-shortcut kbd, .kd-command kbd { padding: 1px 7px; background: #26272b; border: 1px solid #2e3036; border-radius: 5px; font: 12px 'Geist Mono', monospace; color: #c9cbd1; }
+.kd-shortcut kbd, .kd-command kbd { padding: 1px 7px; background: #26272b; border: 1px solid #2e3036; border-radius: 5px; font: 12px 'Geist', system-ui, sans-serif; color: #c9cbd1; }
 
 /* Tidy */
 .kd-tidy { width: min(900px, calc(100vw - 32px)); }
@@ -81,7 +81,7 @@
 .kd-tidy-previews figure { margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: center; }
 .kd-tidy-previews figure > div { display: grid; place-items: center; width: 190px; height: 190px; background: #e4e4e0; border-radius: 12px; overflow: hidden; }
 .kd-tidy-previews img { width: 70%; height: 70%; object-fit: contain; }
-.kd-tidy-previews figcaption { font: 12px 'Geist Mono', monospace; color: #a0a3ab; }
+.kd-tidy-previews figcaption { font: 12px 'Geist', system-ui, sans-serif; color: #a0a3ab; }
 .kd-tidy-previews figcaption.is-good { color: #7fd1a0; }
 .kd-tidy-rules { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 8px; }
 .kd-rule { display: flex; gap: 12px; align-items: flex-start; padding: 12px; text-align: left; background: #26272b; border: 1px solid #2e3036; border-radius: 10px; }
@@ -112,7 +112,7 @@
 .kd-motion-stage footer button { height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: #17181a; color: #ececee; }
 .kd-motion-stage footer button.is-active { background: #0b7bd6; }
 .kd-timeline { flex: none; max-height: 210px; overflow: auto; padding: 8px 16px 12px; border-top: 1px solid #2e3036; background: #1f2023; display: flex; flex-direction: column; gap: 4px; }
-.kd-timeline-ruler { display: flex; justify-content: space-between; margin-left: 112px; color: #8a8d95; font: 11px 'Geist Mono', monospace; }
+.kd-timeline-ruler { display: flex; justify-content: space-between; margin-left: 112px; color: #8a8d95; font: 11px 'Geist', system-ui, sans-serif; }
 .kd-track { display: flex; align-items: center; gap: 12px; }
 .kd-track strong { width: 100px; flex: none; font-weight: 500; color: #c9cbd1; }
 .kd-track > div { position: relative; flex: 1; height: 18px; border-bottom: 1px solid #2e3036; }
@@ -150,7 +150,17 @@
 .kd-command-row.is-edit { flex-direction: column; align-items: stretch; gap: 4px; background: #1b2a38; border: 1px solid #0d99ff55; margin-bottom: 6px; }
 .kd-command-row.is-edit .kd-command-group { padding: 0; color: #4fb0ff; }
 .kd-edit-changes > div { display: flex; justify-content: space-between; }
-.kd-edit-changes b { font: 500 12px 'Geist Mono', monospace; color: #ececee; }
+.kd-edit-changes b { font: 500 12px 'Geist', system-ui, sans-serif; color: #ececee; }
 .kd-command-empty { margin: 0; padding: 14px 10px; color: #a0a3ab; }
 
 html[data-reduce-motion='true'] *, html[data-reduce-motion='true'] *::before, html[data-reduce-motion='true'] *::after { transition: none !important; animation: none !important; }
+.kd-people em { margin-left: auto; color: #a0a3ab; font-style: normal; }
+.kd-people small.is-good { color: #7fd1a0; }
+.kd-linkrow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 4px 0; }
+.kd-linkrow > span { display: flex; flex-direction: column; }
+.kd-linkrow small { color: #a0a3ab; }
+.kd-copy button:disabled { color: #6b6e76; cursor: default; }
+.kd-tag { padding: 4px 10px; border-radius: 999px; background: #26272b; color: #a0a3ab; font-size: 12px; white-space: nowrap; }
+.kd-sc-head { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+.kd-sc-head button { border: 0; background: transparent; color: #0d99ff; padding: 0; }
+.kd-sc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }

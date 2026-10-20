@@ -1,3 +1,4 @@
+import { subscribePixelGrid } from './view-settings';
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowBothIcon } from '@primer/octicons-react/ArrowBothIcon';
@@ -227,7 +228,6 @@ export function VectorCanvas({
     if (autoOpenedEditingObjectRef.current === selection.editingObjectId) return;
     autoOpenedEditingObjectRef.current = selection.editingObjectId;
     setNetworkSelectExplicit(false);
-    setRailGroupOpen('draw');
   }, [selection.editingObjectId, selection.mode]);
 
   useEffect(() => {
@@ -241,6 +241,8 @@ export function VectorCanvas({
       drawRef.current();
     });
   }, []);
+
+  useEffect(() => subscribePixelGrid(requestRender), [requestRender]);
 
   drawRef.current = () => {
     const canvas = canvasRef.current;
@@ -2382,7 +2384,7 @@ export function VectorCanvas({
           <CanvasFlyoutTool label="Pen" shortcut="P" active={activeTool === 'pen' || selection.mode === 'network' && activeTool === 'select'} onClick={() => { onRequestToolChange('pen'); setRailGroupOpen(undefined); }} />
           <CanvasFlyoutTool label="Pencil" shortcut="N" active={activeTool === 'pencil'} onClick={() => { onRequestToolChange('pencil'); setRailGroupOpen(undefined); }} />
           <CanvasFlyoutTool label="Brush" shortcut="J" active={activeTool === 'brush'} onClick={() => { onRequestToolChange('brush'); setRailGroupOpen(undefined); }} />
-          <CanvasFlyoutTool label="Line" shortcut="\\" active={activeTool === 'line'} onClick={() => { onRequestToolChange('line'); setRailGroupOpen(undefined); }} />
+          <CanvasFlyoutTool label="Line" shortcut={'\\'} active={activeTool === 'line'} onClick={() => { onRequestToolChange('line'); setRailGroupOpen(undefined); }} />
           <CanvasFlyoutTool label="Arc" shortcut="A" active={activeTool === 'arc'} onClick={() => { onRequestToolChange('arc'); setRailGroupOpen(undefined); }} />
           <CanvasFlyoutTool label="Guide line" description="(not exported)" shortcut="⇧\" active={activeTool === 'construction-line'} onClick={() => { onRequestToolChange('construction-line'); setRailGroupOpen(undefined); }} />
         </CanvasRailGroup>

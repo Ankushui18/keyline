@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { PlusIcon } from '@primer/octicons-react/PlusIcon';
 import { RedoIcon } from '@primer/octicons-react/RedoIcon';
 import { UndoIcon } from '@primer/octicons-react/UndoIcon';
 
@@ -22,6 +21,7 @@ interface ToolbarProps {
   onOpenCommand: () => void;
   onOpenMotion: () => void;
   onOpenCheck: () => void;
+  onOpenSet: () => void;
   onAddIconFrame: (width: number, height: number) => void;
   onToggleConstraints: () => void;
   onExport: () => void;
@@ -50,6 +50,7 @@ export function Toolbar({
   onOpenCommand,
   onOpenMotion,
   onOpenCheck,
+  onOpenSet,
   onAddIconFrame,
   onToggleConstraints,
   onExport,
@@ -132,46 +133,9 @@ export function Toolbar({
           <button type="button" className="topbar-icon" aria-label="Undo" title={`Undo (${MODIFIER_LABEL} Z)`} disabled={!canUndo} onClick={onUndo}><UndoIcon size={17} /></button>
           <button type="button" className="topbar-icon" aria-label="Redo" title={`Redo (${MODIFIER_LABEL} Shift Z)`} disabled={!canRedo} onClick={onRedo}><RedoIcon size={17} /></button>
         </div>
-        <div className="topbar-frame" ref={frameMenuRef}>
-          <button type="button" className="topbar-text-button" aria-haspopup="dialog" aria-expanded={frameMenuOpen} onClick={() => { setFrameMenuOpen((open) => !open); setCustomOpen(false); }}>
-            <PlusIcon size={14} />
-            Frame
-          </button>
-          {frameMenuOpen && (
-            <div className="topbar-frame-menu" role="dialog" aria-label="Add icon frame size">
-              {[24, 32, 48].map((size) => (
-                <button key={size} type="button" onClick={() => createFrame(size, size)}>
-                  <strong>{size}×{size}</strong>
-                  <span>{size === 24 ? 'Interface icon' : size === 32 ? 'Product icon' : 'Large icon'}</span>
-                </button>
-              ))}
-              <button type="button" aria-expanded={customOpen} onClick={() => setCustomOpen((open) => !open)}>
-                <strong>Custom…</strong>
-                <span>Set width and height</span>
-              </button>
-              {customOpen && (
-                <div className="topbar-frame-custom" role="group" aria-label="Custom icon frame size">
-                  <label><span>W</span><input aria-label="Custom frame width" type="number" min="1" value={customWidth} onChange={(event) => setCustomWidth(Number(event.target.value))} /></label>
-                  <label><span>H</span><input aria-label="Custom frame height" type="number" min="1" value={customHeight} onChange={(event) => setCustomHeight(Number(event.target.value))} /></label>
-                  <button type="button" onClick={() => createFrame(customWidth, customHeight)}>Create</button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="topbar-right">
-        <button type="button" className="topbar-command" onClick={onOpenCommand} title="Search every action, or ask for an edit">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg>
-          Search or ask
-          <kbd>{MODIFIER_LABEL} K</kbd>
-        </button>
-        <button type="button" className="topbar-text-button" disabled={isEmpty} title="Animate this drawing (M)" onClick={onOpenMotion}>Motion</button>
-        <button type="button" className="topbar-text-button" disabled={isEmpty} title={`Check icons are consistent (${MODIFIER_LABEL} Shift C)`} onClick={onOpenCheck}>Check</button>
-        <button type="button" className="topbar-icon" aria-label="Settings" title="Settings" onClick={onOpenSettings}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8" /></svg>
-        </button>
         {collaborators.length > 0 && (
           <div className="topbar-people" role="status" aria-live="polite" aria-label={`${collaborators.length} collaborators online`}>
             {collaborators.slice(0, 3).map((presence) => (
@@ -189,6 +153,39 @@ export function Toolbar({
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></svg>
           Export
         </button>
+        <div className="topbar-frame" ref={frameMenuRef}>
+          <button type="button" className="topbar-icon" aria-label="More" title="More: search, frames, set, motion, check, settings" aria-haspopup="menu" aria-expanded={frameMenuOpen} onClick={() => { setFrameMenuOpen((open) => !open); setCustomOpen(false); }}>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+          </button>
+          {frameMenuOpen && (
+            <div className="topbar-frame-menu topbar-more-menu" role="menu" aria-label="More">
+              <button type="button" role="menuitem" onClick={() => { setFrameMenuOpen(false); onOpenCommand(); }}><strong>Search or ask</strong><span>{MODIFIER_LABEL} K</span></button>
+              <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenSet(); }}><strong>Set</strong><span>All icons together</span></button>
+              <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenMotion(); }}><strong>Motion</strong><span>M</span></button>
+              <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenCheck(); }}><strong>Check consistency</strong><span>{MODIFIER_LABEL} ⇧ C</span></button>
+              <hr />
+              {[24, 32, 48].map((size) => (
+                <button key={size} type="button" role="menuitem" onClick={() => createFrame(size, size)}>
+                  <strong>New {size}×{size} frame</strong>
+                  <span>{size === 24 ? 'Interface icon' : size === 32 ? 'Product icon' : 'Large icon'}</span>
+                </button>
+              ))}
+              <button type="button" role="menuitem" aria-expanded={customOpen} onClick={() => setCustomOpen((open) => !open)}>
+                <strong>New custom frame…</strong>
+                <span>Set width and height</span>
+              </button>
+              {customOpen && (
+                <div className="topbar-frame-custom" role="group" aria-label="Custom icon frame size">
+                  <label><span>W</span><input aria-label="Custom frame width" type="number" min="1" value={customWidth} onChange={(event) => setCustomWidth(Number(event.target.value))} /></label>
+                  <label><span>H</span><input aria-label="Custom frame height" type="number" min="1" value={customHeight} onChange={(event) => setCustomHeight(Number(event.target.value))} /></label>
+                  <button type="button" onClick={() => createFrame(customWidth, customHeight)}>Create</button>
+                </div>
+              )}
+              <hr />
+              <button type="button" role="menuitem" onClick={() => { setFrameMenuOpen(false); onOpenSettings(); }}><strong>Settings</strong><span>Shortcuts, grid, AI</span></button>
+            </div>
+          )}
+        </div>
       </div>
 
       <button

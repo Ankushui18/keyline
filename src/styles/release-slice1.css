@@ -81,7 +81,7 @@
   text-align: right;
   background: #1f1f1f;
   border: 0;
-  font: 10px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 10px 'Geist', system-ui, sans-serif;
 }
 .custom-frame-size > button {
   grid-column: 1 / -1;
@@ -124,7 +124,7 @@
 .artboard-frame-section > summary > span { margin-right: auto; }
 .artboard-frame-section > summary output {
   color: var(--fgColor-muted);
-  font: 600 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 600 9px 'Geist', system-ui, sans-serif;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -198,7 +198,7 @@
   border-radius: 7px;
 }
 .export-viewbox-card span { color: #758195; font-size: 8px; font-weight: 750; letter-spacing: .12em; }
-.export-viewbox-card code { color: #d9e3f3; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.export-viewbox-card code { color: #d9e3f3; font: 11px 'Geist', system-ui, sans-serif; }
 .export-advanced { color: #8c98aa; font-size: 10px; }
 .export-advanced > summary {
   padding: 6px 2px;

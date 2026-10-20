@@ -1,6 +1,9 @@
+import { useSyncExternalStore } from 'react';
+import { isPixelGridVisible, setPixelGridVisible, subscribePixelGrid } from '../canvas/view-settings';
 import { useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { constraintActions, constraintDisplayName, constraintsForSelection } from '../constraints/catalog';
 import type { VectorDocument } from '../core/document';
+import { applyCornerRadii, currentRadii, inspectCorners } from '../core/corner-radius';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
 import {
   previewGeometryPropagation,
@@ -211,12 +214,11 @@ export function PropertiesPanel({
     <aside className="properties-panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">INSPECTOR</span>
           <h2 aria-label="Properties">Design</h2>
         </div>
         <span className={`inspector-context${selectionCount > 0 ? ' has-selection' : ''}`}>
           {selection.mode === 'object' && selectedObjects.length === 1
-            ? selectedObjects[0].name
+            ? 'Shape'
             : selection.mode === 'network' && selectedNodes.length > 0 && selectedSegments.length === 0
               ? `${selectedNodes.length} ${selectedNodes.length === 1 ? 'point' : 'points'} selected`
               : selectionCount > 0
@@ -248,6 +250,7 @@ export function PropertiesPanel({
       {selection.mode === 'object' && selectedObjects.length === 1 ? (
         <ObjectInspector
           document={document}
+          manager={manager}
           object={selectedObjects[0]}
           locked={document.isObjectLocked(selectedObjects[0].id)}
           appearanceExpanded={activeTool !== 'pen' && activeTool !== 'pencil' && activeTool !== 'brush'}
@@ -544,28 +547,28 @@ export function PropertiesPanel({
 
       {selectedNodes.length > 1 && (
         <div className="panel-section parametric-actions">
-          <span className="section-label">BULK NODE ACTIONS</span>
+          <span className="section-label">Align points</span>
           <div className="parametric-button-grid">
             <button onClick={() => onBulkNodeAction('horizontal')}>Align H</button>
             <button onClick={() => onBulkNodeAction('vertical')}>Align V</button>
             <button onClick={() => onBulkNodeAction('distribute')}>Distribute</button>
             <button onClick={() => onBulkNodeAction('symmetry')}>Symmetry</button>
           </div>
-          <p>Actions are committed atomically and rejected if hard constraints cannot be satisfied.</p>
+          <p>Points stay put if a locked rule would break.</p>
         </div>
       )}
 
       {(selectedSegments.length > 0 || visibleParametricGroups.length > 0) && (
         <div className="panel-section parametric-actions">
           <div className="constraint-section-heading">
-            <span className="section-label">LIVE PARAMETRIC</span>
+            <span className="section-label">Mirror and repeat</span>
             <b>{visibleParametricGroups.length}</b>
           </div>
           {selectedSegments.length > 0 && (
             <div className="parametric-button-grid">
-              <button onClick={() => onCreateMirror('x')}>Mirror X</button>
-              <button onClick={() => onCreateMirror('y')}>Mirror Y</button>
-              <button onClick={onCreateRadialRepeat}>Repeat ×6</button>
+              <button onClick={() => onCreateMirror('x')}>Mirror left–right</button>
+              <button onClick={() => onCreateMirror('y')}>Mirror up–down</button>
+              <button onClick={onCreateRadialRepeat}>Repeat ×6 around</button>
             </div>
           )}
           {visibleParametricGroups.map((group) => (
@@ -579,21 +582,10 @@ export function PropertiesPanel({
               onRemove={onRemoveParametricGroup}
             />
           ))}
-          <p>Instances are rendered virtually and remain linked to their source paths.</p>
+          <p>Copies stay linked: edit the original and they follow.</p>
         </div>
       )}
 
-      <details className="panel-section inspector-section panel-help">
-        <summary><span>Canvas shortcuts</span></summary>
-        <div className="inspector-section-body shortcut-list">
-          <ShortcutRow keys={['Space', 'Drag']} text="Pan viewport" />
-          <ShortcutRow keys={['Scroll']} text="Zoom at cursor" />
-          <ShortcutRow keys={['Shift', 'Click']} text="Multi-select" />
-          <ShortcutRow keys={['Ctrl/⌘', 'C']} text="Copy objects" />
-          <ShortcutRow keys={['Ctrl/⌘', 'X']} text="Cut objects" />
-          <ShortcutRow keys={['Ctrl/⌘', 'V']} text="Paste objects" />
-        </div>
-      </details>
     </aside>
   );
 }
@@ -615,17 +607,17 @@ function ParametricGroupEditor({
 }) {
   const validation = validateParametricGroup(document, group);
   return (
-    <div className="parametric-group-editor">
+    <div className="parametric-group-editor figma-inspector">
       <div className="parametric-group-row">
-        <strong>{group.transform.type === 'mirror' ? 'Mirror' : 'Radial repeat'}</strong>
-        <code>{shortId(group.id)}</code>
-        <button type="button" title="Remove live group" aria-label="Remove live group" onClick={() => onRemove(group.id)}>×</button>
+        <span className="repeat-glyph" aria-hidden="true"><PanelIcon d={group.transform.type === 'mirror' ? 'M8 2v12M5.5 4.5L2 8l3.5 3.5zM10.5 4.5L14 8l-3.5 3.5z' : 'M8 2.5a5.5 5.5 0 11-5.5 5.5M8 2.5L6 .8M8 2.5L6 4.2'} /></span>
+        <strong>{group.transform.type === 'mirror' ? 'Mirror' : 'Repeat around a point'}</strong>
+        <button type="button" className="icon-button" title="Remove" aria-label="Remove live group" onClick={() => onRemove(group.id)}><PanelIcon d={MINUS} /></button>
       </div>
       <div className="parametric-source-row">
-        <span>{group.sourcePathIds.length} source path{group.sourcePathIds.length === 1 ? '' : 's'}</span>
+        <span>Repeating {group.sourcePathIds.length} shape{group.sourcePathIds.length === 1 ? '' : 's'}</span>
         {selectedSourcePathIds.length > 0 && (
           <button type="button" onClick={() => onUpdateSources(group.id, selectedSourcePathIds)}>
-            Use selected paths
+            Use selected shapes
           </button>
         )}
       </div>
@@ -662,7 +654,7 @@ function MirrorGroupFields({
   return (
     <>
       <label className="parametric-reference-field">
-        <span>Axis reference</span>
+        <span>Mirror line</span>
         <select
           value={transform.axisSegmentId ?? ''}
           onChange={(event) => onUpdate(group.id, {
@@ -670,7 +662,7 @@ function MirrorGroupFields({
             axisSegmentId: event.target.value || undefined,
           })}
         >
-          <option value="">Manual axis</option>
+          <option value="">Set by hand</option>
           {references.map((segment) => (
             <option key={segment.id} value={segment.id}>{referenceLabel(document, segment.id, 'Line')}</option>
           ))}
@@ -692,22 +684,22 @@ function MirrorGroupFields({
       </div>
       <div className="numeric-field-grid">
         <NumericField
-          label="Axis angle"
+          label="Angle °"
           value={transform.angle ?? (transform.axis === 'x' ? 0 : 90)}
           onCommit={(angle) => onUpdate(group.id, { ...transform, angle })}
         />
         <NumericField
-          label="Origin X"
+          label="X"
           value={transform.origin.x}
           onCommit={(x) => onUpdate(group.id, { ...transform, origin: { ...transform.origin, x } })}
         />
         <NumericField
-          label="Origin Y"
+          label="Y"
           value={transform.origin.y}
           onCommit={(y) => onUpdate(group.id, { ...transform, origin: { ...transform.origin, y } })}
         />
       </div>
-      {transform.axisSegmentId && <p>The referenced construction line drives axis position and angle live.</p>}
+      {transform.axisSegmentId && <p>The guide line sets the mirror position and angle.</p>}
     </>
   );
 }
@@ -732,7 +724,7 @@ function RadialGroupFields({
   return (
     <>
       <label className="parametric-reference-field">
-        <span>Center reference</span>
+        <span>Centre point</span>
         <select
           value={transform.centerNodeId ?? ''}
           onChange={(event) => onUpdate(group.id, {
@@ -740,7 +732,7 @@ function RadialGroupFields({
             centerNodeId: event.target.value || undefined,
           })}
         >
-          <option value="">Manual center</option>
+          <option value="">Set by hand</option>
           {references.map((node) => (
             <option key={node.id} value={node.id}>{referenceLabel(document, node.id, 'Anchor')}</option>
           ))}
@@ -755,7 +747,7 @@ function RadialGroupFields({
           onCommit={(count) => onUpdate(group.id, { ...transform, count: Math.round(count) })}
         />
         <NumericField
-          label="Sweep °"
+          label="Spread °"
           value={transform.sweepAngle}
           onCommit={(sweepAngle) => onUpdate(group.id, { ...transform, sweepAngle })}
         />
@@ -765,12 +757,12 @@ function RadialGroupFields({
           onCommit={(startAngle) => onUpdate(group.id, { ...transform, startAngle })}
         />
         <NumericField
-          label="Center X"
+          label="Centre X"
           value={transform.center.x}
           onCommit={(x) => onUpdate(group.id, { ...transform, center: { ...transform.center, x } })}
         />
         <NumericField
-          label="Center Y"
+          label="Centre Y"
           value={transform.center.y}
           onCommit={(y) => onUpdate(group.id, { ...transform, center: { ...transform.center, y } })}
         />
@@ -783,7 +775,7 @@ function RadialGroupFields({
         />
         <span>Clockwise</span>
       </label>
-      {transform.centerNodeId && <p>The referenced construction anchor drives the repeat center live.</p>}
+      {transform.centerNodeId && <p>The guide point sets the centre.</p>}
     </>
   );
 }
@@ -1147,6 +1139,7 @@ function ArtboardFrameInspector({
   onDelete: () => void;
 }) {
   const artboard = document.activeArtboard;
+  const [menuOpen, setMenuOpen] = useState(false);
   const [widthDraft, setWidthDraft] = useState(String(artboard.frame.width));
   const [heightDraft, setHeightDraft] = useState(String(artboard.frame.height));
   const editingRef = useRef<'width' | 'height'>();
@@ -1217,20 +1210,47 @@ function ArtboardFrameInspector({
     event.currentTarget.blur();
   };
 
+  const gridOn = useSyncExternalStore(subscribePixelGrid, isPixelGridVisible);
   const preset = artboard.frame.width === artboard.frame.height &&
     ARTBOARD_PRESETS.includes(artboard.frame.width as typeof ARTBOARD_PRESETS[number])
     ? String(artboard.frame.width)
     : 'custom';
 
   return (
-    <details className="panel-section artboard-frame-section" open>
-      <summary>
-        <span><strong>Frame</strong><small>{artboard.name}</small></span>
-        <output>{formatNumber(artboard.frame.width)} × {formatNumber(artboard.frame.height)}</output>
-      </summary>
-      <div className="frame-inspector-body">
-        <div className="numeric-field-grid frame-dimension-grid">
-          <label className="numeric-field">
+    <section className="frame-card" aria-label="Frame">
+      <header className="frame-card-head">
+        <div><strong>{artboard.name}</strong><small>Frame</small></div>
+        <div className="frame-card-menu">
+          <button type="button" aria-label="Frame actions" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>···</button>
+          {menuOpen && (
+            <div role="menu" className="frame-card-popover" onMouseLeave={() => setMenuOpen(false)}>
+              <button type="button" role="menuitem" className="duplicate-artboard-button" onClick={() => { setMenuOpen(false); onDuplicate(); }}>Duplicate frame</button>
+              <button
+                type="button"
+                role="menuitem"
+                className="delete-artboard-button"
+                disabled={Boolean(artboard.isCanvasRoot)}
+                onClick={() => { setMenuOpen(false); onDelete(); }}
+              >Delete frame</button>
+            </div>
+          )}
+        </div>
+      </header>
+      <div className="frame-card-block">
+        <span className="frame-card-label">Size</span>
+        <div className="frame-size-chips" role="group" aria-label="Frame size">
+          {[16, 24, 32, 48].map((size) => (
+            <button
+              type="button"
+              key={size}
+              aria-pressed={preset === String(size)}
+              className={preset === String(size) ? 'is-active' : ''}
+              onClick={() => manager.execute({ type: 'UPDATE_ARTBOARD_DIMENSIONS', payload: { artboardId: artboard.id, width: size, height: size } })}
+            >{size}</button>
+          ))}
+        </div>
+        <div className="frame-dimension-grid">
+          <label className="frame-field">
             <span>W</span>
             <input
               data-dimension="width"
@@ -1245,7 +1265,7 @@ function ArtboardFrameInspector({
               onKeyDown={handleDimensionKeyDown}
             />
           </label>
-          <label className="numeric-field">
+          <label className="frame-field">
             <span>H</span>
             <input
               data-dimension="height"
@@ -1261,44 +1281,88 @@ function ArtboardFrameInspector({
             />
           </label>
         </div>
-        <label className="frame-preset-field">
-          <span>Preset</span>
-          <select
-            aria-label="Artboard size preset"
-            value={preset}
-            onChange={(event) => {
-              if (event.target.value === 'custom') return;
-              const size = Number(event.target.value);
-              manager.execute({
-                type: 'UPDATE_ARTBOARD_DIMENSIONS',
-                payload: { artboardId: artboard.id, width: size, height: size },
-              });
-            }}
-          >
-            <option value="custom">Custom</option>
-            {ARTBOARD_PRESETS.map((size) => <option key={size} value={size}>{size} × {size}</option>)}
-          </select>
-        </label>
-        <div className="artboard-action-row">
-          <button type="button" className="duplicate-artboard-button" onClick={onDuplicate}>Duplicate Artboard</button>
-          <button
-            type="button"
-            className="delete-artboard-button"
-            disabled={Boolean(artboard.isCanvasRoot)}
-            title={artboard.isCanvasRoot ? 'The Canvas is the page-level container.' : 'Delete artboard and its contents'}
-            onClick={onDelete}
-          >Delete Artboard</button>
-        </div>
       </div>
-    </details>
+      <label className="frame-grid-toggle">
+        <span>Show pixel grid</span>
+        <input type="checkbox" checked={gridOn} onChange={(event) => setPixelGridVisible(event.target.checked)} />
+      </label>
+    </section>
+  );
+}
+
+function PanelIcon({ d, size = 14 }: { d: string; size?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
+}
+const PLUS = 'M8 3v10M3 8h10';
+const MINUS = 'M3 8h10';
+const EYE = 'M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 9.8a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6z';
+const EYE_OFF = 'M2 2l12 12M6.4 4a6 6 0 011.6-.5c4 0 6.5 4.5 6.5 4.5a11 11 0 01-2 2.5M4 5.5C2.5 6.8 1.5 8 1.5 8S4 12.5 8 12.5c.9 0 1.7-.2 2.4-.5';
+
+function normalizeHex(value: string): string | null {
+  const raw = value.trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(raw)) return `#${raw.split('').map((c) => c + c).join('').toLowerCase()}`;
+  if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw.toLowerCase()}`;
+  return null;
+}
+
+function PaintRow({
+  label, color, opacity, visible, onColor, onOpacity, onToggle, onRemove,
+}: {
+  label: string; color: string; opacity: number; visible: boolean;
+  onColor: (color: string) => void; onOpacity: (opacity: number) => void; onToggle: () => void; onRemove: () => void;
+}) {
+  return (
+    <div className={`paint-row${visible ? '' : ' is-hidden'}`}>
+      <label className="paint-swatch" title={`${label} colour`}>
+        <input type="color" value={color} aria-label={`${label} colour`} onChange={(event) => onColor(event.target.value)} />
+        <span style={{ background: color }} />
+      </label>
+      <input
+        className="paint-hex"
+        aria-label={`${label} hex`}
+        defaultValue={color.replace('#', '').toUpperCase()}
+        key={color}
+        spellCheck={false}
+        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+        onBlur={(event) => {
+          const next = normalizeHex(event.target.value);
+          if (next && next !== color) onColor(next); else event.target.value = color.replace('#', '').toUpperCase();
+        }}
+      />
+      <span className="paint-opacity">
+        <input
+          aria-label={`${label} opacity`}
+          defaultValue={Math.round(opacity * 100)}
+          key={opacity}
+          inputMode="numeric"
+          onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+          onBlur={(event) => {
+            const parsed = Number.parseFloat(event.target.value);
+            if (Number.isFinite(parsed)) onOpacity(Math.min(100, Math.max(0, parsed)) / 100);
+            else event.target.value = String(Math.round(opacity * 100));
+          }}
+        />%
+      </span>
+      <button type="button" className="icon-button" aria-label={visible ? `Hide ${label}` : `Show ${label}`} title={visible ? 'Hide' : 'Show'} onClick={onToggle}><PanelIcon d={visible ? EYE : EYE_OFF} /></button>
+      <button type="button" className="icon-button" aria-label={`Remove ${label}`} title={`Remove ${label.toLowerCase()}`} onClick={onRemove}><PanelIcon d={MINUS} /></button>
+    </div>
+  );
+}
+
+function SectionHead({ title, onAdd, addLabel }: { title: string; onAdd?: () => void; addLabel?: string }) {
+  return (
+    <div className="figma-section-head">
+      <h4>{title}</h4>
+      {onAdd && <button type="button" className="icon-button" aria-label={addLabel} title={addLabel} onClick={onAdd}><PanelIcon d={PLUS} /></button>}
+    </div>
   );
 }
 
 function ObjectInspector({
   document,
+  manager,
   object,
   locked,
-  appearanceExpanded,
   onEnterEdit,
   onUpdate,
   onUpdateAppearance,
@@ -1308,9 +1372,10 @@ function ObjectInspector({
   onFlip,
 }: {
   document: VectorDocument;
+  manager: OperationManager;
   object: NetworkObject;
   locked: boolean;
-  appearanceExpanded: boolean;
+  appearanceExpanded?: boolean;
   onEnterEdit: () => void;
   onUpdate: (objectId: EntityId, updates: Partial<NetworkObject>) => void;
   onUpdateAppearance: (appearanceId: EntityId, updates: Partial<Appearance>) => void;
@@ -1322,14 +1387,12 @@ function ObjectInspector({
   const bounds = objectBounds(document, object.id, INTERACTION_BOUNDS_POLICY);
   const appearance = document.getAppearance(object.appearanceId);
   const stroke = appearance?.stroke;
-  const fill = appearance?.fills[0];
   const network = document.getNetwork(object.networkId);
   const supportsAlignedStroke = Boolean(network?.pathIds.some((pathId) => {
     const path = document.getPath(pathId);
     return path?.isClosed && !path.segmentIds.some((segmentId) => Boolean(document.getSegment(segmentId)?.widthProfile?.length));
   }));
   const constructionOnly = objectConstructionComposition(document, object.id) === 'construction-only';
-  // X and Y read from the frame's top-left corner, like every other design tool, not from the infinite page.
   const frameOrigin = (() => {
     const layer = document.getLayerForObject(object.id);
     const frame = layer ? document.getArtboard(layer.artboardId)?.frame : undefined;
@@ -1338,11 +1401,38 @@ function ObjectInspector({
   const updateTransform = (updates: Partial<NetworkObject['transform']>) => onUpdate(object.id, {
     transform: { ...object.transform, ...updates },
   });
+  const corners = inspectCorners(document, object.id);
+  const [perCorner, setPerCorner] = useState(false);
+  const [cornerNote, setCornerNote] = useState('');
+  const roundedAvg = corners.roundedRadii.length
+    ? corners.roundedRadii.reduce((sum, value) => sum + value, 0) / corners.roundedRadii.length
+    : 0;
+  const applyRadii = (radii: number[]) => {
+    try {
+      const result = applyCornerRadii(manager, object.id, radii);
+      setCornerNote(result.applied === 0
+        ? 'Radius is too big for these sides.'
+        : result.clamped > 0 ? 'Reduced to the biggest radius these sides allow.' : '');
+    } catch {
+      setCornerNote('Could not round these corners.');
+    }
+  };
+  const slotLabels: Record<string, string> = { 'top-left': 'Top left', 'top-right': 'Top right', 'bottom-right': 'Bottom right', 'bottom-left': 'Bottom left' };
+  const remembered = currentRadii(object.id);
+  const slotNames = ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const;
+  const slots = remembered && corners.roundedRadii.length > 0
+    ? remembered.map((_v, i) => ({ nodeId: `r${i}`, slot: slotNames[i] ?? i }))
+    : corners.sharp;
+  const canRound = corners.closed && (corners.sharp.length > 0 || (remembered !== undefined && corners.roundedRadii.length > 0));
+  const fills = appearance?.fills ?? [];
+  const setFills = (next: typeof fills) => appearance && onUpdateAppearance(appearance.id, { fills: next });
+  const patchFill = (index: number, patch: Partial<(typeof fills)[number]>) =>
+    setFills(fills.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+
   return (
-    <fieldset className="object-inspector-fieldset" disabled={locked} aria-label={locked ? 'Locked object properties' : 'Object properties'}>
+    <fieldset className="object-inspector-fieldset figma-inspector" disabled={locked} aria-label={locked ? 'Locked object properties' : 'Object properties'}>
       {locked && <div className="locked-object-notice">Locked in Layers · properties are read-only</div>}
       <div className="panel-section object-summary object-selection-summary">
-        <span className="object-glyph network-glyph" />
         <div>
           <input
             className="object-name-field"
@@ -1355,104 +1445,99 @@ function ObjectInspector({
               if (name && name !== object.name) onUpdate(object.id, { name });
             }}
           />
-          <span>Vector object · Enter or double-click</span>
         </div>
-        <button type="button" className="edit-network-button" onClick={onEnterEdit}>Edit path</button>
+        <button type="button" className="edit-network-button" onClick={onEnterEdit}>Edit points</button>
       </div>
-      <details className="panel-section inspector-section object-transform-inspector" open>
-        <summary><span>Position &amp; size</span></summary>
-        <div className="inspector-section-body object-transform-body">
+
+      <section className="panel-section figma-section object-transform-inspector">
+        <SectionHead title="Position and size" />
         <div className="numeric-field-grid">
           <NumericField label="X" value={bounds.minX - frameOrigin.x} onCommit={(value) => updateTransform({ x: object.transform.x + value + frameOrigin.x - bounds.minX })} />
           <NumericField label="Y" value={bounds.minY - frameOrigin.y} onCommit={(value) => updateTransform({ y: object.transform.y + value + frameOrigin.y - bounds.minY })} />
-          <NumericField
-            label="W"
-            value={bounds.width}
-            min={0.001}
-            onCommit={(value) => {
-              if (bounds.width > 1e-9) updateTransform({ scaleX: object.transform.scaleX * value / bounds.width });
-            }}
-          />
-          <NumericField
-            label="H"
-            value={bounds.height}
-            min={0.001}
-            onCommit={(value) => {
-              if (bounds.height > 1e-9) updateTransform({ scaleY: object.transform.scaleY * value / bounds.height });
-            }}
-          />
+          <NumericField label="W" value={bounds.width} min={0.001} onCommit={(value) => { if (bounds.width > 1e-9) updateTransform({ scaleX: object.transform.scaleX * value / bounds.width }); }} />
+          <NumericField label="H" value={bounds.height} min={0.001} onCommit={(value) => { if (bounds.height > 1e-9) updateTransform({ scaleY: object.transform.scaleY * value / bounds.height }); }} />
+          <NumericField label="∠" value={object.transform.rotation} onCommit={(value) => updateTransform({ rotation: value })} />
         </div>
-        <div className="transform-flip-actions" role="group" aria-label="Flip selection">
-          <button type="button" onClick={() => onFlip('horizontal')} title="Flip horizontal · Shift+H"><FlipHorizontalIcon />Flip horizontal<kbd>⇧H</kbd></button>
-          <button type="button" onClick={() => onFlip('vertical')} title="Flip vertical · Shift+V"><FlipVerticalIcon />Flip vertical<kbd>⇧V</kbd></button>
+        <div className="figma-icon-row" role="group" aria-label="Flip">
+          <button type="button" onClick={() => onFlip('horizontal')} title="Flip horizontal · Shift+H"><FlipHorizontalIcon />Flip horizontal</button>
+          <button type="button" onClick={() => onFlip('vertical')} title="Flip vertical · Shift+V"><FlipVerticalIcon />Flip vertical</button>
         </div>
-        <details className="transform-advanced">
-          <summary>Rotation &amp; scale</summary>
-          <div className="numeric-field-grid transform-secondary-grid">
-            <NumericField label="R°" value={object.transform.rotation} onCommit={(value) => updateTransform({ rotation: value })} />
-            <NumericField label="SX" value={object.transform.scaleX} onCommit={(value) => updateTransform({ scaleX: value })} />
-            <NumericField label="SY" value={object.transform.scaleY} onCommit={(value) => updateTransform({ scaleY: value })} />
+      </section>
+
+      {canRound && (
+        <section className="panel-section figma-section corner-radius-section">
+          <SectionHead title="Corner radius" />
+          <div className="radius-row">
+            {!perCorner ? (
+              <NumericField label="R" value={roundedAvg} min={0} onCommit={(value) => applyRadii(slots.map(() => value))} />
+            ) : (
+              <div className="numeric-field-grid radius-grid">
+                {slots.map((corner, index) => (
+                  <NumericField
+                    key={corner.nodeId}
+                    label={typeof corner.slot === 'string' ? slotLabels[corner.slot].replace(/^(\w)\w*\s(\w)\w*$/, (_m, a: string, b: string) => `${a}${b}`.toUpperCase()) : String(index + 1)}
+                    value={remembered?.[index] ?? 0}
+                    min={0}
+                    onCommit={(value) => applyRadii(slots.map((_c, i) => (i === index ? value : (remembered?.[i] ?? 0))))}
+                  />
+                ))}
+              </div>
+            )}
+            <button type="button" className={`icon-button${perCorner ? ' is-active' : ''}`} aria-pressed={perCorner} aria-label="Independent corners" title="Set each corner on its own" onClick={() => setPerCorner((value) => !value)}>
+              <PanelIcon d="M2.5 6V3.5H5M11 3.5h2.5V6M13.5 10v2.5H11M5 12.5H2.5V10" />
+            </button>
           </div>
-        </details>
-        </div>
-      </details>
+          {cornerNote && <p className="semantic-disabled-reason" role="note">{cornerNote}</p>}
+          {perCorner && <p className="panel-hint">Order: top left, top right, bottom right, bottom left.</p>}
+        </section>
+      )}
+
       {appearance && (
-        <details className="panel-section inspector-section object-appearance-inspector" open={appearanceExpanded || undefined}>
-          <summary><span>Appearance</span></summary>
-          <div className="inspector-section-body appearance-body">
+        <section className="panel-section figma-section object-appearance-inspector">
+          <SectionHead title="Fill" onAdd={constructionOnly ? undefined : () => setFills([...fills, { type: 'solid', color: fills.length ? '#c8ced9' : '#8b6cf6', opacity: 1, visible: true }])} addLabel="Add fill" />
           {constructionOnly ? (
             <p className="semantic-disabled-reason" role="note">Fill is unavailable because this object contains only construction geometry.</p>
-          ) : fill ? (
-            <div className="appearance-fill-control">
-              <label className="appearance-color-row">
-                <span>Fill</span>
-                <input
-                  type="color"
-                  value={fill.color}
-                  aria-label="Fill color"
-                  onChange={(event) => onUpdateAppearance(appearance.id, {
-                    fills: [{ ...fill, color: event.target.value }, ...appearance.fills.slice(1)],
-                  })}
-                />
-                <code>{fill.color.toUpperCase()}</code>
-              </label>
-              <span className="fill-actions">
-                <span><input
-                  type="checkbox"
-                  aria-label="Show fill"
-                  checked={fill.visible}
-                  onChange={(event) => onUpdateAppearance(appearance.id, {
-                    fills: [{ ...fill, visible: event.target.checked }, ...appearance.fills.slice(1)],
-                  })}
-                />On</span>
-                <button type="button" onClick={() => onUpdateAppearance(appearance.id, {
-                  fills: appearance.fills.slice(1),
-                })}>Remove</button>
-              </span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="add-fill-button"
-              onClick={() => onUpdateAppearance(appearance.id, {
-                fills: [{ type: 'solid', color: '#8b6cf6', opacity: 1, visible: true }],
-              })}
-            >Add fill</button>
-          )}
+          ) : fills.length === 0 ? (
+            <p className="panel-hint">No fill. Press + to add one.</p>
+          ) : fills.map((fill, index) => (
+            <PaintRow
+              key={index}
+              label="Fill"
+              color={fill.color}
+              opacity={fill.opacity ?? 1}
+              visible={fill.visible}
+              onColor={(color) => patchFill(index, { color })}
+              onOpacity={(opacity) => patchFill(index, { opacity })}
+              onToggle={() => patchFill(index, { visible: !fill.visible })}
+              onRemove={() => setFills(fills.filter((_item, i) => i !== index))}
+            />
+          ))}
+        </section>
+      )}
+
+      {appearance && (
+        <section className="panel-section figma-section appearance-stroke-section">
+          <SectionHead
+            title="Stroke"
+            addLabel="Add stroke"
+            onAdd={stroke?.visible ? undefined : () => onUpdateAppearance(appearance.id, {
+              stroke: stroke
+                ? { ...stroke, visible: true }
+                : { color: '#c8ced9', width: 1.25, cap: 'round', join: 'round', alignment: 'center', opacity: 1, dash: [], visible: true },
+            })}
+          />
           {stroke?.visible ? (
-            <div className="appearance-stroke-control">
-              <label className="appearance-color-row">
-                <span>Stroke</span>
-                <input
-                  type="color"
-                  value={stroke.color}
-                  aria-label="Stroke color"
-                  onChange={(event) => onUpdateAppearance(appearance.id, {
-                    stroke: { ...stroke, color: event.target.value },
-                  })}
-                />
-                <code>{stroke.color.toUpperCase()}</code>
-              </label>
+            <>
+              <PaintRow
+                label="Stroke"
+                color={stroke.color}
+                opacity={stroke.opacity ?? 1}
+                visible
+                onColor={(color) => onUpdateAppearance(appearance.id, { stroke: { ...stroke, color } })}
+                onOpacity={(opacity) => onUpdateAppearance(appearance.id, { stroke: { ...stroke, opacity } })}
+                onToggle={() => onUpdateAppearance(appearance.id, { stroke: { ...stroke, visible: false } })}
+                onRemove={() => onUpdateAppearance(appearance.id, { stroke: { ...stroke, visible: false } })}
+              />
               <div className="numeric-field-grid">
                 <NumericField
                   label="Width"
@@ -1464,38 +1549,30 @@ function ObjectInspector({
                   onEditEnd={onCommitContinuousEdit}
                   onEditCancel={onRollbackContinuousEdit}
                 />
-                <NumericField label="Opacity" value={appearance.opacity * 100} min={0} max={100} onCommit={(value) => onUpdateAppearance(appearance.id, { opacity: value / 100 })} />
               </div>
-              <details className="inline-disclosure stroke-details">
-                <summary><span>Cap &amp; join</span><output>{stroke.cap} · {stroke.join}</output></summary>
-                <div className="appearance-select-grid">
-                  <label><span>Cap</span><select value={stroke.cap} onChange={(event) => onUpdateAppearance(appearance.id, { stroke: { ...stroke, cap: event.target.value as typeof stroke.cap } })}><option value="butt">Butt</option><option value="round">Round</option><option value="square">Square</option></select></label>
-                  <label><span>Join</span><select value={stroke.join} onChange={(event) => onUpdateAppearance(appearance.id, { stroke: { ...stroke, join: event.target.value as typeof stroke.join } })}><option value="miter">Miter</option><option value="round">Round</option><option value="bevel">Bevel</option></select></label>
-                </div>
-              </details>
               <StrokeAlignmentControl
                 value={stroke.alignment}
                 alignedOptionsEnabled={supportsAlignedStroke}
                 onChange={(alignment) => onUpdateAppearance(appearance.id, { stroke: { ...stroke, alignment } })}
               />
-              <button type="button" className="remove-paint-button" onClick={() => onUpdateAppearance(appearance.id, { stroke: { ...stroke, visible: false } })}>Remove stroke</button>
-            </div>
+              <div className="appearance-select-grid">
+                <label><span>Cap</span><select value={stroke.cap} onChange={(event) => onUpdateAppearance(appearance.id, { stroke: { ...stroke, cap: event.target.value as typeof stroke.cap } })}><option value="butt">Butt</option><option value="round">Round</option><option value="square">Square</option></select></label>
+                <label><span>Join</span><select value={stroke.join} onChange={(event) => onUpdateAppearance(appearance.id, { stroke: { ...stroke, join: event.target.value as typeof stroke.join } })}><option value="miter">Miter</option><option value="round">Round</option><option value="bevel">Bevel</option></select></label>
+              </div>
+            </>
           ) : (
-            <button
-              type="button"
-              className="add-fill-button"
-              onClick={() => onUpdateAppearance(appearance.id, {
-                stroke: stroke
-                  ? { ...stroke, visible: true }
-                  : { color: '#c8ced9', width: 1.25, cap: 'round', join: 'round', alignment: 'center', opacity: 1, dash: [], visible: true },
-              })}
-            >Add stroke</button>
+            <p className="panel-hint">No stroke. Press + to add one.</p>
           )}
-          {!stroke?.visible && (
+        </section>
+      )}
+
+      {appearance && (
+        <section className="panel-section figma-section">
+          <SectionHead title="Layer" />
+          <div className="numeric-field-grid">
             <NumericField label="Opacity" value={appearance.opacity * 100} min={0} max={100} onCommit={(value) => onUpdateAppearance(appearance.id, { opacity: value / 100 })} />
-          )}
           </div>
-        </details>
+        </section>
       )}
     </fieldset>
   );
@@ -2411,10 +2488,10 @@ function MultiObjectInspector({
         <span className="section-label">ALIGN SELECTION</span>
         <div className="parametric-button-grid" role="group" aria-label="Align selected objects">
           <button type="button" onClick={() => onAlign(ids, 'left')}>Left</button>
-          <button type="button" onClick={() => onAlign(ids, 'center-x')}>Center H</button>
+          <button type="button" onClick={() => onAlign(ids, 'center-x')}>Centre H</button>
           <button type="button" onClick={() => onAlign(ids, 'right')}>Right</button>
           <button type="button" onClick={() => onAlign(ids, 'top')}>Top</button>
-          <button type="button" onClick={() => onAlign(ids, 'center-y')}>Center V</button>
+          <button type="button" onClick={() => onAlign(ids, 'center-y')}>Centre V</button>
           <button type="button" onClick={() => onAlign(ids, 'bottom')}>Bottom</button>
         </div>
         <div className="transform-flip-actions" role="group" aria-label="Flip selected objects">
@@ -2672,11 +2749,7 @@ function MixedNumericField({
 function EmptyInspector() {
   return (
     <div className="empty-inspector">
-      <div className="empty-visual" aria-hidden="true">
-        <span /><span /><span />
-      </div>
-      <h3>Nothing selected</h3>
-      <p>Select a layer or object to edit its properties.</p>
+      <p>Select a shape to edit its look, size and rules.</p>
     </div>
   );
 }
@@ -2706,23 +2779,22 @@ function KeylineMultiNodeInspector({
   const modes = nodes.map(nodeMode);
   const commonMode = modes.every((mode) => mode === modes[0]) ? modes[0] : undefined;
   return (
-    <div className="keyline-node-inspector">
-      <div className="multi-summary keyline-selection-compatibility"><h3>Multiple nodes</h3><p>{nodes.length} nodes</p></div>
-      <div className="keyline-field-block">
-        <span className="keyline-field-label">Position</span>
-        <div className="keyline-position-grid">
+    <div className="figma-inspector keyline-node-inspector">
+      <section className="panel-section figma-section">
+        <SectionHead title="Position" />
+        <div className="numeric-field-grid">
           <MixedCoordinateField axis="X" value={common('x')} onCommit={(value) => onMoveAxis('x', value)} />
           <MixedCoordinateField axis="Y" value={common('y')} onCommit={(value) => onMoveAxis('y', value)} />
         </div>
-      </div>
-      <div className="keyline-field-block">
-        <span className="keyline-field-label">Corner type</span>
-        <div className="keyline-corner-control" role="group" aria-label="Selected point corner type">
+      </section>
+      <section className="panel-section figma-section">
+        <SectionHead title="Corner type" />
+        <div className="segmented-control" role="group" aria-label="Selected point corner type">
           <ModeButton active={commonMode === 'corner'} label="Sharp" title="Sharp corners" onClick={() => onSetMode('corner')} />
           <ModeButton active={commonMode === 'smooth'} label="Smooth" title="Smooth handles" onClick={() => onSetMode('smooth')} />
           <ModeButton active={commonMode === 'symmetric'} label="Mirrored" title="Mirrored handles" onClick={() => onSetMode('symmetric')} />
         </div>
-      </div>
+      </section>
       {verticalSuggested && !dismissed && (
         <div className="keyline-suggestion">
           <div className="keyline-suggestion-heading">
@@ -2736,10 +2808,11 @@ function KeylineMultiNodeInspector({
           </div>
         </div>
       )}
-      <div className="keyline-locked-rules">
-        <span>Locked rules</span>
-        <output>{lockedRuleCount}</output>
-      </div>
+      {lockedRuleCount > 0 && (
+        <section className="panel-section figma-section">
+          <PropertyRow name="Locked rules" value={String(lockedRuleCount)} />
+        </section>
+      )}
     </div>
   );
 }
@@ -2787,45 +2860,36 @@ function NodeInspector({ node, onSetMode, onMove, onDelete }: {
   const hasHandles = Boolean(node.handleIn || node.handleOut);
   const mode = node.handleMode ?? (hasHandles ? 'symmetric' : 'corner');
   return (
-    <>
+    <div className="figma-inspector">
       <div className="panel-section object-summary node-selection-summary">
-        <span className="object-glyph node-glyph" />
-        <div><strong>Node</strong><span>{shortId(node.id)}</span></div>
-        <button type="button" className="direct-delete-point" title="Delete selected point (Delete)" onClick={onDelete}>Delete</button>
+        <div><strong>Point</strong></div>
+        <button type="button" className="direct-delete-point" title="Delete point · Delete" onClick={onDelete}>Delete</button>
       </div>
-      <div className="panel-section">
-        <span className="section-label">POSITION</span>
-        <div className="field-grid">
+      <section className="panel-section figma-section">
+        <SectionHead title="Position" />
+        <div className="numeric-field-grid">
           <CoordinateField axis="X" value={node.position.x} onCommit={(x) => onMove({ ...node.position, x })} />
           <CoordinateField axis="Y" value={node.position.y} onCommit={(y) => onMove({ ...node.position, y })} />
         </div>
-        <p className="field-help">Use +15, -8, *2, /4, or x/2+6 for precise adjustments.</p>
-      </div>
-      <div className="panel-section">
-        <span className="section-label">NODE MODE</span>
-        <div className="segmented-control" role="group" aria-label="Node handle mode">
-          <ModeButton active={mode === 'corner'} label="Corner" title="Independent corner handles" onClick={() => onSetMode('corner')} />
-          <ModeButton active={mode === 'smooth'} label="Smooth" title="Collinear handles with independent lengths" onClick={() => onSetMode('smooth')} />
-          <ModeButton active={mode === 'symmetric'} label="Symmetric" title="Collinear handles with equal lengths" onClick={() => onSetMode('symmetric')} />
+        <p className="panel-hint">Type maths too: +15, *2, /4.</p>
+      </section>
+      <section className="panel-section figma-section">
+        <SectionHead title="Corner type" />
+        <div className="segmented-control" role="group" aria-label="Point corner type">
+          <ModeButton active={mode === 'corner'} label="Sharp" title="Sharp corner, handles move on their own" onClick={() => onSetMode('corner')} />
+          <ModeButton active={mode === 'smooth'} label="Smooth" title="Handles stay in a straight line" onClick={() => onSetMode('smooth')} />
+          <ModeButton active={mode === 'symmetric'} label="Mirrored" title="Handles stay in a line and equal length" onClick={() => onSetMode('symmetric')} />
         </div>
-      </div>
-      <details className="panel-section inspector-section node-details">
-        <summary><span>Geometry details</span><output>{hasHandles ? 'Handles' : 'No handles'}</output></summary>
-        <div className="inspector-section-body node-details-body">
-          <div className="property-list">
-            <PropertyRow name="Bézier handles" value={hasHandles ? mode : 'None'} />
-            <PropertyRow name="Constraints" value={String(node.constraintIds.length)} />
-          </div>
-          {hasHandles && (
-            <div className="handle-details">
-              <span className="section-label">HANDLES</span>
-              {node.handleIn && <PointRow label="In" x={node.handleIn.x} y={node.handleIn.y} />}
-              {node.handleOut && <PointRow label="Out" x={node.handleOut.x} y={node.handleOut.y} />}
-            </div>
-          )}
-        </div>
-      </details>
-    </>
+      </section>
+      {(hasHandles || node.constraintIds.length > 0) && (
+        <section className="panel-section figma-section">
+          <SectionHead title="Handles" />
+          {node.handleIn && <PointRow label="In" x={node.handleIn.x} y={node.handleIn.y} />}
+          {node.handleOut && <PointRow label="Out" x={node.handleOut.x} y={node.handleOut.y} />}
+          {node.constraintIds.length > 0 && <PropertyRow name="Locked rules" value={String(node.constraintIds.length)} />}
+        </section>
+      )}
+    </div>
   );
 }
 
@@ -2835,35 +2899,27 @@ function SegmentInspector({ document, segmentId }: { document: VectorDocument; s
   const end = document.getNode(segment.endNodeId);
   const length = start && end ? Math.hypot(end.position.x - start.position.x, end.position.y - start.position.y) : 0;
   return (
-    <>
+    <div className="figma-inspector">
       <div className="panel-section object-summary">
-        <span className="object-glyph segment-glyph" />
-        <div><strong>Segment</strong><span>{shortId(segment.id)}</span></div>
+        <div><strong>{segment.role === 'construction' ? 'Guide line' : 'Side'}</strong></div>
       </div>
-      <div className="panel-section property-list segment-primary-details">
-        <PropertyRow name="Type" value={segment.type === 'bezier' ? 'Bézier' : segment.type === 'arc' ? 'Circular arc' : 'Line'} />
-        <PropertyRow name="Role" value={segment.role === 'construction' ? 'Construction' : 'Artwork'} />
-        {segment.role === 'construction' && <PropertyRow name="Extent" value={segment.constructionExtent === 'infinite' ? 'Infinite' : 'Finite'} />}
-        <PropertyRow name="Chord length" value={`${formatNumber(length)} px`} />
+      <section className="panel-section figma-section">
+        <SectionHead title="Details" />
+        <PropertyRow name="Shape" value={segment.type === 'bezier' ? 'Curve' : segment.type === 'arc' ? 'Arc' : 'Straight line'} />
+        <PropertyRow name="Length" value={`${formatNumber(length)} px`} />
         {segment.type === 'arc' && <PropertyRow name="Radius" value={`${formatNumber(segment.radius ?? 0)} px`} />}
-      </div>
-      <details className="panel-section inspector-section segment-technical-details">
-        <summary><span>Technical details</span><output>{segment.widthProfile?.length ?? 0} width points</output></summary>
-        <div className="inspector-section-body property-list">
-          <PropertyRow name="Start node" value={shortId(segment.startNodeId)} mono />
-          <PropertyRow name="End node" value={shortId(segment.endNodeId)} mono />
-        </div>
-      </details>
-    </>
+        {segment.role === 'construction' && <PropertyRow name="Extent" value={segment.constructionExtent === 'infinite' ? 'Endless' : 'Fixed length'} />}
+      </section>
+    </div>
   );
 }
 
 function MultiInspector({ nodeCount, segmentCount }: { nodeCount: number; segmentCount: number }) {
   return (
-    <div className="panel-section multi-summary">
-      <div className="multi-icon">{nodeCount + segmentCount}</div>
-      <h3>{nodeCount > 0 && segmentCount > 0 ? 'Mixed network selection' : nodeCount > 0 ? 'Multiple nodes' : 'Multiple segments'}</h3>
-      <p>{nodeCount > 0 && `${nodeCount} node${nodeCount === 1 ? '' : 's'}`}{nodeCount > 0 && segmentCount > 0 && ' · '}{segmentCount > 0 && `${segmentCount} segment${segmentCount === 1 ? '' : 's'}`}</p>
+    <div className="figma-inspector">
+      <div className="panel-section object-summary">
+        <div><strong>{nodeCount} point{nodeCount === 1 ? '' : 's'}{segmentCount > 0 ? ` · ${segmentCount} side${segmentCount === 1 ? '' : 's'}` : ''} selected</strong></div>
+      </div>
     </div>
   );
 }
@@ -2914,10 +2970,6 @@ function PointRow({ label, x, y }: { label: string; x: number; y: number }) {
 
 function PropertyRow({ name, value, mono = false }: { name: string; value: string; mono?: boolean }) {
   return <div className="property-row"><span>{name}</span><strong className={mono ? 'mono' : ''}>{value}</strong></div>;
-}
-
-function ShortcutRow({ keys, text }: { keys: string[]; text: string }) {
-  return <div className="shortcut-row"><span>{text}</span><span>{keys.map((key) => <kbd key={key}>{key}</kbd>)}</span></div>;
 }
 
 function ModeButton({

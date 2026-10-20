@@ -7,11 +7,12 @@
   gap: 16px;
   height: 52px;
   padding: 0 16px;
+  font: 13px/1.4 'Geist', system-ui, sans-serif;
   color: #ececee;
   background: #17181a;
   border-bottom: 1px solid #2e3036;
 }
-.topbar button { font: inherit; color: inherit; cursor: pointer; }
+.topbar button { font: inherit; font-size: inherit; color: inherit; cursor: pointer; }
 .topbar button:focus-visible, .topbar input:focus-visible { outline: 2px solid #0d99ff; outline-offset: 2px; }
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topbar-left { flex: 1 1 auto; }
@@ -50,7 +51,7 @@
 .topbar-command { display: inline-flex; align-items: center; gap: 8px; height: 32px; min-width: 190px; padding: 0 8px 0 10px; color: #8a8d95; background: #1f2023; border: 1px solid #2e3036; border-radius: 8px; }
 .topbar-command:hover { color: #c9cbd1; border-color: #3a3c42; }
 .topbar-command svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.topbar-command kbd { margin-left: auto; padding: 1px 6px; font: 11px 'Geist Mono', monospace; background: #26272b; border-radius: 4px; }
+.topbar-command kbd { margin-left: auto; padding: 1px 6px; font: 11px 'Geist', system-ui, sans-serif; background: #26272b; border-radius: 4px; }
 .topbar-people { display: flex; padding-left: 2px; }
 .topbar-people span { display: grid; place-items: center; width: 28px; height: 28px; margin-left: -6px; color: #fff; font-size: 11px; font-weight: 600; border: 2px solid #17181a; border-radius: 50%; }
 .topbar-people span:first-child { margin-left: 0; }

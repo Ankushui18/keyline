@@ -7,7 +7,7 @@
   font-display: swap;
 }
 @font-face {
-  font-family: 'Geist Mono';
+  font-family: 'Geist', system-ui, sans-serif;
   src: url('../assets/geist-mono.woff2') format('woff2');
   font-style: normal;
   font-weight: 400 700;
@@ -309,7 +309,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .canvas-flyout-tool-copy { min-width: 0; display: grid; gap: 2px; }
 .canvas-flyout-tool-copy strong { font-size: 13px; font-weight: 500; }
 .canvas-flyout-tool-copy small { color: #8a8d95; font-size: 11px; line-height: 1.3; }
-.canvas-flyout-tool kbd { color: #8a8d95; background: transparent; border: 0; font: 10px 'Geist Mono', monospace; }
+.canvas-flyout-tool kbd { color: #8a8d95; background: transparent; border: 0; font: 10px 'Geist', system-ui, sans-serif; }
 .canvas-tool-proxies { position: fixed; inset: 0; pointer-events: none; }
 .canvas-tool-rail .canvas-tool-proxy {
   position: fixed;
@@ -352,7 +352,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-size: 12px;
 }
 .canvas-hint .hint-dot { display: none; }
-.canvas-hint kbd { color: #c9cbd1; background: #2c2e33; border: 0; border-radius: 4px; font-family: 'Geist Mono', monospace; }
+.canvas-hint kbd { color: #c9cbd1; background: #2c2e33; border: 0; border-radius: 4px; font-family: 'Geist', system-ui, sans-serif; }
 
 .vector-edit-toolbar {
   z-index: 14;
@@ -395,7 +395,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   font-weight: 600;
 }
 .vector-edit-toolbar .vector-edit-toolbar-done:hover { background: #0b7bd6; }
-.vector-edit-toolbar-done kbd { margin-left: 3px; color: #fff; background: transparent; border: 0; font: 11px 'Geist Mono', monospace; }
+.vector-edit-toolbar-done kbd { margin-left: 3px; color: #fff; background: transparent; border: 0; font: 11px 'Geist', system-ui, sans-serif; }
 .vector-edit-toolbar-menu {
   background: #1f2023;
   border: 1px solid #2e3036;
@@ -465,7 +465,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: #17181a;
   border: 0;
   border-radius: 999px;
-  font: 12px 'Geist Mono', monospace;
+  font: 12px 'Geist', system-ui, sans-serif;
 }
 .empty-start-presets button:hover { color: #fff; background: #0b7bd6; }
 .empty-start-option.is-import { cursor: pointer; background: #1f2023; border: 1px dashed #4a4d55; }
@@ -476,7 +476,7 @@ button.empty-start-option:hover { background: #2c2e33; border-color: #4a4d55; }
 .empty-start-card > footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 20px; color: #8a8d95; font-size: 12px; }
 .empty-start-card > footer button { padding: 0; color: #8a8d95; background: transparent; border: 0; font-size: 12px; }
 .empty-start-card > footer button:hover { color: #ececee; }
-.empty-start-card kbd { padding: 2px 6px; color: #c9cbd1; background: #2c2e33; border: 0; border-radius: 4px; font-family: 'Geist Mono', monospace; }
+.empty-start-card kbd { padding: 2px 6px; color: #c9cbd1; background: #2c2e33; border: 0; border-radius: 4px; font-family: 'Geist', system-ui, sans-serif; }
 
 /* Inspector: one 300px graphite panel split into Layers and Design. */
 .right-sidebar {
@@ -611,7 +611,7 @@ button.empty-start-option:hover { background: #2c2e33; border-color: #4a4d55; }
   border-radius: 8px;
 }
 .properties-panel .numeric-field input,
-.properties-panel .frame-preset-field select { background: #17181a; border-color: #2e3036; font-family: 'Geist Mono', monospace; }
+.properties-panel .frame-preset-field select { background: #17181a; border-color: #2e3036; font-family: 'Geist', system-ui, sans-serif; }
 .properties-panel .segmented-control button[aria-pressed='true'], .properties-panel .segmented-control button.is-active {
   color: #ececee;
   background: #2c2e33;
@@ -644,7 +644,7 @@ button.empty-start-option:hover { background: #2c2e33; border-color: #4a4d55; }
 .export-preview, .export-preview textarea { background: #18191c; }
 .export-preview-heading { color: #a7a9b0; border-color: #2e3036; }
 .export-preview-heading code { color: #a7a9b0; }
-.export-preview textarea { color: #d4d5d9; font-family: 'Geist Mono', monospace; }
+.export-preview textarea { color: #d4d5d9; font-family: 'Geist', system-ui, sans-serif; }
 .svg-preview { background: #fff; border-color: #2e3036; }
 .delivery-section { border-color: #2e3036; }
 .delivery-artboard-row, .constraint-actions button, .export-preset-grid button, .export-variable-list article {

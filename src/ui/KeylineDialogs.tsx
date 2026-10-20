@@ -1,20 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { isPixelGridVisible, setPixelGridVisible, subscribePixelGrid } from '../canvas/view-settings';
 import type { ConsistencyReport } from '../core/consistency';
 import type { DrawingStyle } from '../core/types';
 import { renderImportPreview } from '../import/import-preview';
 import { applyTidy, type TidyAnalysis, type TidyRuleId } from '../import/tidy';
 import type { SvgImportResult } from '../import/svg-import';
-import {
-  MOTION_EASINGS,
-  MOTION_PRESETS,
-  buildAnimatedSvg,
-  clampMotionSettings,
-  countAnimatedShapes,
-  motionCss,
-  motionTotalMs,
-  motionTracks,
-  type MotionSettings,
-} from '../export/motion-export';
 import { MODIFIER_LABEL } from './Toolbar';
 
 interface CommonDialogProps { onClose: () => void }
@@ -71,35 +61,29 @@ export function ShareDialog({
     : status === 'offline' ? 'Offline. Changes sync when you reconnect.'
       : status === 'error' ? 'Could not reach the sharing server. Your work is still saved on this device.'
         : 'Connecting…';
+  const sharing = Boolean(roomId);
+  const initials = (name: string) => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase();
   return (
     <Backdrop onClose={onClose}>
       <section className="kd-dialog kd-share" role="dialog" aria-modal="true" aria-labelledby="share-title">
         <header><h2 id="share-title">Share “{documentName}”</h2><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
-        {!roomId ? (
-          <>
-            <p className="kd-lead">Make a live link. Anyone who opens it edits this drawing with you, and you see each other’s cursors.</p>
-            <ul className="kd-bullets">
-              <li>The drawing stays on this device until someone opens the link.</li>
-              <li>Anyone with the link can edit. Stop sharing at any time.</li>
-            </ul>
-            <footer><button type="button" onClick={onClose}>Not now</button><button type="button" className="is-primary" onClick={() => { onCreateLink(); setCopied(true); }}>Create link and copy</button></footer>
-          </>
-        ) : (
-          <>
-            <div className={`kd-status is-${status ?? 'connecting'}`} role="status"><i />{statusText}</div>
-            <div className="kd-copy">
-              <code>{link}</code>
-              <button type="button" onClick={() => { onCopyLink(); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? 'Copied' : 'Copy link'}</button>
-            </div>
-            <div className="kd-people" aria-label="People in this drawing">
-              {people.map((person) => (
-                <div key={person.id}><span className="kd-avatar" style={{ background: person.color }}>{person.name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span><span><strong>{person.name}</strong><small>{person.detail}</small></span></div>
-              ))}
-              {people.length <= 1 && <p className="kd-muted">No one else has joined yet. Send the link to start drawing together.</p>}
-            </div>
-            <footer><button type="button" className="is-danger" onClick={onStopSharing}>Stop sharing</button><button type="button" className="is-primary" onClick={onClose}>Done</button></footer>
-          </>
-        )}
+        <div className="kd-people" aria-label="People in this drawing">
+          <div><span className="kd-avatar" style={{ background: '#0b7bd6' }}>YO</span><span><strong>You</strong><small>This device</small></span><em>Owner</em></div>
+          {people.filter((person) => !/\(you\)$/i.test(person.name)).map((person) => (
+            <div key={person.id}><span className="kd-avatar" style={{ background: person.color }}>{initials(person.name)}</span><span><strong>{person.name}</strong><small className="is-good">{person.detail}</small></span><em>Can edit</em></div>
+          ))}
+          {sharing && people.filter((person) => !/\(you\)$/i.test(person.name)).length === 0 && <p className="kd-muted">No one else has joined yet. Send the link to start drawing together.</p>}
+        </div>
+        <div className="kd-linkrow">
+          <span><strong>Anyone with the link</strong><small>{sharing ? 'Can edit this drawing with you. Turn off to stop.' : 'Off. The drawing stays on this device.'}</small></span>
+          <Toggle label="Share a live link" value={sharing} onChange={(value) => { if (value) { onCreateLink(); setCopied(true); } else onStopSharing(); }} />
+        </div>
+        {sharing && <div className={`kd-status is-${status ?? 'connecting'}`} role="status"><i />{statusText}</div>}
+        <div className="kd-copy">
+          <code>{sharing ? link : 'Turn on the link to get an address to share'}</code>
+          <button type="button" disabled={!sharing} onClick={() => { onCopyLink(); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>{copied ? 'Copied' : 'Copy link'}</button>
+        </div>
+        <footer><button type="button" className="is-primary" onClick={onClose}>Done</button></footer>
       </section>
     </Backdrop>
   );
@@ -107,7 +91,7 @@ export function ShareDialog({
 
 /* --------------------------------------------------------------- Settings */
 
-export type SettingsSection = 'Drawing' | 'Performance' | 'Shortcuts';
+export type SettingsSection = 'General' | 'Canvas and grid' | 'Performance' | 'Shortcuts' | 'AI and connections';
 export const SHORTCUT_GROUPS: Array<{ title: string; items: Array<[string, string]> }> = [
   { title: 'Tools', items: [['Select', 'V'], ['Pen', 'P'], ['Pencil', 'N'], ['Brush', 'J'], ['Rectangle', 'R'], ['Rounded rectangle', '⇧ R'], ['Ellipse', 'U'], ['Polygon', 'G'], ['Star', 'S'], ['Line', '\\'], ['Arc', 'A']] },
   { title: 'Edit shape', items: [['Bend', 'D'], ['Cut', 'X or C'], ['Round corner', 'F'], ['Offset', 'O'], ['Stroke width', 'W'], ['Eraser', 'E'], ['Lasso', 'Q or L'], ['Shape builder', 'B'], ['Fill areas', '⇧ B']] },
@@ -121,7 +105,7 @@ export function SettingsDialog({
   onReduceMotionChange,
   drawingStyle,
   onDrawingStyleChange,
-  initialSection = 'Drawing',
+  initialSection = 'General',
   onClose,
 }: CommonDialogProps & {
   rendererMode: 'canvas2d' | 'webgl';
@@ -135,7 +119,9 @@ export function SettingsDialog({
   const [section, setSection] = useState<SettingsSection>(initialSection);
   const [widthText, setWidthText] = useState(String(drawingStyle.strokeWidth));
   useDialogEscape(onClose);
-  const sections: SettingsSection[] = ['Drawing', 'Performance', 'Shortcuts'];
+  const sections: SettingsSection[] = ['General', 'Canvas and grid', 'Performance', 'Shortcuts', 'AI and connections'];
+  const gridOn = useSyncExternalStore(subscribePixelGrid, isPixelGridVisible);
+  const subtitle: Record<SettingsSection, string> = { General: 'How new shapes look when you draw them.', 'Canvas and grid': 'What you see around your drawing.', Performance: 'Most people never need to change these.', Shortcuts: 'Every tool is one key away.', 'AI and connections': 'What Keyline connects to, and what it does not.' };
   return (
     <Backdrop onClose={onClose}>
       <section className="kd-dialog kd-settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -144,8 +130,8 @@ export function SettingsDialog({
           {sections.map((item) => <button type="button" key={item} aria-current={section === item} className={section === item ? 'is-active' : ''} onClick={() => setSection(item)}>{item}</button>)}
         </nav>
         <div className="kd-settings-content">
-          <header><div><h2>{section}</h2><p>{section === 'Drawing' ? 'How new shapes look when you draw them.' : section === 'Performance' ? 'Most people never need to change these.' : 'Every tool is one key away.'}</p></div><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
-          {section === 'Drawing' && (
+          <header><div><h2>{section}</h2><p>{subtitle[section]}</p></div><button type="button" aria-label="Close" onClick={onClose}>×</button></header>
+          {section === 'General' && (
             <>
               <Row title="Line width" description="New shapes start with this width, in pixels.">
                 <input className="kd-number" type="number" min="0.25" max="64" step="0.25" aria-label="Default line width" value={widthText}
@@ -162,14 +148,36 @@ export function SettingsDialog({
               </Row>
             </>
           )}
+          {section === 'Canvas and grid' && (
+            <Row title="Pixel grid" description="Shows how icons land on the pixel grid when you zoom in.">
+              <Toggle label="Pixel grid" value={gridOn} onChange={setPixelGridVisible} />
+            </Row>
+          )}
+          {section === 'AI and connections' && (
+            <>
+              <Row title="Ask for an edit" description="Reads short phrases like “thinner” or “round ends”. Runs on this device. No AI model is used.">
+                <span className="kd-tag">On this device</span>
+              </Row>
+              <Row title="AI model" description="No AI model is connected. Nothing you draw is sent anywhere.">
+                <span className="kd-tag">Not connected</span>
+              </Row>
+              <Row title="Connect your own assistant" description="A way to let a tool you already use draw with you, with your approval for each change.">
+                <span className="kd-tag">Planned</span>
+              </Row>
+            </>
+          )}
           {section === 'Performance' && (
             <>
-              <Row title="Drawing engine" description="Accelerated uses your graphics card. Try it on large drawings.">
-                <Segmented value={rendererMode} options={[['canvas2d', 'Standard'], ['webgl', 'Accelerated']]} onChange={(value) => onRendererModeChange(value as 'canvas2d' | 'webgl')} label="Drawing engine" />
+              <Row title="Drawing engine" description="GPU uses your graphics card. Try it on large drawings.">
+                <Segmented value={rendererMode} options={[['canvas2d', 'Standard'], ['webgl', 'GPU']]} onChange={(value) => onRendererModeChange(value as 'canvas2d' | 'webgl')} label="Drawing engine" />
               </Row>
               <Row title="Reduce motion in the editor" description="Turns off panel and menu animation.">
                 <Toggle label="Reduce motion in the editor" value={reduceMotion} onChange={onReduceMotionChange} />
               </Row>
+              <div className="kd-sc-head"><span className="kd-label">Keyboard shortcuts</span><button type="button" onClick={() => setSection('Shortcuts')}>See all</button></div>
+              <div className="kd-sc-grid">
+                {[['Select', 'V'], ['Pen', 'P'], ['Edit shape', 'Enter'], ['Shapes', 'R · U'], ['Ask for an edit', `${MODIFIER_LABEL} K`], ['Motion', 'M']].map(([label, key]) => <div className="kd-shortcut" key={label}><span>{label}</span><kbd>{key}</kbd></div>)}
+              </div>
             </>
           )}
           {section === 'Shortcuts' && (
@@ -251,119 +259,6 @@ export function ImportTidyDialog({
 }
 
 /* ----------------------------------------------------------------- Motion */
-
-export function MotionDialog({
-  objectName,
-  svg,
-  settings,
-  onSettingsChange,
-  onDownload,
-  onCopyCss,
-  onClose,
-}: CommonDialogProps & {
-  objectName: string;
-  /** Static SVG of the active artboard, or undefined when there is nothing to animate. */
-  svg: string | undefined;
-  settings: MotionSettings;
-  onSettingsChange: (settings: MotionSettings) => void;
-  onDownload: () => void;
-  onCopyCss: (css: string) => void;
-  onClose: () => void;
-}) {
-  const [previewSize, setPreviewSize] = useState<16 | 24 | 320>(320);
-  const [playKey, setPlayKey] = useState(0);
-  const [exporting, setExporting] = useState(false);
-  const clean = clampMotionSettings(settings);
-  const shapeCount = svg ? countAnimatedShapes(svg) : 0;
-  const animated = useMemo(() => svg ? buildAnimatedSvg(svg, clean) : undefined, [svg, clean.preset, clean.durationMs, clean.delayMs, clean.staggerMs, clean.easing, clean.loop]);
-  const tracks = motionTracks(shapeCount, clean);
-  const total = motionTotalMs(shapeCount, clean);
-  useDialogEscape(exporting ? () => setExporting(false) : onClose);
-  const update = (updates: Partial<MotionSettings>) => { onSettingsChange({ ...settings, ...updates }); setPlayKey((key) => key + 1); };
-
-  if (exporting) {
-    return (
-      <Backdrop onClose={() => setExporting(false)}>
-        <section className="kd-dialog kd-motion-export" role="dialog" aria-modal="true" aria-labelledby="motion-export-title">
-          <header><div><h2 id="motion-export-title">Export motion</h2><span>{objectName} · {(total / 1000).toFixed(1)}s{clean.loop ? ' · loops' : ''}</span></div><button type="button" aria-label="Close" onClick={() => setExporting(false)}>×</button></header>
-          <div className="kd-formats">
-            <button type="button" className="is-active" onClick={() => { onDownload(); setExporting(false); }}><span><strong>Animated SVG</strong><small>One file that plays anywhere an image does</small></span><b>Download</b></button>
-            <button type="button" onClick={() => { onCopyCss(motionCss(clean)); setExporting(false); }}><span><strong>CSS animation</strong><small>Keyframes to paste into your own styles</small></span><b>Copy</b></button>
-            <button type="button" disabled><span><strong>React component</strong><small>Props for play, pause and speed</small></span><b>Later</b></button>
-            <button type="button" disabled><span><strong>Lottie JSON</strong><small>For apps that already play Lottie</small></span><b>Later</b></button>
-            <button type="button" disabled><span><strong>GIF or video</strong><small>For slides and social posts</small></span><b>Later</b></button>
-          </div>
-          <p className="kd-note">Visitors who turn on “reduce motion” see the finished drawing instead of the animation. This is built in.</p>
-          <footer><button type="button" onClick={() => setExporting(false)}>Back</button></footer>
-        </section>
-      </Backdrop>
-    );
-  }
-
-  return (
-    <Backdrop wide>
-      <section className="kd-dialog kd-motion" role="dialog" aria-modal="true" aria-labelledby="motion-title">
-        <header>
-          <div><strong id="motion-title">{objectName}</strong><span>Motion</span></div>
-          <div className="kd-header-actions">
-            <button type="button" className="is-primary" disabled={!animated || animated === svg} onClick={() => setExporting(true)}>Export motion</button>
-            <button type="button" aria-label="Close motion" onClick={onClose}>×</button>
-          </div>
-        </header>
-        <div className="kd-motion-body">
-          <aside aria-label="Presets">
-            <span className="kd-label">Start with a preset</span>
-            {MOTION_PRESETS.map((preset) => (
-              <button type="button" key={preset.id} aria-pressed={settings.preset === preset.id} className={`kd-preset${settings.preset === preset.id ? ' is-active' : ''}`} onClick={() => update({ preset: preset.id })}>
-                <strong>{preset.name}</strong><small>{preset.description}</small>
-              </button>
-            ))}
-            <p className="kd-muted">Motion is added when you export. Your drawing is not changed.</p>
-          </aside>
-          <div className="kd-motion-stage">
-            {animated && animated !== svg ? (
-              <img key={`${playKey}-${previewSize}`} alt={`${objectName} animated with ${MOTION_PRESETS.find((p) => p.id === settings.preset)?.name}`} src={svgUrl(animated)} width={previewSize} height={previewSize} />
-            ) : (
-              <p className="kd-muted">Draw something on an icon frame, then animate it here.</p>
-            )}
-            <footer>
-              {([16, 24, 320] as const).map((size) => <button type="button" key={size} aria-pressed={previewSize === size} className={previewSize === size ? 'is-active' : ''} onClick={() => setPreviewSize(size)}>{size === 320 ? 'Large' : `${size} px`}</button>)}
-              <button type="button" onClick={() => setPlayKey((key) => key + 1)}>↻ Replay</button>
-            </footer>
-          </div>
-          <aside aria-label="Timing">
-            <span className="kd-label">Timing</span>
-            <NumberRow label="Duration" unit="ms" value={settings.durationMs} min={100} max={10000} step={50} onChange={(value) => update({ durationMs: value })} />
-            <NumberRow label="Delay" unit="ms" value={settings.delayMs} min={0} max={5000} step={50} onChange={(value) => update({ delayMs: value })} />
-            <NumberRow label="Between shapes" unit="ms" value={settings.staggerMs} min={0} max={1000} step={10} onChange={(value) => update({ staggerMs: value })} />
-            <div className="kd-row"><span><strong>Feel</strong></span>
-              <select aria-label="Feel" value={settings.easing} onChange={(event) => update({ easing: event.target.value as MotionSettings['easing'] })}>{MOTION_EASINGS.map((easing) => <option key={easing.id} value={easing.id}>{easing.name}</option>)}</select>
-            </div>
-            <div className="kd-row"><span><strong>Loop</strong></span><Toggle label="Loop" value={settings.loop} onChange={(value) => update({ loop: value })} /></div>
-          </aside>
-        </div>
-        <section className="kd-timeline" aria-label="Timeline">
-          <div className="kd-timeline-ruler" aria-hidden="true">{[0, 0.25, 0.5, 0.75, 1].map((part) => <span key={part}>{((total * part) / 1000).toFixed(2).replace(/\.?0+$/, '') || '0'}s</span>)}</div>
-          {tracks.length === 0 && <p className="kd-muted">No shapes to animate yet.</p>}
-          {tracks.map((track) => (
-            <div className="kd-track" key={track.label}>
-              <strong>{track.label}</strong>
-              <div><span style={{ left: `${(track.startMs / total) * 100}%`, width: `${((track.endMs - track.startMs) / total) * 100}%` }} /></div>
-            </div>
-          ))}
-        </section>
-      </section>
-    </Backdrop>
-  );
-}
-
-function NumberRow({ label, unit, value, min, max, step, onChange }: { label: string; unit: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
-  return (
-    <label className="kd-row"><span><strong>{label}</strong></span>
-      <span className="kd-number-wrap"><input className="kd-number" type="number" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} /><em>{unit}</em></span>
-    </label>
-  );
-}
 
 /* ----------------------------------------------------------------- Check */
 

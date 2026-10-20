@@ -1,3 +1,4 @@
+import { isPixelGridVisible } from './view-settings';
 import type { CollaboratorPresence } from '../collaboration/session';
 import {
   CONSTRUCTION_VISUAL_STYLE,
@@ -449,7 +450,7 @@ function drawNetworkNodes(
     context.fillStyle = '#1F2023';
     context.fill();
     context.fillStyle = '#FFFFFF';
-    context.font = `600 ${11 / scale}px ui-monospace, SFMono-Regular, monospace`;
+    context.font = `600 ${11 / scale}px Geist, system-ui, sans-serif`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillText('V', badgeX + 9.5 / scale, badgeY + 9.8 / scale);
@@ -564,7 +565,7 @@ function drawArtboardPixelGrid(
 ): void {
   // The document-pixel grid belongs to the production frame, not to the
   // pasteboard around it. This matches the supplied Phase 1 editor reference.
-  if (scale < 4) return;
+  if (scale < 4 || !isPixelGridVisible()) return;
   context.save();
   context.beginPath();
   context.rect(frame.x, frame.y, frame.width, frame.height);
@@ -625,7 +626,7 @@ function drawArtboards(
       context.setLineDash([]);
     }
     context.fillStyle = selected ? COLORS.selected : active ? '#4a4d55' : '#747a84';
-    context.font = `600 ${11 / scale}px ui-sans-serif, system-ui, sans-serif`;
+    context.font = `600 ${11 / scale}px Geist, system-ui, sans-serif`;
     context.textAlign = 'left';
     context.textBaseline = 'bottom';
     const clipLabel = artboard.clipContent ? ' · Clip' : '';
@@ -715,7 +716,7 @@ function drawRemotePresence(
       context.closePath();
       context.fillStyle = color;
       context.fill();
-      context.font = `600 ${10 / scale}px ui-sans-serif, system-ui, sans-serif`;
+      context.font = `600 ${10 / scale}px Geist, system-ui, sans-serif`;
       const label = collaborator.user.name;
       const width = context.measureText(label).width + 10 / scale;
       context.fillRect(cursor.x + 9 / scale, cursor.y + 9 / scale, width, 18 / scale);
@@ -1309,7 +1310,7 @@ function drawConstraintIndicators(
   context.strokeStyle = alpha(cyan, 0.82);
   context.fillStyle = alpha(cyan, 0.92);
   context.lineWidth = lineWidth;
-  context.font = `600 ${fontSize}px ui-monospace, SFMono-Regular, monospace`;
+  context.font = `600 ${fontSize}px Geist, system-ui, sans-serif`;
   context.textAlign = 'center';
   context.textBaseline = 'middle';
 
@@ -1432,7 +1433,7 @@ function drawConstraintIndicators(
       context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
     }
     context.lineWidth = 1 / indicatorScale;
-    context.font = `600 ${9 / indicatorScale}px ui-monospace, SFMono-Regular, monospace`;
+    context.font = `600 ${9 / indicatorScale}px Geist, system-ui, sans-serif`;
     drawIndicator(constraint, indicatorScale);
     context.restore();
   }

@@ -156,7 +156,7 @@ button { color: inherit; }
 .object-summary { display: flex; align-items: center; gap: 11px; }
 .object-summary div { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .object-summary strong { font-size: 12px; }
-.object-summary div span { color: var(--muted); font: 9px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em; }
+.object-summary div span { color: var(--muted); font: 9px/1.3 'Geist', system-ui, sans-serif; letter-spacing: .05em; }
 .object-glyph { flex: 0 0 auto; width: 28px; height: 28px; display: block; position: relative; background: #202b43; border: 1px solid #334b7d; border-radius: 7px; }
 .node-glyph::before { content: ""; position: absolute; width: 7px; height: 7px; left: 9px; top: 9px; border-radius: 50%; background: #9cb8ff; box-shadow: 0 0 0 3px rgba(91,140,255,.16); }
 .segment-glyph::before { content: ""; position: absolute; width: 17px; height: 1px; left: 5px; top: 13px; background: #9cb8ff; transform: rotate(-28deg); }
@@ -164,7 +164,7 @@ button { color: inherit; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
 .coordinate-field { height: 32px; display: flex; align-items: center; overflow: hidden; background: #12151a; border: 1px solid #2d323c; border-radius: 6px; }
 .coordinate-field > span { align-self: stretch; display: grid; place-items: center; width: 27px; color: #778295; background: #1c2027; border-right: 1px solid #2d323c; font-size: 9px; font-weight: 750; }
-.coordinate-field output, .coordinate-field input { min-width: 0; flex: 1; padding: 0 7px; color: #d7dce5; overflow: hidden; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; }
+.coordinate-field output, .coordinate-field input { min-width: 0; flex: 1; padding: 0 7px; color: #d7dce5; overflow: hidden; font: 10px 'Geist', system-ui, sans-serif; text-align: right; }
 .coordinate-field input { align-self: stretch; width: 100%; background: transparent; border: 0; outline: 0; }
 .coordinate-field:focus-within { border-color: #6e7681; }
 .field-help { margin: 7px 0 0; color: #778295; font-size: 10px; line-height: 1.4; }
@@ -172,7 +172,7 @@ button { color: inherit; }
 .property-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; }
 .property-row > span { color: #858f9f; }
 .property-row strong { color: #ccd2dd; font-weight: 560; }
-.property-row strong.mono { color: #99a4b7; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .03em; }
+.property-row strong.mono { color: #99a4b7; font: 9px 'Geist', system-ui, sans-serif; letter-spacing: .03em; }
 .handle-details .section-label { margin-bottom: 10px; }
 .point-row { display: flex; justify-content: space-between; color: #818b9c; font-size: 10px; margin-top: 7px; }
 .point-row code { color: #aeb8c8; font-size: 9px; }
@@ -253,7 +253,7 @@ button { color: inherit; }
 .constraint-actions button { min-width: 0; height: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #a1adba; background: #1d2229; border: 1px solid #303842; border-radius: 7px; cursor: pointer; }
 .constraint-actions button:hover:not(:disabled) { color: #d9f7fa; background: #23333a; border-color: #3c6970; transform: translateY(-1px); }
 .constraint-actions button:disabled { opacity: .32; cursor: not-allowed; }
-.constraint-actions button > span { color: #67cad4; font: 16px/1 ui-monospace, monospace; }
+.constraint-actions button > span { color: #67cad4; font: 16px/1 'Geist', system-ui, sans-serif; }
 .constraint-actions button strong { overflow: hidden; font-size: 8px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .constraint-parameters { min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 7px 11px; background: #15191e; border-top: 1px solid #2a3139; }
 .constraint-parameters label { height: 27px; display: flex; align-items: center; gap: 5px; padding-left: 7px; color: #7e8998; background: #1e232a; border: 1px solid #303842; border-radius: 5px; font-size: 8px; }
@@ -265,13 +265,13 @@ button { color: inherit; }
 .constraint-section-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 4px 9px; }
 .constraint-section-heading b { min-width: 18px; height: 18px; display: grid; place-items: center; color: #7dcdd5; background: #1d3439; border-radius: 999px; font-size: 8px; }
 .no-constraints { margin: 6px 4px; color: #626d7d; font-size: 9px; line-height: 1.45; }
-.no-constraints kbd { padding: 1px 4px; color: #a9b8ce; background: #202732; border: 1px solid #354153; border-radius: 3px; font: 8px ui-monospace, monospace; }
+.no-constraints kbd { padding: 1px 4px; color: #a9b8ce; background: #202732; border: 1px solid #354153; border-radius: 3px; font: 8px 'Geist', system-ui, sans-serif; }
 .constraint-suggestions { margin: 6px 0 7px; padding: 7px; background: #151b23; border: 1px solid #2b3645; border-radius: 6px; }
 .constraint-suggestions > span { display: block; margin-bottom: 5px; color: #718096; font-size: 8px; }
 .constraint-suggestions > div { display: flex; flex-wrap: wrap; gap: 4px; }
 .constraint-suggestions button { height: 25px; display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; color: #aab8cb; background: #202936; border: 1px solid #35455b; border-radius: 4px; cursor: pointer; font-size: 8px; }
 .constraint-suggestions button:hover { color: #e4f0ff; border-color: #5375aa; background: #26364d; }
-.constraint-suggestions button i { color: #68a0ff; font: normal 11px ui-monospace, monospace; }
+.constraint-suggestions button i { color: #68a0ff; font: normal 11px 'Geist', system-ui, sans-serif; }
 .bulk-constraint-parameter { min-height: 42px; display: flex; align-items: center; gap: 8px; margin: 6px 0; padding: 6px 7px; background: linear-gradient(135deg, #17202c, #161b22); border: 1px solid #34445a; border-radius: 6px; }
 .bulk-constraint-parameter > span { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .bulk-constraint-parameter strong { color: #b8c8dd; font-size: 8px; }
@@ -282,7 +282,7 @@ button { color: inherit; }
 .constraint-card.priority-medium { border-left-color: #d4aa58; }
 .constraint-card.priority-soft { border-left-color: #777f8e; }
 .constraint-card-heading { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 6px 0 8px; }
-.constraint-card-heading > span { width: 20px; color: #65ccd6; text-align: center; font: 14px ui-monospace, monospace; }
+.constraint-card-heading > span { width: 20px; color: #65ccd6; text-align: center; font: 14px 'Geist', system-ui, sans-serif; }
 .constraint-card-heading > div { min-width: 0; flex: 1; display: flex; flex-direction: column; }
 .constraint-card-heading strong { color: #cbd3dd; font-size: 9px; }
 .constraint-card-heading code { color: #616c7c; font-size: 7px; }
@@ -299,7 +299,7 @@ button { color: inherit; }
 .constraint-context-menu > span { display: block; padding: 6px 8px 7px; color: #697485; border-bottom: 1px solid #2c333c; font-size: 8px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .constraint-context-menu button { width: 100%; height: 29px; display: flex; align-items: center; gap: 8px; color: #aeb7c5; background: transparent; border: 0; border-radius: 5px; cursor: pointer; text-align: left; font-size: 9px; }
 .constraint-context-menu button:hover { color: #e1f8fa; background: #24343a; }
-.constraint-context-menu button i { width: 22px; color: #62c9d3; font: 12px ui-monospace, monospace; text-align: center; }
+.constraint-context-menu button i { width: 22px; color: #62c9d3; font: 12px 'Geist', system-ui, sans-serif; text-align: center; }
 .constraint-context-menu p { margin: 9px 8px; color: #707b8b; font-size: 9px; line-height: 1.4; }
 
 .diagnostics-panel { grid-row: 3; position: relative; z-index: 8; max-height: 178px; display: grid; grid-template-columns: 210px minmax(0,1fr); background: #21191c; border-top: 1px solid #573238; box-shadow: 0 -8px 24px rgba(0,0,0,.18); }

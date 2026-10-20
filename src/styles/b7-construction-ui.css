@@ -70,7 +70,7 @@
   color: var(--fgColor-muted);
   display: inline-flex;
   flex: 0 0 auto;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-family: 'Geist', system-ui, sans-serif;
   font-size: 8px;
   font-weight: 700;
   height: 14px;

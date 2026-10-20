@@ -331,7 +331,7 @@
 .drawing-style-inspector > summary output {
   margin-left: auto;
   color: #a8a8a8;
-  font: 560 9px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 560 9px 'Geist', system-ui, sans-serif;
 }
 .drawing-style-body > .numeric-field { width: 100%; }
 .drawing-fill-row {

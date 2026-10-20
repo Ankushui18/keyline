@@ -51,6 +51,7 @@ import { ConstraintDiagnostics } from './ui/ConstraintDiagnostics';
 import { StatusBar } from './ui/StatusBar';
 import { Toolbar } from './ui/Toolbar';
 import { drawnObjectCount, drawnObjectsForArtboard, realArtboards } from './core/real-content';
+import { SetView } from './ui/SetView';
 import { Dashboard, type StartAction } from './ui/Dashboard';
 import type { AppearanceUpdates, QuickEditPlan, QuickEditTarget } from './core/quick-edit';
 import { CommandBar, type CommandItem } from './ui/CommandBar';
@@ -85,9 +86,9 @@ const ImportTidyDialog = lazy(async () => {
   const module = await import('./ui/KeylineDialogs');
   return { default: module.ImportTidyDialog };
 });
-const MotionDialog = lazy(async () => {
-  const module = await import('./ui/KeylineDialogs');
-  return { default: module.MotionDialog };
+const MotionWorkspace = lazy(async () => {
+  const module = await import('./ui/MotionWorkspace');
+  return { default: module.MotionWorkspace };
 });
 const ConsistencyDialog = lazy(async () => {
   const module = await import('./ui/KeylineDialogs');
@@ -243,7 +244,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [motionOpen, setMotionOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'Drawing' | 'Performance' | 'Shortcuts'>('Drawing');
+  const [settingsSection, setSettingsSection] = useState<import('./ui/KeylineDialogs').SettingsSection>('General');
   const [reduceMotion, setReduceMotion] = useState(() => window.localStorage.getItem('keyline-reduce-motion') === 'true');
   const [motionSettings, setMotionSettings] = useState<MotionSettings>(() => {
     try { return clampMotionSettings({ ...DEFAULT_MOTION_SETTINGS, ...JSON.parse(window.localStorage.getItem('keyline-motion') ?? '{}') }); } catch { return DEFAULT_MOTION_SETTINGS; }
@@ -266,7 +267,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     window.localStorage.getItem('vector-studio-sidebar-collapsed') === 'true');
   const [solverStatus, setSolverStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [diagnostics, setDiagnostics] = useState<ConstraintConflict[]>([]);
-  const [notice, setNotice] = useState<{ message: string; tone: 'info' | 'error' } | null>(null);
+  const [notice, setNotice] = useState<{ message: string; tone: 'info' | 'error'; action?: { label: string; run: () => void } } | null>(null);
   const [constraintMenu, setConstraintMenu] = useState<{ x: number; y: number } | null>(null);
   const [roomId, setRoomId] = useState(() => new URLSearchParams(window.location.search).get('room'));
   const [collaborationStatus, setCollaborationStatus] = useState<CollaborationStatus | null>(null);
@@ -286,8 +287,8 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   }>({ regionIds: [], resultPathIds: [] });
 
   const persistence = useMemo(() => new DocumentPersistence(manager, setSaveStatus, () => documentNameRef.current), [manager]);
-  const announce = useCallback((message: string, tone: 'info' | 'error' = 'info') => {
-    setNotice({ message, tone });
+  const announce = useCallback((message: string, tone: 'info' | 'error' = 'info', action?: { label: string; run: () => void }) => {
+    setNotice({ message, tone, action });
   }, []);
   const updateDrawingStyle = useCallback((updates: Partial<DrawingStyle>) => {
     setDrawingStyle((current) => {
@@ -907,13 +908,14 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       manager.commitTransaction();
       setSelection(emptySelection('object'));
       setSelectedLayerIds(new Set());
+      announce(`Deleted ${objectIds.length} ${objectIds.length === 1 ? 'shape' : 'shapes'}`, 'info', { label: 'Undo', run: () => { manager.undo(); } });
       return true;
     } catch (error) {
       manager.rollbackTransaction();
       console.warn('Object deletion failed.', error);
       return false;
     }
-  }, [document, manager, selection]);
+  }, [announce, document, manager, selection]);
 
   const copySelection = useCallback((intent: 'copy' | 'cut') => {
     const objectIds = [...selection.objectIds].filter((objectId) =>
@@ -1386,6 +1388,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           ? emptySelection('object')
           : (current) => ({ ...current, nodeIds: new Set(), segmentIds: new Set(plan.replacementSegmentId ? [plan.replacementSegmentId] : []) }));
         if (plan.deleteObjectId) setSelectedLayerIds(new Set());
+        announce(plan.deleteObjectId ? 'Deleted the path' : 'Deleted 1 point', 'info', { label: 'Undo', run: () => { manager.undo(); } });
       } catch (error) {
         manager.rollbackTransaction();
         announce(`Delete point rejected: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
@@ -1726,16 +1729,23 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     }
   }, [announce, manager, updateObjectAppearances]);
 
+  /* Icon set view */
+  const [setViewOpen, setSetViewOpen] = useState(false);
+  const openSet = useCallback(() => {
+    if (drawnObjectCount(document) === 0) { announce('Draw something first, then see it as a set.', 'error'); return; }
+    setSetViewOpen(true);
+  }, [announce, document]);
+
   /* Check */
   const openCheck = useCallback(() => {
-    if (document.objects.size === 0) { announce('Draw something first, then check it.', 'error'); return; }
+    if (drawnObjectCount(document) === 0) { announce('Draw something first, then check it.', 'error'); return; }
     setConsistencyReport(analyzeConsistency(document));
   }, [announce, document]);
   const fixConsistency = useCallback(() => {
     const report = analyzeConsistency(document);
     if (!report.target || report.fixObjectIds.length === 0) return;
     updateObjectAppearances(report.fixObjectIds, { strokeWidth: report.target.strokeWidth, strokeCap: report.target.cap, strokeJoin: report.target.join });
-    setConsistencyReport(analyzeConsistency(document));
+    setConsistencyReport((current) => (current ? analyzeConsistency(document) : current));
     announce(`Fixed ${report.fixObjectIds.length} ${report.fixObjectIds.length === 1 ? 'shape' : 'shapes'} in one undo step.`);
   }, [announce, document, updateObjectAppearances]);
   const showConsistencyOffenders = useCallback((objectIds: EntityId[]) => {
@@ -1796,17 +1806,18 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       { id: 'frame-48', label: 'New icon frame 48 × 48', group: 'Frames', keywords: 'artboard add', run: () => addIconFrame(48, 48) },
       { id: 'export', label: 'Export SVG or code', group: 'Actions', keywords: 'download save react css', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: () => setExportOpen(true) },
       { id: 'motion', label: 'Animate (Motion)', group: 'Actions', shortcut: 'M', keywords: 'animation draw on pulse', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: openMotion },
+      { id: 'set', label: 'See the whole icon set', group: 'Actions', keywords: 'grid library overview all icons', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: openSet },
       { id: 'check', label: 'Check icons are consistent', group: 'Actions', shortcut: `${MODIFIER_LABEL} ⇧ C`, keywords: 'consistency line width audit', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: openCheck },
       { id: 'share', label: 'Share a live link', group: 'Actions', keywords: 'collaborate invite', run: () => setShareOpen(true) },
       { id: 'constraints', label: 'Constraints', group: 'Actions', shortcut: 'K', keywords: 'rules lock parallel equal', run: () => setConstraintsOpen((open) => !open) },
       { id: 'families', label: 'Icon families', group: 'Actions', keywords: 'components variants collection', run: () => setFamilyCollectionOpen(true) },
-      { id: 'settings', label: 'Settings', group: 'Actions', keywords: 'preferences renderer shortcuts', run: () => { setSettingsSection('Drawing'); setSettingsOpen(true); } },
+      { id: 'settings', label: 'Settings', group: 'Actions', keywords: 'preferences renderer shortcuts', run: () => { setSettingsSection('General'); setSettingsOpen(true); } },
       { id: 'shortcuts', label: 'Keyboard shortcuts', group: 'Actions', keywords: 'keys help', run: () => { setSettingsSection('Shortcuts'); setSettingsOpen(true); } },
       { id: 'undo', label: 'Undo', group: 'Actions', shortcut: `${MODIFIER_LABEL} Z`, disabledReason: manager.canUndo ? undefined : 'Nothing to undo', run: () => manager.undo() },
       { id: 'redo', label: 'Redo', group: 'Actions', shortcut: `${MODIFIER_LABEL} ⇧ Z`, disabledReason: manager.canRedo ? undefined : 'Nothing to redo', run: () => manager.redo() },
       { id: 'home', label: 'All files', group: 'Actions', keywords: 'dashboard home projects', run: () => void goHome() },
     ];
-  }, [addIconFrame, changeTool, goHome, isEmptyDocument, manager, openCheck, openMotion, revision, toolDisabledReasons]);
+  }, [addIconFrame, changeTool, goHome, isEmptyDocument, manager, openCheck, openMotion, openSet, revision, toolDisabledReasons]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1972,10 +1983,11 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
         collaborators={collaborators}
         onHome={() => void goHome()}
         onShare={() => setShareOpen(true)}
-        onOpenSettings={() => { setSettingsSection('Drawing'); setSettingsOpen(true); }}
+        onOpenSettings={() => { setSettingsSection('General'); setSettingsOpen(true); }}
         onOpenCommand={() => setCommandOpen(true)}
         onOpenMotion={openMotion}
         onOpenCheck={openCheck}
+        onOpenSet={openSet}
         onAddIconFrame={addIconFrame}
         onToggleConstraints={() => setConstraintsOpen((open) => !open)}
         onExport={() => setExportOpen(true)}
@@ -2061,8 +2073,8 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       )}
       {motionOpen && (
         <Suspense fallback={<div className="modal-backdrop"><div className="dialog-loading" role="status">Preparing motion…</div></div>}>
-          <MotionDialog
-            objectName={documentName}
+          <MotionWorkspace
+            fileName={documentName}
             svg={motionSvg}
             settings={motionSettings}
             onSettingsChange={updateMotionSettings}
@@ -2071,6 +2083,24 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
             onClose={() => setMotionOpen(false)}
           />
         </Suspense>
+      )}
+      {setViewOpen && (
+        <SetView
+          document={document}
+          revision={revision}
+          fileName={documentName}
+          styleSummary={`Line ${drawingStyle.strokeWidth} px · ${drawingStyle.strokeCap === 'round' ? 'Round' : drawingStyle.strokeCap === 'square' ? 'Square' : 'Flat'} ends · ${drawingStyle.strokeJoin === 'round' ? 'Round' : drawingStyle.strokeJoin === 'bevel' ? 'Bevel' : 'Sharp'} corners`}
+          onOpenIcon={(artboardId) => {
+            const artboard = document.getArtboard(artboardId);
+            if (artboard) manager.execute({ type: 'SET_ACTIVE_LOCATION', payload: { pageId: artboard.pageId, artboardId } });
+            setSetViewOpen(false);
+          }}
+          onFix={fixConsistency}
+          onShowObjects={(ids) => { setSetViewOpen(false); showConsistencyOffenders(ids); }}
+          onExport={() => setExportOpen(true)}
+          onShare={() => setShareOpen(true)}
+          onBack={() => setSetViewOpen(false)}
+        />
       )}
       {consistencyReport && (
         <Suspense fallback={<div className="modal-backdrop"><div className="dialog-loading" role="status">Checking icons…</div></div>}>
@@ -2259,9 +2289,16 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
             onDeleteArtboard={deleteActiveArtboard}
             onSelectLayers={(layerIds) => {
               setSelectedLayerIds(new Set(layerIds));
-              const objectIds = [...layerIds]
-                .map((layerId) => document.getLayer(layerId)?.objectId)
-                .filter((id): id is EntityId => id !== undefined && document.isObjectVisible(id));
+              // Picking a group or layer selects every shape inside it.
+              const collect = (layerId: EntityId, out: EntityId[]) => {
+                const layer = document.getLayer(layerId);
+                if (!layer) return;
+                if (layer.objectId) out.push(layer.objectId);
+                layer.childIds.forEach((childId) => collect(childId, out));
+              };
+              const collected: EntityId[] = [];
+              [...layerIds].forEach((layerId) => collect(layerId, collected));
+              const objectIds = [...new Set(collected)].filter((id) => document.isObjectVisible(id));
               setSelection({
                 mode: 'object',
                 objectIds: new Set(objectIds),
@@ -2353,6 +2390,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       {notice && (
         <div className={`workspace-notice is-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
           <span>{notice.message}</span>
+          {notice.action && <button type="button" className="workspace-notice-action" onClick={() => { notice.action?.run(); setNotice(null); }}>{notice.action.label}</button>}
           <button type="button" aria-label="Dismiss notification" onClick={() => setNotice(null)}>×</button>
         </div>
       )}
@@ -2372,6 +2410,16 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
         solverStatus={solverStatus}
         zoom={showEmptyStart ? 1 : zoom}
         saveStatus={saveStatus}
+        shared={Boolean(roomId)}
+        onDownloadCopy={() => {
+          const url = URL.createObjectURL(new Blob([JSON.stringify(document.toSnapshot())], { type: 'application/json' }));
+          const anchor = window.document.createElement('a');
+          anchor.href = url;
+          anchor.download = `${documentNameRef.current.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'keyline'}.keyline.json`;
+          anchor.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 0);
+          announce('A copy was downloaded to this device.');
+        }}
         selectionLabel={selection.mode === 'network'
           ? `${selection.nodeIds.size + selection.segmentIds.size || 'No'} point${selection.nodeIds.size + selection.segmentIds.size === 1 ? '' : 's'} selected${selection.editingObjectId ? ` on ${document.getObject(selection.editingObjectId)?.name ?? 'vector'}` : ''}`
           : selection.objectIds.size > 0

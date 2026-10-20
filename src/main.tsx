@@ -16,12 +16,18 @@ import './styles/release-slice2.css';
 import './styles/family-rules.css';
 import './styles/phase1-redesign.css';
 import './styles/keyline-reference-final.css';
+import './styles/keyline-dialogs.css';
 import './styles/topbar.css';
 import './styles/dialogs.css';
 import './styles/dashboard.css';
+import './styles/phase1-match.css';
+import './styles/phase1-parity.css';
+import './styles/layers.css';
+import './styles/motion.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
   </React.StrictMode>,
 );
+void document.fonts?.load('600 11px Geist');

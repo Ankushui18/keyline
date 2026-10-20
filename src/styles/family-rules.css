@@ -710,7 +710,7 @@
 .family-row-findings {
   min-width: 18px;
   color: #bdc0c8;
-  font: 680 8.5px/1 ui-monospace, SFMono-Regular, monospace;
+  font: 680 8.5px/1 'Geist', system-ui, sans-serif;
   text-align: center;
 }
 .family-collection-detail {
