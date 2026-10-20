@@ -47,7 +47,7 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 | Enter/insert a point on a segment | Verified | `tools/pen-tool.ts`, `ADD_NODE`/`SPLIT_SEGMENT` operations |
 | Escape leaves the current context without losing committed edits | Verified | `exitNetworkEditMode`, one transaction per gesture |
 | Double-click **enters a group**, `Escape` leaves | **Verified — added in this pass** | `core/group-context.ts` (`selectionTargetForObject`, `resolveObjectPress`, `exitGroupContext`); 10 contract tests in `src/core/group-context.test.ts` |
-| Hover preview of the object under the pointer | **Missing** | no hover state in `VectorCanvas.tsx` |
+| Hover preview of the object under the pointer | **Verified — added in this pass** | `core/target-resolution.ts` (`resolvePointerTarget`), drawn by `drawHoverTarget` in `canvas/renderer.ts`; 10 contract tests in `src/core/target-resolution.test.ts` |
 | Command palette | **Missing** | `src/ui/` has a `CommandBar` for AI text, not a searchable command palette |
 | Keyboard-only operation of the canvas | **Partial** | canvas is focusable (`tabIndex` at `VectorCanvas.tsx:2363`), arrows nudge, but selection itself needs a pointer or the Layers panel |
 
@@ -145,7 +145,7 @@ Ordered by dependency and by what a designer would feel first — not by how int
 | # | Gap | Why it blocks | Size |
 |---|---|---|---|
 | 1 | ~~Group entry on the canvas~~ (done in this pass) | — | — |
-| 2 | Hover affordance (object/segment preview before clicking) | Users cannot predict what a click will select | S |
+| 2 | ~~Hover affordance (object/segment preview before clicking)~~ (done in this pass) | — | — |
 | 3 | Text objects (entity, editing, SVG round trip) | Excludes branding and typography entirely — the largest single missing capability | L |
 | 4 | Gradient fills | Same: branding work is not possible with solids alone | M |
 | 5 | Command palette over existing operations | Makes 67 operations discoverable without a wider toolbar | M |
@@ -172,10 +172,13 @@ These are the non-negotiables from the plan, and they already hold at this commi
 Adopt the plan's P1 milestone as stated: **direct selection and path editing**, delivered as three
 increments, each shippable on its own.
 
-1. *Selection truth* — done: paint order, `Ctrl/⌘`-click cycling, hover previews still open.
+1. *Selection truth* — done: paint order, `Ctrl/⌘`-click cycling, and hover previews that resolve
+   through the same pipeline as the click (measured at a 1.4–1.6 ms median per pointer move on a
+   2000-object document, so it fits a 16 ms frame).
 2. *Group navigation* — done: a click selects the outermost group, each double-click descends one
    level, `Escape` steps out. Known limit: deleting a group selection leaves the empty group layer.
-   Next in this area: group outlines on canvas and `Cmd/⌘`-click to select the parent group.
+   Also done: hover outlines for groups and shapes, and `Alt`-click to select the parent group
+   (`Alt`-drag still duplicates; the two are separated by movement).
 3. *Path editing polish* — insertion preview before commit, per-anchor corner/smooth state visible in
    the canvas, arc-specific handles.
 

@@ -34,7 +34,10 @@ import {
   objectsUnderPoint,
   selectionForHit,
 } from '../tools/select-tool';
-import { exitGroupContext, resolveObjectPress, selectionForTarget } from '../core/group-context';
+import { exitGroupContext, selectionForTarget } from '../core/group-context';
+import {
+  parentGroupTarget, resolveObjectPress, resolvePointerTarget, type PointerTarget,
+} from '../core/target-resolution';
 import { buildShapeBuilderResult, regionAtPoint } from '../tools/shape-builder';
 import { prepareCutPaths, prepareSplitAtPoint, prepareSplitSegment } from '../tools/cut-tool';
 import { addWidthPoint, hitTestWidthHandle, updateWidthPoint, type WidthHandle } from '../tools/width-tool';
@@ -92,6 +95,8 @@ interface VectorCanvasProps {
   activeTool: ToolId;
   constructionExtent: ConstructionExtent;
   toolDisabledReasons?: Partial<Record<ToolId, string>>;
+  /** True while a modal owns the screen; the pointer preview must not survive it. */
+  interactionBlocked?: boolean;
   selection: SelectionState;
   selectedArtboardIds: Set<EntityId>;
   impactObjectIds?: ReadonlySet<EntityId>;
@@ -134,7 +139,7 @@ const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000
 type Gesture =
   | { kind: 'pan'; pointerId: number; lastScreen: Point }
   | { kind: 'move'; pointerId: number; startScreen: Point; lastWorld: Point; nodeIds: EntityId[]; moving: boolean }
-  | { kind: 'move-object'; pointerId: number; startScreen: Point; lastWorld: Point; objectIds: EntityId[]; moving: boolean; duplicateOnDrag: boolean }
+  | { kind: 'move-object'; pointerId: number; startScreen: Point; lastWorld: Point; objectIds: EntityId[]; moving: boolean; duplicateOnDrag: boolean; leafObjectId: EntityId }
   | {
       kind: 'move-artboard'; pointerId: number; startScreen: Point; startWorld: Point; artboardIds: EntityId[];
       frames: Array<{ artboardId: EntityId; frame: { x: number; y: number; width: number; height: number } }>;
@@ -188,6 +193,7 @@ export function VectorCanvas({
   onArtboardSelectionChange,
   onShapeBuilderStateChange,
   onRequestToolChange,
+  interactionBlocked,
   onOpenConstraintMenu,
   onViewportChange,
   viewportFocusRequest,
@@ -213,6 +219,8 @@ export function VectorCanvas({
   const hoveredNodeRef = useRef<EntityId | undefined>();
   const hoveredSegmentRef = useRef<EntityId | undefined>();
   const hoveredHandleRef = useRef<HandleHit | undefined>();
+  /** Body preview for the pointer, produced by the same resolver the press uses. */
+  const hoveredTargetRef = useRef<PointerTarget | undefined>();
   const spacePressedRef = useRef(false);
   const altPressedRef = useRef(false);
   const initializedViewportRef = useRef(false);
@@ -311,6 +319,9 @@ export function VectorCanvas({
       hoveredNodeId: hoveredNodeRef.current,
       hoveredSegmentId: hoveredSegmentRef.current,
       hoveredHandle: hoveredHandleRef.current,
+      hoveredTarget: hoveredTargetRef.current && toolRef.current === 'select'
+        ? { bounds: hoveredTargetRef.current.bounds, group: hoveredTargetRef.current.group }
+        : undefined,
       widthToolActive: toolRef.current === 'width',
       remotePresence,
       overlayOnly: webglRendered,
@@ -349,6 +360,7 @@ export function VectorCanvas({
     hoveredNodeRef.current = undefined;
     hoveredSegmentRef.current = undefined;
     hoveredHandleRef.current = undefined;
+    hoveredTargetRef.current = undefined;
     pencilPreviewRef.current = undefined;
     bendPreviewRef.current = undefined;
     cutPreviewRef.current = undefined;
@@ -533,6 +545,13 @@ export function VectorCanvas({
       window.removeEventListener('blur', onBlur);
     };
   }, [manager, onArtboardSelectionChange, onRequestToolChange, onSelectionChange, onShapeBuilderStateChange, requestRender, zoomStep]);
+
+  useEffect(() => {
+    // A preview belongs to the tool that produced it, and no preview may sit on top of
+    // a modal that has taken the pointer away.
+    clearHover();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, interactionBlocked]);
 
   const clearPreviews = () => {
     penPreviewRef.current = undefined;
@@ -1261,6 +1280,7 @@ export function VectorCanvas({
             objectIds: [...nextSelection.objectIds],
             moving: false,
             duplicateOnDrag: event.altKey || altPressedRef.current,
+            leafObjectId: objectHit.id,
           };
           canvas.setPointerCapture(event.pointerId);
         }
@@ -1335,6 +1355,24 @@ export function VectorCanvas({
       }
     }
     event.preventDefault();
+  };
+
+  const clearHover = () => {
+    hoveredTargetRef.current = undefined;
+    hoveredNodeRef.current = undefined;
+    hoveredSegmentRef.current = undefined;
+    hoveredHandleRef.current = undefined;
+    hoveredRegionRef.current = undefined;
+    requestRender();
+  };
+
+  const handlePointerLeave = () => {
+    onPresenceCursor(undefined);
+    // A stale preview would keep outlining something the pointer has left behind, but a
+    // live gesture owns its visuals until it ends.
+    if (gestureRef.current) return;
+    eraserPreviewRef.current = undefined;
+    clearHover();
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -1838,6 +1876,21 @@ export function VectorCanvas({
       return;
     }
 
+    if (gesture.kind === 'move-object' && !gesture.moving && event.altKey) {
+      // Alt-click without a drag steps out one group level. Alt-drag keeps duplicating:
+      // the two gestures are separated by movement, not by a second modifier.
+      const parent = parentGroupTarget(
+        manager.document,
+        gesture.leafObjectId,
+        selectionRef.current.groupContext,
+      );
+      gestureRef.current = null;
+      if (parent) {
+        onSelectionChange(selectionForTarget(selectionRef.current, parent, false, parent.context));
+        requestRender();
+        return;
+      }
+    }
     if (gesture.kind === 'move-object') {
       if (!gesture.moving && screenDistance(screen, gesture.startScreen) >= 2) {
         manager.beginTransaction(
@@ -2221,6 +2274,14 @@ export function VectorCanvas({
   const updateHover = (world: Point, constrainPen = false) => {
     const localWorld = editingLocalPoint(world);
     const canvas = canvasRef.current;
+    if (toolRef.current === 'select' && !gestureRef.current) {
+      hoveredTargetRef.current = resolvePointerTarget(manager.document, {
+        point: world,
+        localPoint: localWorld,
+        tolerance: 7 / viewportRef.current.scale,
+        selection: selectionRef.current,
+      });
+    }
     if (canvas && toolRef.current === 'select' && selectionRef.current.mode === 'object') {
       const objectHandle = selectedArtboardIdsRef.current.size === 0
         ? hitTestObjectFrameHandle(manager.document, selectionRef.current.objectIds, world, viewportRef.current.scale)
@@ -2286,6 +2347,7 @@ export function VectorCanvas({
     hoveredNodeRef.current = undefined;
     hoveredSegmentRef.current = undefined;
     hoveredHandleRef.current = undefined;
+    hoveredTargetRef.current = undefined;
     eraserPreviewRef.current = toolRef.current === 'eraser'
       ? { point: localWorld, radius: Math.max(0.5, eraserSettings.weight / 2), shape: eraserSettings.shape }
       : undefined;
@@ -2379,19 +2441,9 @@ export function VectorCanvas({
         onPointerDown={handlePointerDown}
         onDoubleClick={handleDoubleClick}
         onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
-        onPointerLeave={() => {
-          onPresenceCursor(undefined);
-          if (!gestureRef.current) {
-            hoveredRegionRef.current = undefined;
-            hoveredNodeRef.current = undefined;
-            hoveredSegmentRef.current = undefined;
-            hoveredHandleRef.current = undefined;
-            eraserPreviewRef.current = undefined;
-            requestRender();
-          }
-        }}
       />
       {artboardRename && (
         <input

@@ -5,8 +5,9 @@ import type { EntityId, LayerNode } from '../core/types';
 import { preparePrimitiveObject } from '../tools/primitive-tool';
 import {
   exitGroupContext, groupChainForObject, groupToEnterOnDoubleClick, isObjectWithinGroup,
-  resolveObjectPress, selectionForTarget, selectionTargetForObject,
+  selectionForTarget, selectionTargetForObject,
 } from './group-context';
+import { resolveObjectPress } from './target-resolution';
 import { hitTestObject } from '../tools/select-tool';
 import { prepareNudgeObjects } from './object-operations';
 import { objectBounds } from './object-geometry';

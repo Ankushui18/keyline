@@ -7,12 +7,32 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- **Hover previews.** Pointing at the canvas now outlines what a click will select: a dashed
+  outline for a group and a solid hairline for a shape, drawn as a light preview that never reads
+  as the persistent selection. Hover and press resolve through one pipeline
+  (`src/core/target-resolution.ts`), so the preview obeys paint order, the group you have entered,
+  and the document's visible/locked state; anchors, segments and Bézier handles preview only while
+  their path is being edited. Hover never writes to the document or the selection, and the preview
+  clears when the pointer leaves the canvas, a dialog opens, the tool changes, or a drag begins.
+- **`Alt`-click selects the parent group.** One click steps out one level, including from inside a
+  nested group, and leaves the selection at that level. `Alt`-drag still duplicates — the two
+  gestures are separated by movement, not by another modifier. Precedence is documented in
+  `docs/EDITING-AUDIT.md` §3.5: path affordances, then `Alt`-click, then `Ctrl/⌘`-click cycling,
+  then `Shift`-click, then a plain click.
 - **Group entry and exit.** A click on grouped artwork selects the outermost group (every shape
   inside it, so the existing move/resize/rotate/delete paths apply unchanged). Double-click descends
   one nested level, a banner names the group you are inside, and `Escape` or **Exit group** steps back
   out one level with the group still selected. Clicking artwork outside the group leaves it. Unlike
   isolation, entering a group hides nothing. The contract lives in `src/core/group-context.ts` and is
   pinned by `src/core/group-context.test.ts`.
+
+### Changed
+
+- Hover resolution was measured, not assumed: 60 resolutions on a 2000-object document take a
+  1.4–1.6 ms median in Node (`src/core/target-resolution.test.ts`), down from 56 ms. The gain came
+  from scoping hit tests to the candidate object, memoising bounds in `src/core/bounds-cache.ts`,
+  and caching object→layer lookups against a document revision counter that every mutator bumps.
+  This is the resolution step only; a browser frame-time benchmark is still outstanding.
 
 ### Fixed
 

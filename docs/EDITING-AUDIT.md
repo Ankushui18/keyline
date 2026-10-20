@@ -73,7 +73,9 @@ or where it would have to be added.
 |---|---|---|---|
 | Click selects a shape | yes, topmost under cursor | `select-tool.ts:87` | works |
 | Marquee select | yes, additive with `Shift` | `VectorCanvas.tsx:1147` | works |
-| Drag to move | yes, `Alt`-drag duplicates | `VectorCanvas.tsx:1704` | works |
+| Drag to move | yes, `Alt`-drag duplicates | `VectorCanvas.tsx` `handlePointerDown` → `move-object` | works |
+| Hover previews the target a click will select | yes — one resolver (`resolvePointerTarget`) feeds hover and press; groups preview dashed, shapes solid, path points only while that path is being edited | `core/target-resolution.ts`, `drawHoverTarget` in `canvas/renderer.ts` | **shipped in this pass** |
+| `Alt`-click selects the parent group | yes — steps out one level, including from inside a nested group, and leaves the selection at that level; `Alt`-drag still duplicates, separated by movement | `parentGroupTarget` in `core/target-resolution.ts`, `VectorCanvas.tsx` `handlePointerUp` | **shipped in this pass** |
 | Arrow-key nudge, objects | yes, 1 px / `Shift` 10 px, one undo step | `App.tsx:1843`, `core/object-operations.ts:253` | **added in this pass** |
 | Arrow-key nudge, points | yes | `App.tsx:1871` | works |
 | Drag a corner to **resize** an object | yes — eight square handles on a frame drawn on the object's own axes, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
@@ -197,7 +199,51 @@ frame has nothing to align against, while two or more such shapes align to their
 combined bounds. That distinction is expressed once, in `canAlignObjects`, rather
 than re-derived in each inspector branch.
 
-### 3.5 Typography and gradients are absent, not weak
+### 3.5 Hover previews resolve through the selection pipeline
+
+Hover is not a second hit tester. `src/core/target-resolution.ts` answers one
+question — *what will a click do here?* — and both the pointer preview and the press
+read that answer:
+
+- `resolveObjectTarget` turns a leaf object into the thing a click selects, honouring
+  the current `groupContext`: at the page root a child previews its **group**, and
+  inside an entered group the same child previews itself.
+- `resolvePointerTarget` is the whole pipeline. In point editing it answers anchor,
+  segment or Bézier handle first, because those are the finest targets; in object
+  mode it answers object bodies only, so the outline never promises a smaller target
+  than the click will take.
+- `parentGroupTarget` is the `Alt`-click gesture. It steps out one level, never
+  re-selects the group the selection is already in, and answers `undefined` at the
+  root where there is no level to leave.
+
+Hover state is render-only: `updateHover` writes refs, `drawHoverTarget` draws them,
+and nothing in that path touches the document or the selection (asserted in
+`src/core/target-resolution.test.ts`). Groups preview as a dashed outline, shapes as a
+solid hairline, so a preview never reads as the persistent selection. The preview is
+cleared when the pointer leaves the canvas, when a modal takes over
+(`interactionBlocked`), when the active tool changes, and while a gesture is running.
+
+**Measured, not asserted.** `target-resolution.test.ts` builds a 2000-object document
+and times 60 hover resolutions after 5 warm-ups: **median 1.4–1.6 ms**, against a
+16 ms frame. Earlier in this work the same query cost 56 ms and, before scoped hit
+testing, 127 ms at 200 objects — the fix was to stop walking the whole scene per move
+(`hitTest`/`hitTestObject` scoped to the candidate object) and to memoise bounds
+(`core/bounds-cache.ts`) and object→layer lookups against the document's revision
+counter, which every mutator bumps. These are Node timings for the resolution step
+alone, not browser frame times; the browser benchmark is still outstanding, and no
+claim beyond this measurement is made.
+
+Modifier precedence, settled before wiring:
+
+1. **Path affordances win** — anchors, segments and handles beat every body-level
+   gesture while a path is in point editing.
+2. **`Alt`-click** selects the parent group. It only fires when the pointer did not
+   move, which is how `Alt`-drag keeps duplicating.
+3. **`Ctrl/⌘`-click** cycles down the stack under the pointer (z-order).
+4. **`Shift`-click** adds to or removes from the selection.
+5. **A plain click** selects what the preview shows.
+
+### 3.6 Typography and gradients are absent, not weak
 
 There is no text entity and no gradient fill type. These are feature projects, not
 interaction fixes, and they should be sequenced after the interaction layer —
@@ -228,7 +274,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
 | 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
-| 4 | Text and gradients (3.5) | typography and illustration, the two missing media |
+| 4 | Text and gradients (3.6) | typography and illustration, the two missing media |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived
@@ -238,7 +284,7 @@ quality gain, and it needs no new model concepts.
 
 ## 6. Shipped in this pass
 
-Five changes, all small and all verified by the existing gates:
+Six changes, all small and all verified by the existing gates:
 
 - **Resize and rotate.** A quad frame on the object's own axes with eight resize
   handles and a rotate zone just outside each corner; `Shift` keeps the ratio when
@@ -253,6 +299,12 @@ Five changes, all small and all verified by the existing gates:
 - **Group entry and exit.** A click selects the outermost group, each double-click
   descends one level, `Escape` leaves one level. `src/core/group-context.ts` holds the
   contract, `src/core/group-context.test.ts` pins it with 11 tests.
+- **Hover previews and the shared target pipeline.** `src/core/target-resolution.ts`
+  answers *what will a click do here?* once, for hover, press, double-click and
+  modifier clicks; the canvas draws its answer as a dashed group outline or a solid
+  shape outline without touching the document. `Alt`-click selects the parent group
+  (10 tests in `src/core/target-resolution.test.ts`, hover resolution measured at a
+  1.4–1.6 ms median on 2000 objects).
 - **Truthful inspector availability.** Every disabled control in the right panel
   names its reason in its tooltip, availability comes from the visible-and-unlocked
   set the commands act on, and a frame holding a single shape can be aligned.
@@ -268,7 +320,8 @@ Everything else in sections 3 and 5 is proposed, not built.
 - `npm test` — the interaction tests named in section 3 live next to the code they
   cover (`src/tools/select-tool.test.ts`, `src/core/object-resize.test.ts`,
   `src/core/object-workflow.test.ts`, `src/canvas/viewport.test.ts`,
-  `src/core/inspector-layout.test.ts`, `src/ui/PropertiesPanel.states.test.tsx`).
+  `src/core/inspector-layout.test.ts`, `src/core/target-resolution.test.ts`,
+  `src/ui/PropertiesPanel.states.test.tsx`).
 - `npm run test:conformance` — proves the shell the handles will be drawn over is
   internally consistent.
 - Read `src/canvas/VectorCanvas.tsx:651-1200` — the whole pointer-down decision

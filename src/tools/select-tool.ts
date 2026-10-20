@@ -5,9 +5,10 @@ import {
 } from '../core/construction-geometry';
 import { closestPointOnSegment } from '../core/geometry';
 import { parametricInstanceMatrices, parametricSourceObjectId } from '../core/parametric';
-import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
+import { INTERACTION_BOUNDS_POLICY } from '../core/object-geometry';
+import { cachedObjectBounds } from '../core/bounds-cache';
 import { inverseMatrix, multiplyMatrices, objectTransformMatrix, transformPoint, type Matrix2D } from '../core/transforms';
-import type { EntityId, Point, SelectionState } from '../core/types';
+import type { EntityId, Point, Segment, SelectionState } from '../core/types';
 
 export interface HitResult {
   kind: 'node' | 'segment';
@@ -27,11 +28,29 @@ export function hitTest(
   tolerance: number,
   objectId?: EntityId,
 ): HitResult | null {
+  // Scoped hits are the per-pointer-move path (hover and press), so they must not walk
+  // the whole document. Asking the network for its own nodes also avoids the expensive
+  // node → object lookup for every node that does not belong to the scope.
+  if (objectId) {
+    const object = document.getObject(objectId);
+    if (!object || !document.isObjectVisible(objectId) || document.isObjectLocked(objectId)) return null;
+    const network = document.getNetwork(object.networkId);
+    for (let index = (network?.nodeIds.length ?? 0) - 1; index >= 0; index -= 1) {
+      const node = document.getNode(network!.nodeIds[index]);
+      if (!node) continue;
+      const matrices = hitMatricesForNode(document, objectId, node.id);
+      const positions = matrices.length > 0 ? matrices.map((matrix) => transformPoint(node.position, matrix)) : [node.position];
+      if (positions.some((position) => distance(position, point) <= tolerance)) {
+        return { kind: 'node', id: node.id };
+      }
+    }
+    return hitTestSegment(document, point, tolerance, objectId);
+  }
+
   const nodes = [...document.nodes.values()];
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index];
     const object = document.getObjectForNode(node.id);
-    if (objectId && object?.id !== objectId) continue;
     if (!document.isNodeVisible(node.id) || document.isNodeLocked(node.id)) continue;
     const matrices = object
       ? hitMatricesForNode(document, object.id, node.id)
@@ -44,7 +63,7 @@ export function hitTest(
     }
   }
 
-  return hitTestSegment(document, point, tolerance, objectId);
+  return hitTestSegment(document, point, tolerance);
 }
 
 /** Segment-only hit testing for area tools such as Eraser, where nearby nodes
@@ -55,33 +74,54 @@ export function hitTestSegment(
   tolerance: number,
   objectId?: EntityId,
 ): HitResult | null {
+  if (objectId) {
+    const object = document.getObject(objectId);
+    if (!object || !document.isObjectVisible(objectId) || document.isObjectLocked(objectId)) return null;
+    const network = document.getNetwork(object.networkId);
+    const segments = (network?.pathIds ?? [])
+      .flatMap((pathId) => document.getPath(pathId)?.segmentIds ?? [])
+      .map((segmentId) => document.getSegment(segmentId))
+      .filter((segment): segment is NonNullable<typeof segment> => Boolean(segment));
+    for (let index = segments.length - 1; index >= 0; index -= 1) {
+      if (segmentHitsPoint(document, segments[index], point, tolerance, objectId)) {
+        return { kind: 'segment', id: segments[index].id };
+      }
+    }
+    return null;
+  }
   const segments = [...document.segments.values()];
   for (let index = segments.length - 1; index >= 0; index -= 1) {
     const segment = segments[index];
     const object = document.getObjectForSegment(segment.id);
-    if (objectId && object?.id !== objectId) continue;
     if (!document.isSegmentVisible(segment.id) || document.isSegmentLocked(segment.id)) continue;
-    if (segment.role === 'construction') {
-      const line = constructionLineGeometry(document, segment);
-      if (line && projectPointToConstructionLine(line, point).distance <= tolerance) {
-        return { kind: 'segment', id: segment.id };
-      }
-      continue;
-    }
-    const matrices = object
-      ? hitMatricesForSegment(document, object.id, segment.id)
-      : [];
-    const candidates = matrices.length > 0 ? matrices : [undefined];
-    for (const matrix of candidates) {
-      const inverse = matrix ? inverseMatrix(matrix) : undefined;
-      const localPoint = inverse ? transformPoint(point, inverse) : point;
-      const closest = closestPointOnSegment(document, segment, localPoint);
-      if (!closest) continue;
-      const closestWorld = matrix ? transformPoint(closest.point, matrix) : closest.point;
-      if (distance(closestWorld, point) <= tolerance) return { kind: 'segment', id: segment.id };
-    }
+    if (segmentHitsPoint(document, segment, point, tolerance, object?.id)) return { kind: 'segment', id: segment.id };
   }
   return null;
+}
+
+/** Distance test for one segment, including construction lines and parametric instances. */
+function segmentHitsPoint(
+  document: VectorDocument,
+  segment: Segment,
+  point: Point,
+  tolerance: number,
+  objectId?: EntityId,
+): boolean {
+  if (segment.role === 'construction') {
+    const line = constructionLineGeometry(document, segment);
+    return Boolean(line && projectPointToConstructionLine(line, point).distance <= tolerance);
+  }
+  const matrices = objectId ? hitMatricesForSegment(document, objectId, segment.id) : [];
+  const candidates = matrices.length > 0 ? matrices : [undefined];
+  for (const matrix of candidates) {
+    const inverse = matrix ? inverseMatrix(matrix) : undefined;
+    const localPoint = inverse ? transformPoint(point, inverse) : point;
+    const closest = closestPointOnSegment(document, segment, localPoint);
+    if (!closest) continue;
+    const closestWorld = matrix ? transformPoint(closest.point, matrix) : closest.point;
+    if (distance(closestWorld, point) <= tolerance) return true;
+  }
+  return false;
 }
 
 /** Every object on the active page in paint order: back to front, exactly as drawn. */
@@ -101,7 +141,7 @@ export function objectsUnderPoint(document: VectorDocument, point: Point, tolera
   for (let index = painted.length - 1; index >= 0; index -= 1) {
     const objectId = painted[index];
     if (!document.isObjectVisible(objectId) || document.isObjectLocked(objectId)) continue;
-    const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
+    const bounds = cachedObjectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
     if (bounds.width <= 1e-6 && bounds.height <= 1e-6) continue;
     if (point.x >= bounds.minX - tolerance && point.x <= bounds.maxX + tolerance &&
         point.y >= bounds.minY - tolerance && point.y <= bounds.maxY + tolerance) {
@@ -132,27 +172,30 @@ export function hitTestObject(document: VectorDocument, point: Point, tolerance:
   const stack = objectsUnderPoint(document, point, tolerance);
   const topOfStack = stack[0];
 
-  // Infinite construction lines are clickable outside their own bounds, so a raw
-  // geometry hit can name an object the bounds stack does not contain. Paint order
-  // still decides: a shape above the line wins, the line wins when it is on top.
-  const geometryHit = hitTest(document, point, tolerance);
-  const geometryOwner = geometryHit
-    ? (geometryHit.kind === 'node'
-        ? document.getObjectForNode(geometryHit.id)?.id
-        : document.getObjectForSegment(geometryHit.id)?.id)
-    : undefined;
-  if (geometryHit && geometryOwner) {
-    const painted = objectsInPaintOrder(document);
-    const ownerIndex = painted.lastIndexOf(geometryOwner);
-    const topIndex = topOfStack ? painted.lastIndexOf(topOfStack) : -1;
-    if (ownerIndex >= topIndex && document.isObjectVisible(geometryOwner) && !document.isObjectLocked(geometryOwner)) {
-      return { kind: 'object', id: geometryOwner, geometryHit };
-    }
+  if (!topOfStack) {
+    // Nothing's bounds contain the point. Only an infinite construction line can still
+    // be hit out here, and scanning just those keeps pointer moves off the whole scene.
+    const construction = hitTestInfiniteConstruction(document, point, tolerance);
+    if (!construction) return null;
+    const owner = document.getObjectForSegment(construction.id);
+    return owner ? { kind: 'object', id: owner.id, geometryHit: construction } : null;
   }
 
-  if (!topOfStack) return null;
-  const ownGeometry = hitTest(document, point, tolerance, topOfStack);
-  return { kind: 'object', id: topOfStack, geometryHit: ownGeometry ?? undefined };
+  // Geometry matters only for the object the click would select, so it is resolved for
+  // that object alone instead of scanning every node and segment in the document.
+  const geometry = hitTest(document, point, tolerance, topOfStack);
+  return { kind: 'object', id: topOfStack, geometryHit: geometry ?? undefined };
+}
+
+/** Infinite construction lines are clickable outside their own bounds. */
+export function hitTestInfiniteConstruction(document: VectorDocument, point: Point, tolerance: number): HitResult | null {
+  for (const segment of document.segments.values()) {
+    if (segment.role !== 'construction' || segment.constructionExtent !== 'infinite') continue;
+    if (!document.isSegmentVisible(segment.id) || document.isSegmentLocked(segment.id)) continue;
+    if (!segmentHitsPoint(document, segment, point, tolerance, document.getObjectForSegment(segment.id)?.id)) continue;
+    return { kind: 'segment', id: segment.id };
+  }
+  return null;
 }
 
 export function selectionForObjectHit(

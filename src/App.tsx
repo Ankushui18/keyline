@@ -2184,6 +2184,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           activeTool={activeTool}
           constructionExtent={constructionExtent}
           toolDisabledReasons={toolDisabledReasons}
+          interactionBlocked={commandOpen || exportOpen || shareOpen || settingsOpen || motionOpen || setViewOpen || familyCollectionOpen || constraintsOpen}
           selection={selection}
           selectedArtboardIds={selectedArtboardIds}
           impactObjectIds={geometryImpactObjectIds}

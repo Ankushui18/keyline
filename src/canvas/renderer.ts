@@ -13,7 +13,7 @@ import {
 import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
-import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
+import { INTERACTION_BOUNDS_POLICY, objectBounds, type GeometryBounds } from '../core/object-geometry';
 import { axisAlignedFrame, frameHandlePoints, framePoint, objectFrame, type SelectionFrame } from '../core/object-resize';
 import {
   parametricGroupsForRegion,
@@ -117,6 +117,8 @@ interface RenderOptions {
   hoveredNodeId?: EntityId;
   hoveredSegmentId?: EntityId;
   hoveredHandle?: { nodeId: EntityId; handleType: 'in' | 'out' };
+  /** Target preview for the pointer, resolved by the shared target pipeline. */
+  hoveredTarget?: { bounds: GeometryBounds; group: boolean };
   widthToolActive?: boolean;
   remotePresence?: CollaboratorPresence[];
   overlayOnly?: boolean;
@@ -176,6 +178,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
     hoveredNodeId,
     hoveredSegmentId,
     hoveredHandle,
+    hoveredTarget,
     widthToolActive,
     remotePresence,
     overlayOnly = false,
@@ -247,6 +250,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
       hoveredSegmentId,
     );
     drawGeometryImpactHighlights(context, document, viewport.scale, impactObjectIds);
+    if (hoveredTarget) drawHoverTarget(context, hoveredTarget, viewport.scale);
     if (selection.mode === 'object') drawObjectSelection(context, document, viewport.scale, selection.objectIds);
     drawParametricControls(context, document, viewport.scale, selection);
     if (remotePresence?.length) drawRemotePresence(context, document, viewport.scale, remotePresence);
@@ -1097,6 +1101,26 @@ function drawGeometryImpactHighlights(
       bounds.height + inset * 2,
     );
   }
+  context.restore();
+}
+
+/**
+ * A light outline for whatever the pointer would select. Groups are dashed and objects
+ * are solid, so the preview never reads as the persistent selection, which is a solid
+ * frame with square handles.
+ */
+function drawHoverTarget(
+  context: CanvasRenderingContext2D,
+  target: { bounds: GeometryBounds; group: boolean },
+  scale: number,
+): void {
+  const { bounds, group } = target;
+  if (bounds.width <= 0 && bounds.height <= 0) return;
+  context.save();
+  context.strokeStyle = alpha(COLORS.selectedStrong, 0.55);
+  context.lineWidth = 1 / scale;
+  context.setLineDash(group ? [4 / scale, 3 / scale] : []);
+  context.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
   context.restore();
 }
 
