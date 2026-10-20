@@ -121,11 +121,11 @@ interface VectorCanvasProps {
 type ArtboardResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 type ArtboardHit = { artboardId: EntityId; part: 'title' | 'border' | ArtboardResizeHandle };
 
-// Figma's rotate cursor: a short curved arrow capped by arrowheads at both ends,
-// dark grey on a white outline so it reads over the light artboard and the dark
-// canvas alike. Same trick as the pen cursor — an inline SVG with URL-encoded
-// colours, so no literal reaches CSS.
-const ROTATE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M7.47 10.53A7.4 7.4 0 0 1 20.86 16.77' fill='none' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M5.78 13.70L9.93 11.22L5.51 8.88Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M19.51 20.11L18.75 15.33L23.38 17.21Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M7.47 10.53A7.4 7.4 0 0 1 20.86 16.77' fill='none' stroke='%232b2f36' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M5.78 13.70L9.93 11.22L5.51 8.88Z' fill='%232b2f36' stroke='%232b2f36' stroke-width='0.7' stroke-linejoin='round'/%3E%3Cpath d='M19.51 20.11L18.75 15.33L23.38 17.21Z' fill='%232b2f36' stroke='%232b2f36' stroke-width='0.7' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14, crosshair`;
+// Figma's rotate cursor: a short curved arrow with a barbed head at each end, a
+// near-black stroke on a white halo so it reads over the light artboard and the
+// dark canvas alike. Same trick as the pen cursor — an inline SVG with
+// URL-encoded colours, so no literal reaches CSS.
+const ROTATE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M8.73 10.54A7.2 7.2 0 1 1 21.02 17.63' fill='none' stroke='%23ffffff' stroke-width='4.15' stroke-linecap='round'/%3E%3Cpath d='M7.73 13.31L10.57 11.05L8.43 11.37L7.00 9.75Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M19.12 19.89L19.65 16.29L20.45 18.31L22.57 18.74Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M8.73 10.54A7.2 7.2 0 1 1 21.02 17.63' fill='none' stroke='%231e1e1e' stroke-width='1.95' stroke-linecap='round'/%3E%3Cpath d='M7.73 13.31L10.57 11.05L8.43 11.37L7.00 9.75Z' fill='%231e1e1e' stroke='%231e1e1e' stroke-width='0.45' stroke-linejoin='round'/%3E%3Cpath d='M19.12 19.89L19.65 16.29L20.45 18.31L22.57 18.74Z' fill='%231e1e1e' stroke='%231e1e1e' stroke-width='0.45' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14, crosshair`;
 
 const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='m4 21 4.4-1.1L20 8.3 15.7 4 4.1 15.6 4 21Z' fill='white' stroke='%231f2328' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='m13.8 6 4.2 4.2M5 19.8l4-4' fill='none' stroke='%231f2328' stroke-width='1.4'/%3E%3C/svg%3E") 4 21, crosshair`;
 

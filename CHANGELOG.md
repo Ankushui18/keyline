@@ -23,8 +23,8 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Changed
 
-- Selected objects now show a quad frame with eight square resize handles and a `W × H` readout
-  under the frame that turns with the selection. Drag a handle to resize
+- Selected objects now show a quad frame with eight square resize handles and a `W × H` readout that
+  turns with the selection and flips to the top edge rather than rendering upside down. Drag a handle to resize
   (`Shift` keeps the aspect ratio); hover just outside a corner to get a rotate cursor and drag to
   rotate (`Shift` snaps to 15°), the way Figma does it — no separate handle. The frame follows the
   object's own axes, so both gestures are exact at any angle, and each drag is one undoable step.

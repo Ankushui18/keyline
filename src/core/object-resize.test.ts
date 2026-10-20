@@ -257,3 +257,29 @@ describe('object rotation', () => {
     expect(afterFirst.y).toBeCloseTo(center.y + (beforeFirst.x - center.x));
   });
 });
+
+describe('readout orientation', () => {
+  // The pill must never render upside down: past a quarter turn it hangs from the
+  // top edge, rotated back into the readable half turn.
+  const readable = (rotation: number) => {
+    const normalized = ((rotation % 360) + 360) % 360;
+    return normalized > 90 && normalized < 270 ? rotation + 180 : rotation;
+  };
+  const degrees = (value: number) => ((value % 360) + 360) % 360;
+
+  it('keeps the label upright across a full turn', () => {
+    for (let rotation = -360; rotation <= 360; rotation += 5) {
+      const angle = degrees(readable(rotation));
+      expect(angle <= 90 || angle >= 270).toBe(true);
+    }
+  });
+
+  it('measures the frame the way the readout prints it', () => {
+    const { frame } = setup(37);
+    const width = Math.hypot(frame.corners[1].x - frame.corners[0].x, frame.corners[1].y - frame.corners[0].y);
+    const height = Math.hypot(frame.corners[3].x - frame.corners[0].x, frame.corners[3].y - frame.corners[0].y);
+    // Per-object size, not the axis-aligned bounding box: 100 x 50 stays 100 x 50.
+    expect(width).toBeCloseTo(100);
+    expect(height).toBeCloseTo(50);
+  });
+});

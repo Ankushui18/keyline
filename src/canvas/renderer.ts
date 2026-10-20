@@ -1197,7 +1197,6 @@ function drawSelectionSizeBadge(
   const fontSize = 10 / scale;
   const paddingX = 4.5 / scale;
   const barHeight = 15 / scale;
-  const gap = 10 / scale;
   context.save();
   context.font = `590 ${fontSize}px Geist, system-ui, sans-serif`;
   context.textAlign = 'center';
@@ -1209,9 +1208,16 @@ function drawSelectionSizeBadge(
     context.restore();
     return;
   }
-  const bottom = framePoint(frame, 0.5, 1);
-  context.translate(bottom.x, bottom.y);
-  context.rotate(frame.rotation * Math.PI / 180);
+  // Text must never render upside down. When the frame has turned past a quarter
+  // turn, the readout hangs off the top edge instead, rotated back into the
+  // readable half turn, so it still follows the shape without inverting.
+  const normalized = ((frame.rotation % 360) + 360) % 360;
+  const flipped = normalized > 90 && normalized < 270;
+  // Outside the frame, whichever edge it hangs from.
+  const gap = flipped ? -barHeight - 7 / scale : 7 / scale;
+  const anchor = framePoint(frame, 0.5, flipped ? 0 : 1);
+  context.translate(anchor.x, anchor.y);
+  context.rotate((frame.rotation + (flipped ? 180 : 0)) * Math.PI / 180);
   context.beginPath();
   context.roundRect(-barWidth / 2, gap, barWidth, barHeight, 2.5 / scale);
   // The deeper blue: white 10 px on the bright frame blue is only 2.9:1.
