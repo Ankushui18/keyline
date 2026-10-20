@@ -8,6 +8,8 @@ import {
   resolveObjectPress, selectionForTarget, selectionTargetForObject,
 } from './group-context';
 import { hitTestObject } from '../tools/select-tool';
+import { prepareNudgeObjects } from './object-operations';
+import { objectBounds } from './object-geometry';
 
 /**
  * Behaviour contract for group navigation.
@@ -195,6 +197,23 @@ describe('group navigation contract', () => {
     expect(outside.enteredGroup).toBe(false);
     expect(outside.selection.groupContext).toBeUndefined();
     expect(outside.selection.objectIds).toEqual(new Set([objects.c]));
+  });
+
+  it('transforms a whole group through the existing object operations, in one undo step', () => {
+    const { document, manager, objects } = scene();
+    const group = selectionTargetForObject(document, objects.a)!;
+    const before = group.objectIds.map((id) => objectBounds(document, id));
+    const plan = prepareNudgeObjects(document, group.objectIds, { x: 10, y: 5 })!;
+    manager.beginTransaction('Nudge group');
+    plan.operations.forEach((operation) => manager.execute(operation));
+    manager.commitTransaction();
+    group.objectIds.forEach((id, index) => {
+      const after = objectBounds(document, id);
+      expect(after.minX).toBeCloseTo(before[index].minX + 10);
+      expect(after.minY).toBeCloseTo(before[index].minY + 5);
+    });
+    expect(manager.undo()).toBe(true);
+    expect(group.objectIds.map((id) => objectBounds(document, id))).toEqual(before);
   });
 
   it('never makes a hidden or locked group reachable through its children', () => {

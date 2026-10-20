@@ -139,7 +139,7 @@ An on-canvas banner names the entered group and offers `Exit group`, matching th
 existing isolation banner; the Layers panel highlights the entered group instead of its
 members while you are inside it.
 
-The contract is pinned by `src/core/group-context.test.ts` (10 tests) and was written
+The contract is pinned by `src/core/group-context.test.ts` (11 tests) and was written
 before the code. Known limit: deleting a group selection removes its objects but leaves
 the empty group layer behind.
 
@@ -252,7 +252,7 @@ Five changes, all small and all verified by the existing gates:
   `Ctrl/⌘ +` / `-` steps the zoom. See `wheelIntent` in `src/canvas/viewport.ts`.
 - **Group entry and exit.** A click selects the outermost group, each double-click
   descends one level, `Escape` leaves one level. `src/core/group-context.ts` holds the
-  contract, `src/core/group-context.test.ts` pins it with 10 tests.
+  contract, `src/core/group-context.test.ts` pins it with 11 tests.
 - **Truthful inspector availability.** Every disabled control in the right panel
   names its reason in its tooltip, availability comes from the visible-and-unlocked
   set the commands act on, and a frame holding a single shape can be aligned.
