@@ -75,3 +75,39 @@ export class Viewport {
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
+
+/** The subset of a DOM wheel event the canvas needs. Kept structural so tests
+ * can describe a gesture without constructing an event. */
+export interface WheelInput {
+  deltaX: number;
+  deltaY: number;
+  /** 0 = pixels, 1 = lines, 2 = pages (the DOM `deltaMode`). */
+  deltaMode: number;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}
+
+export type WheelIntent =
+  | { kind: 'zoom'; factor: number }
+  | { kind: 'pan'; deltaX: number; deltaY: number };
+
+/** DOM_DELTA_LINE is conventionally 16 px; DOM_DELTA_PAGE is the viewport. */
+const LINE_HEIGHT = 16;
+
+/**
+ * Decides what a wheel gesture means over the canvas.
+ *
+ * Plain scrolling pans — a mouse wheel and a two-finger trackpad swipe are the
+ * same input, and both should move the sheet the way every other editor does.
+ * `Shift` maps a vertical wheel onto the horizontal axis, and `Ctrl`/`⌘` zooms
+ * at the pointer, which is also how browsers report a trackpad pinch.
+ */
+export function wheelIntent(event: WheelInput, viewportHeight: number): WheelIntent {
+  const unit = event.deltaMode === 1 ? LINE_HEIGHT : event.deltaMode === 2 ? Math.max(1, viewportHeight) : 1;
+  const deltaX = event.deltaX * unit;
+  const deltaY = event.deltaY * unit;
+  if (event.ctrlKey || event.metaKey) return { kind: 'zoom', factor: Math.exp(-deltaY * 0.0015) };
+  if (event.shiftKey && deltaX === 0) return { kind: 'pan', deltaX: deltaY, deltaY: 0 };
+  return { kind: 'pan', deltaX, deltaY };
+}

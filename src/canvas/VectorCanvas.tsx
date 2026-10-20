@@ -65,7 +65,7 @@ import {
   type PrimitivePreview,
 } from './renderer';
 import { renderWebGLScene } from './webgl-renderer';
-import { Viewport } from './viewport';
+import { Viewport, wheelIntent } from './viewport';
 
 interface ShapeBuilderState {
   regionIds: EntityId[];
@@ -404,9 +404,30 @@ export function VectorCanvas({
     requestRender();
   }, [manager, onViewportChange, requestRender, viewportFocusRequest]);
 
+  /** Keyboard zoom around the canvas centre, for pointers without a wheel. */
+  const zoomStep = useCallback((direction: 1 | -1) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    viewportRef.current.zoomAt({ x: rect.width / 2, y: rect.height / 2 }, direction === 1 ? 1.25 : 0.8);
+    onViewportChange(viewportRef.current.scale);
+    requestRender();
+  }, [onViewportChange, requestRender]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
+      if ((event.ctrlKey || event.metaKey) && (event.key === '=' || event.key === '+')) {
+        event.preventDefault();
+        zoomStep(1);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && (event.key === '-' || event.key === '_')) {
+        event.preventDefault();
+        zoomStep(-1);
+        return;
+      }
       if (event.code === 'Space') {
         spacePressedRef.current = true;
         event.preventDefault();
@@ -480,7 +501,7 @@ export function VectorCanvas({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [manager, onArtboardSelectionChange, onRequestToolChange, onSelectionChange, onShapeBuilderStateChange, requestRender]);
+  }, [manager, onArtboardSelectionChange, onRequestToolChange, onSelectionChange, onShapeBuilderStateChange, requestRender, zoomStep]);
 
   const clearPreviews = () => {
     penPreviewRef.current = undefined;
@@ -2181,9 +2202,14 @@ export function VectorCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    viewportRef.current.zoomAt(screen, Math.exp(-event.deltaY * 0.0015));
-    onViewportChange(viewportRef.current.scale);
+    const intent = wheelIntent(event, rect.height);
+    if (intent.kind === 'zoom') {
+      viewportRef.current.zoomAt({ x: event.clientX - rect.left, y: event.clientY - rect.top }, intent.factor);
+      onViewportChange(viewportRef.current.scale);
+    } else {
+      // The sheet follows the gesture: scrolling down walks you down the canvas.
+      viewportRef.current.panBy(-intent.deltaX, -intent.deltaY);
+    }
     requestRender();
   }, [onViewportChange, requestRender]);
 

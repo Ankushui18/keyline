@@ -638,7 +638,8 @@ button.empty-start-option:hover { background: var(--surface-active); border-colo
   height: 28px;
   padding: 0 var(--space-4);
   color: var(--text-muted);
-  background: var(--surface-canvas);
+  /* Same docked-chrome surface as the top bar and the inspector. */
+  background: var(--surface-panel);
   border-top: 1px solid var(--border-default);
   font-size: var(--font-size-sm);
 }

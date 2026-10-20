@@ -391,7 +391,8 @@ Modifier is `Ctrl` on Windows/Linux and `⌘` on macOS.
 | Undo / redo | `Ctrl/⌘ Z` / `Ctrl/⌘ ⇧ Z` |
 | Nudge points | Arrow keys (1 px), `Shift` + arrows (10 px) |
 | Delete selection or point | `Delete` / `Backspace` |
-| Pan / zoom | Middle-drag or `Space` + drag / wheel |
+| Pan | Wheel or two-finger scroll, `Shift` + wheel (horizontal), middle-drag, `Space` + drag |
+| Zoom | `Ctrl/⌘` + wheel or pinch, `Ctrl/⌘ +` / `Ctrl/⌘ -` |
 
 Shortcuts are ignored while typing in a field or while a dialog is open.
 

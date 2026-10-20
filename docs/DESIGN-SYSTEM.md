@@ -51,7 +51,7 @@ Tokens come in four tiers. Use the highest tier that expresses your intent.
 
 | Group | Tokens | Notes |
 |---|---|---|
-| Surfaces | `--surface-canvas`, `--surface-panel`, `--surface-raised`, `--surface-inset`, `--surface-sunken`, `--surface-active`, `--surface-selected` | Dark chrome only. |
+| Surfaces | `--surface-canvas`, `--surface-panel`, `--surface-raised`, `--surface-inset`, `--surface-sunken`, `--surface-active`, `--surface-selected` | Dark chrome only. Docked chrome — top bar, status bar and the inspector — uses one surface (`--surface-panel`) so adjacent panels never disagree by a ramp step; `--surface-canvas` is the shell behind it, and `--surface-raised`/`--surface-inset` carry fields and hover states inside a panel. |
 | Borders | `--border-subtle`, `--border-default`, `--border-strong` | Three steps, no more. |
 | Text | `--text-primary`, `--text-secondary`, `--text-muted`, `--text-subtle`, `--text-disabled`, `--text-inverse`, `--text-on-accent`, `--text-on-bright` | `--text-on-accent` is white; put it on `--accent-solid`, never on `--accent`. |
 | Accent | `--accent`, `--accent-hover`, `--accent-pressed`, `--accent-wash`, `--accent-solid`, `--accent-solid-hover`, `--accent-solid-pressed`, `--accent-soft`, `--accent-control` | Two families: *bright* accent for strokes and indicators, *solid* accent for filled buttons. |

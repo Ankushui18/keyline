@@ -9,7 +9,11 @@
   padding: 0 var(--space-4);
   font: 13px/1.4 var(--font-sans);
   color: var(--text-primary);
-  background: var(--surface-canvas);
+  /* Docked chrome uses the panel surface, the same one the inspector sits on.
+     The canvas token is reserved for the app shell behind everything; using it
+     here left the right-hand panel one ramp step lighter than the bars beside
+     it, which reads as an accidental seam at the top-right corner. */
+  background: var(--surface-panel);
   border-bottom: 1px solid var(--border-default);
 }
 .topbar button { font: inherit; font-size: inherit; color: inherit; cursor: pointer; }
