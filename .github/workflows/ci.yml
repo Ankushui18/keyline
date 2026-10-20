@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App, Wasm smoke test and relay
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Strict TypeScript
+        run: npm run typecheck
+
+      - name: Production build
+        run: npm run build
+
+      - name: Unit and integration tests
+        run: |
+          mkdir -p audit
+          npx vitest run --reporter=default --reporter=json --outputFile.json=audit/vitest.json
+
+      - name: Wasm solver smoke test
+        run: npm run test:solver
+
+      - name: Collaboration relay integration
+        run: npm run test:collaboration
+
+      - name: Documentation links and published counts
+        run: node scripts/check-docs.mjs --results audit/vitest.json
+
+      - name: Dependency audit (informational)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+  rust:
+    name: Rust solver tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Test the solver crate
+        run: cargo test --manifest-path solver/Cargo.toml --locked

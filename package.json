@@ -1,7 +1,17 @@
 {
-  "name": "vector-studio",
+  "name": "keyline",
   "private": true,
   "version": "0.1.0",
+  "description": "A local-first parametric vector editor for precision icon work.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ankushui18/keyline.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Ankushui18/keyline/issues"
+  },
+  "homepage": "https://github.com/Ankushui18/keyline#readme",
   "type": "module",
   "scripts": {
     "dev": "node scripts/run-with-collaboration.mjs",
@@ -13,7 +23,8 @@
     "test:solver": "node scripts/test-solver.mjs",
     "test:collaboration": "node scripts/test-collaboration.mjs",
     "typecheck": "tsc -b --pretty false",
-    "check": "npm run build && npm test && npm run test:solver && npm run test:collaboration",
+    "check": "npm run build && npm test && npm run test:solver && npm run test:collaboration && npm run check:docs",
+    "check:docs": "node scripts/check-docs.mjs",
     "test:browser": "node scripts/test-browser.mjs",
     "test:design": "node scripts/test-browser.mjs design",
     "test:review": "node scripts/test-browser.mjs review"

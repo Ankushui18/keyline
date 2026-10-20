@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { parseDocumentBackup } from '../core/document-backup';
 import { createEntityId } from '../core/ids';
+import type { DocumentSnapshot } from '../core/types';
 import {
   deleteStoredDocument,
   duplicateStoredDocument,
@@ -13,7 +15,8 @@ export type StartAction =
   | { kind: 'icon'; size: number }
   | { kind: 'logo'; width: number; height: number }
   | { kind: 'sample' }
-  | { kind: 'svg'; source: string; name: string };
+  | { kind: 'svg'; source: string; name: string }
+  | { kind: 'backup'; snapshot: DocumentSnapshot; name: string };
 
 type Filter = 'all' | 'icons' | 'logo' | 'imported';
 const FILTERS: Array<[Filter, string]> = [['all', 'All'], ['icons', 'Icon sets'], ['logo', 'Logos'], ['imported', 'Imported']];
@@ -37,7 +40,7 @@ export function Dashboard({
   onStart,
 }: {
   onOpen: (id: string) => void;
-  onStart: (action: StartAction) => void;
+  onStart: (action: StartAction) => void | Promise<void>;
 }) {
   const [files, setFiles] = useState<DocumentSummary[] | null>(null);
   const [query, setQuery] = useState('');
@@ -101,15 +104,29 @@ export function Dashboard({
     return () => window.removeEventListener('pointerdown', close);
   }, [menuId]);
 
-  const readSvgFile = useCallback(async (file: File) => {
-    if (!(file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg'))) {
-      setMessage('Drop an SVG file to import it.');
+  const readImportFile = useCallback(async (file: File) => {
+    const lower = file.name.toLowerCase();
+    const isSvg = file.type === 'image/svg+xml' || lower.endsWith('.svg');
+    const isBackup = file.type === 'application/json' || lower.endsWith('.json');
+    if (!isSvg && !isBackup) {
+      setMessage('Drop an SVG or a .keyline.json backup to import it.');
       return;
     }
     try {
-      onStart({ kind: 'svg', source: await file.text(), name: file.name });
-    } catch {
-      setMessage('Could not read that SVG file.');
+      const source = await file.text();
+      if (isBackup) {
+        // Parse before leaving the dashboard so a bad file gets a readable message here.
+        const backup = parseDocumentBackup(source, file.name);
+        try {
+          await onStart({ kind: 'backup', ...backup });
+        } catch {
+          throw new Error('Could not restore that backup. Browser storage may be full.');
+        }
+      } else {
+        await onStart({ kind: 'svg', source, name: file.name });
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : `Could not import ${file.name}.`);
     }
   }, [onStart]);
 
@@ -161,7 +178,7 @@ export function Dashboard({
         event.preventDefault();
         setDragging(false);
         const file = [...event.dataTransfer.files][0];
-        if (file) void readSvgFile(file);
+        if (file) void readImportFile(file);
       }}
     >
       <header className="dashboard-header">
@@ -176,8 +193,8 @@ export function Dashboard({
         </label>
         <span className="dashboard-spacer" />
         <span className="dashboard-device-note">Saved on this device</span>
-        <input ref={fileInputRef} type="file" accept="image/svg+xml,.svg" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void readSvgFile(file); event.target.value = ''; }} />
-        <button type="button" className="dashboard-button" onClick={() => fileInputRef.current?.click()}>Import SVG</button>
+        <input ref={fileInputRef} type="file" accept="image/svg+xml,.svg,application/json,.json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void readImportFile(file); event.target.value = ''; }} />
+        <button type="button" className="dashboard-button" onClick={() => fileInputRef.current?.click()}>Import</button>
         <button type="button" className="dashboard-button is-primary" onClick={() => onStart({ kind: 'icon', size: 24 })}>New icon set</button>
       </header>
 
@@ -191,7 +208,7 @@ export function Dashboard({
             <StartCard title="Logo or mark" detail="512 px square" onClick={() => onStart({ kind: 'logo', width: 512, height: 512 })}>
               <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M8 13c2 3 6 3 8 0" /></svg>
             </StartCard>
-            <StartCard title="Import an SVG" detail="Drop it anywhere" dashed onClick={() => fileInputRef.current?.click()}>
+            <StartCard title="Import a file" detail="SVG or backup" dashed onClick={() => fileInputRef.current?.click()}>
               <svg viewBox="0 0 24 24"><path d="M12 15V4" /><path d="m7 9 5-5 5 5" /><path d="M5 15v4h14v-4" /></svg>
             </StartCard>
             <StartCard title="Open a sample" detail="Built with rules" onClick={() => onStart({ kind: 'sample' })}>
@@ -208,7 +225,7 @@ export function Dashboard({
             </div>
           </div>
           {files === null ? <p className="dashboard-note" role="status">Loading your files…</p> : !hasFiles ? (
-            <div className="dashboard-empty"><strong>No files yet</strong><span>Start with an icon set or drop an SVG anywhere on this page. Your work is saved here automatically.</span></div>
+            <div className="dashboard-empty"><strong>No files yet</strong><span>Start with an icon set or drop an SVG or backup anywhere on this page. Your work is saved here automatically.</span></div>
           ) : visible.length === 0 ? (
             <div className="dashboard-empty"><strong>Nothing matches</strong><span>{query ? `No file name contains “${query}”.` : 'No files of this type yet.'}</span></div>
           ) : (

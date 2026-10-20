@@ -1,7 +1,7 @@
 {
   "name": "vector-solver",
   "type": "module",
-  "description": "Deterministic geometric constraint solver for Vector Studio",
+  "description": "Deterministic geometric constraint solver for Keyline",
   "version": "0.1.0",
   "files": [
     "vector_solver_bg.wasm",

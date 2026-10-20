@@ -44,7 +44,7 @@ export function StatusBar({
       </div>
       <div className="status-group status-right">
         <span className={`save-state is-${offline ? 'offline' : saveStatus}`}><b />{offline ? 'Offline. Changes will sync when you’re back.' : saveLabel(saveStatus)}</span>
-        {saveStatus === 'error' && onDownloadCopy && <button type="button" className="status-download" onClick={onDownloadCopy}>Download a copy</button>}
+        {saveStatus === 'error' && onDownloadCopy && <button type="button" className="status-download" title="Downloads a .keyline.json backup you can import from the dashboard" onClick={onDownloadCopy}>Download a copy</button>}
         <i />
         <span className="zoom-readout">{Math.round(zoom * 100)}%</span>
       </div>
