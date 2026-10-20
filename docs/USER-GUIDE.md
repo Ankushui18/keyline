@@ -87,9 +87,10 @@ operable, and both width and split height persist on the device.
 
 Press `Enter` on a selected object to edit its points; `Enter` or `Escape` leaves point editing.
 
-A selected object shows a frame with eight resize handles, drawn on the object's own axes so it
-rotates with the shape. There is no separate rotate handle: as in Figma, move the pointer just
-outside a corner and it becomes a rotate arrow.
+A selected object shows a frame with eight square resize handles, drawn on the object's own axes so
+it rotates with the shape. The frame also prints its size (`W × H`) on a small blue pill under the
+bottom edge whenever the selection is large enough for the readout to fit. There is no separate
+rotate handle: as in Figma, move the pointer just outside a corner and it becomes a rotate arrow.
 
 - Drag a corner or edge handle to resize — `Shift` on a corner keeps the aspect ratio.
 - Drag just outside a corner, where the cursor turns into a rotate arrow, to rotate — `Shift`

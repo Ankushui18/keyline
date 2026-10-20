@@ -14,7 +14,7 @@ import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
-import { axisAlignedFrame, frameHandlePoints, objectFrame } from '../core/object-resize';
+import { axisAlignedFrame, frameHandlePoints, framePoint, objectFrame, type SelectionFrame } from '../core/object-resize';
 import {
   parametricGroupsForRegion,
   parametricInstanceMatrices,
@@ -1160,20 +1160,65 @@ function drawObjectSelection(
     context.strokeStyle = COLORS.selected;
     context.stroke();
 
-    // Only the eight resize handles are drawn. Rotation has no handle of its own:
-    // hovering just outside a corner turns the cursor into a rotate arrow, the way
-    // Figma does it, and frameHitTarget owns that zone.
+    // Only the eight resize handles are drawn: white squares with a blue edge, the
+    // same shape the artboard handles use, so both frames read as one control.
+    // Rotation has no handle of its own — frameHitTarget owns the zone just
+    // outside each corner, and the cursor is the affordance.
+    const half = 3.5 / scale;
     for (const { point } of frameHandlePoints(frame)) {
-      const radius = 3.5 / scale;
       context.beginPath();
-      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.rect(point.x - half, point.y - half, half * 2, half * 2);
       context.fillStyle = COLORS.inverse;
       context.fill();
       context.lineWidth = 1.5 / scale;
       context.strokeStyle = COLORS.selected;
       context.stroke();
     }
+    drawSelectionSizeBadge(context, frame, scale);
   }
+  context.restore();
+}
+
+/**
+ * Figma-style size readout under the frame: `W × H` on a blue pill that turns with
+ * the selection. Screen-sized, so it stays legible at any zoom, and it only draws
+ * when there is room for it to sit clear of the box.
+ */
+function drawSelectionSizeBadge(
+  context: CanvasRenderingContext2D,
+  frame: SelectionFrame,
+  scale: number,
+): void {
+  const width = Math.hypot(frame.corners[1].x - frame.corners[0].x, frame.corners[1].y - frame.corners[0].y);
+  const height = Math.hypot(frame.corners[3].x - frame.corners[0].x, frame.corners[3].y - frame.corners[0].y);
+  if (width <= 0 && height <= 0) return;
+  const label = `${Math.round(width)} × ${Math.round(height)}`;
+  // Screen-sized, never world-sized: the readout is chrome, not artwork.
+  const fontSize = 10 / scale;
+  const paddingX = 4.5 / scale;
+  const barHeight = 15 / scale;
+  const gap = 10 / scale;
+  context.save();
+  context.font = `590 ${fontSize}px Geist, system-ui, sans-serif`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  const barWidth = context.measureText(label).width + paddingX * 2;
+  // At icon scale the pill would be wider than the shape and cover it, so it only
+  // appears once the selection is comfortably bigger than the readout.
+  if (width * scale < barWidth * 1.15 || height * scale < barHeight * 2) {
+    context.restore();
+    return;
+  }
+  const bottom = framePoint(frame, 0.5, 1);
+  context.translate(bottom.x, bottom.y);
+  context.rotate(frame.rotation * Math.PI / 180);
+  context.beginPath();
+  context.roundRect(-barWidth / 2, gap, barWidth, barHeight, 2.5 / scale);
+  // The deeper blue: white 10 px on the bright frame blue is only 2.9:1.
+  context.fillStyle = COLORS.selectedStrong;
+  context.fill();
+  context.fillStyle = COLORS.inverse;
+  context.fillText(label, 0, gap + barHeight / 2);
   context.restore();
 }
 

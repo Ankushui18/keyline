@@ -76,7 +76,8 @@ or where it would have to be added.
 | Drag to move | yes, `Alt`-drag duplicates | `VectorCanvas.tsx:1704` | works |
 | Arrow-key nudge, objects | yes, 1 px / `Shift` 10 px, one undo step | `App.tsx:1843`, `core/object-operations.ts:253` | **added in this pass** |
 | Arrow-key nudge, points | yes | `App.tsx:1871` | works |
-| Drag a corner to **resize** an object | yes — eight handles on a frame drawn on the object's own axes, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
+| Drag a corner to **resize** an object | yes — eight square handles on a frame drawn on the object's own axes, `Shift` keeps the ratio, one undo entry per drag | `src/core/object-resize.ts`, `renderer.ts:1102` | **shipped in this pass** |
+| Size readout while selected | yes — `W × H` pill under the frame, rotated with it, hidden when the selection is too small to fit it | `drawSelectionSizeBadge` in `renderer.ts` | **shipped in this pass** |
 | Rotate | yes — hover just outside a corner for a rotate cursor, drag to turn, `Shift` snaps to 15° (no handle, as in Figma) | `frameHitTarget` / `prepareRotateObjects` in `src/core/object-resize.ts` | **shipped in this pass** |
 | Double-click a shape | enters point editing (also `Enter`) | `VectorCanvas.tsx:621` | works |
 | Double-click **enters a group** | **no** — clicks resolve to the leaf object; groups are selectable only in the Layers panel | `ui/LayersPanel.tsx:452`, isolation at `core/document.ts:317` | **missing** |

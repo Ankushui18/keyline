@@ -121,11 +121,11 @@ interface VectorCanvasProps {
 type ArtboardResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 type ArtboardHit = { artboardId: EntityId; part: 'title' | 'border' | ArtboardResizeHandle };
 
-// Figma shows no rotate handle; the cursor is the affordance — a curved arrow with
-// a solid head, white with a dark halo so it reads on the light artboard as well as
-// on the canvas around it. Same trick as the pen cursor: an inline SVG with
-// URL-encoded colours, so no literal reaches CSS.
-const ROTATE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M15.96 6.35A6.9 6.9 0 1 1 9.64 5.52' fill='none' stroke='%231f2328' stroke-width='5.4' stroke-linecap='round'/%3E%3Cpath d='M20.22 9.33L13.87 8.43L17.20 3.67Z' fill='%231f2328' stroke='%231f2328' stroke-width='2.1' stroke-linejoin='round'/%3E%3Cpath d='M15.96 6.35A6.9 6.9 0 1 1 9.64 5.52' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M20.22 9.33L13.87 8.43L17.20 3.67Z' fill='white' stroke='white' stroke-width='1.05' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, crosshair`;
+// Figma's rotate cursor: a short curved arrow capped by arrowheads at both ends,
+// dark grey on a white outline so it reads over the light artboard and the dark
+// canvas alike. Same trick as the pen cursor — an inline SVG with URL-encoded
+// colours, so no literal reaches CSS.
+const ROTATE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M7.47 10.53A7.4 7.4 0 0 1 20.86 16.77' fill='none' stroke='%23ffffff' stroke-width='4.5' stroke-linecap='round'/%3E%3Cpath d='M5.78 13.70L9.93 11.22L5.51 8.88Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M19.51 20.11L18.75 15.33L23.38 17.21Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.6' stroke-linejoin='round'/%3E%3Cpath d='M7.47 10.53A7.4 7.4 0 0 1 20.86 16.77' fill='none' stroke='%232b2f36' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M5.78 13.70L9.93 11.22L5.51 8.88Z' fill='%232b2f36' stroke='%232b2f36' stroke-width='0.7' stroke-linejoin='round'/%3E%3Cpath d='M19.51 20.11L18.75 15.33L23.38 17.21Z' fill='%232b2f36' stroke='%232b2f36' stroke-width='0.7' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14, crosshair`;
 
 const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='m4 21 4.4-1.1L20 8.3 15.7 4 4.1 15.6 4 21Z' fill='white' stroke='%231f2328' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='m13.8 6 4.2 4.2M5 19.8l4-4' fill='none' stroke='%231f2328' stroke-width='1.4'/%3E%3C/svg%3E") 4 21, crosshair`;
 
