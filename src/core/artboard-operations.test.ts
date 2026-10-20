@@ -16,20 +16,27 @@ describe('icon artboard operations', () => {
     const document = VectorDocument.createEmpty();
     const manager = new OperationManager(document);
     const originalArtboardId = document.activeArtboardId;
+    const originalFrame = { ...document.activeArtboard.frame };
     const plan = prepareCreateIconArtboard(document, 24, 24);
 
     executePlan(manager, 'Add icon frame', plan.operations);
     expect(document.activeArtboardId).toBe(plan.artboard.id);
     expect(document.activeArtboard.name).toBe('Icon 24');
-    expect(document.activeArtboard.frame).toMatchObject({ width: 24, height: 24 });
+    expect(document.activeArtboard.frame).toEqual({ x: 0, y: 0, width: 24, height: 24 });
+    expect(document.artboards.size).toBe(1);
+    expect(document.activeArtboardId).toBe(originalArtboardId);
     expect(document.objectsForArtboard(plan.artboard.id)).toHaveLength(1);
     expect(document.activeNetwork.nodeIds).toHaveLength(0);
 
     expect(manager.undo()).toBe(true);
     expect(document.activeArtboardId).toBe(originalArtboardId);
-    expect(document.getArtboard(plan.artboard.id)).toBeUndefined();
+    expect(document.activeArtboard.name).toBe('Artboard 1');
+    expect(document.activeArtboard.frame).toEqual(originalFrame);
+    expect(document.artboards.size).toBe(1);
     expect(manager.redo()).toBe(true);
     expect(document.activeArtboardId).toBe(plan.artboard.id);
+    expect(document.activeArtboard.name).toBe('Icon 24');
+    expect(document.artboards.size).toBe(1);
   });
 
   it('duplicates frame dimensions and graph-backed content with fresh IDs', () => {

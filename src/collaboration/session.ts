@@ -185,6 +185,7 @@ export class CollaborationSession {
     this.reconcileQueued = true;
     queueMicrotask(() => {
       this.reconcileQueued = false;
+      if (this.disposed) return;
       const initial = this.metadata.get('initialSnapshot') as DocumentSnapshot | undefined;
       if (!initial) return;
       try {
@@ -210,9 +211,7 @@ export class CollaborationSession {
             this.canonical.set('snapshot', jsonClone(snapshot));
           }, this.clientId);
         }
-        if (snapshotHash(this.manager.document.toSnapshot()) !== snapshotHash(snapshot)) {
-          this.manager.replaceFromRemoteSnapshot(snapshot);
-        }
+        applyCollaborativeSnapshot(this.manager, snapshot);
         this.callbacks.onReplayConflicts?.(replayed.conflicts);
       } catch (error) {
         this.callbacks.onStatus('error');
@@ -299,16 +298,22 @@ function safePresenceUser(value: unknown): CollaboratorPresence['user'] | undefi
   return { id: candidate.id, name: candidate.name, color: candidate.color };
 }
 
-function collaborationServerUrl(): string {
-  const configured = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_COLLABORATION_URL;
+export function collaborationServerUrl(): string {
+  const configured = import.meta.env.VITE_COLLABORATION_URL;
   if (configured) return configured.replace(/\/$/, '');
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const previewMatch = window.location.hostname.match(/^(?:5173|4173)-(.+)$/);
-  if (previewMatch) return `${protocol}//1234-${previewMatch[1]}/collaboration`;
-  if (window.location.port === '5173' || window.location.port === '4173') {
-    return `${protocol}//${window.location.hostname}:1234/collaboration`;
-  }
+  // Always use the app's same-origin WebSocket proxy. Browser localhost and
+  // sibling preview ports are not the server, and may be blocked or unreachable.
   return `${protocol}//${window.location.host}/collaboration`;
+}
+
+/** Shared content must never replace this device's IndexedDB file identity. */
+export function applyCollaborativeSnapshot(manager: OperationManager, snapshot: DocumentSnapshot): void {
+  const localId = manager.document.id;
+  const current = { ...manager.document.toSnapshot(), id: snapshot.id };
+  if (snapshotHash(current) !== snapshotHash(snapshot)) {
+    manager.replaceFromRemoteSnapshot({ ...jsonClone(snapshot), id: localId });
+  }
 }
 
 export function snapshotHash(snapshot: DocumentSnapshot): string {
@@ -325,7 +330,7 @@ function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
+    return `{${Object.keys(record).filter((key) => record[key] !== undefined).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
   }
   return JSON.stringify(value) ?? 'null';
 }

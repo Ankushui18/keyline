@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VectorDocument } from '../core/document';
 import { createEntityId } from '../core/ids';
 import { OperationManager, type OperationDescriptor } from '../core/operations';
 import type { DocumentSnapshot, VectorNode } from '../core/types';
 import { preparePrimitiveObject } from '../tools/primitive-tool';
 import {
+  applyCollaborativeSnapshot,
   collaborationSchemaCompatibilityNotice,
+  collaborationServerUrl,
   replayCollaborativeOperations,
   snapshotHash,
   type CollaborativeOperation,
@@ -195,4 +197,54 @@ describe('deterministic collaboration replay', () => {
       'This room uses document schema v7; this client supports v6. Update Keyline before editing this room.',
     );
   });
+});
+
+
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+describe('same-origin collaboration transport', () => {
+  it.each([
+    ['http:', 'localhost:5173', 'ws://localhost:5173/collaboration'],
+    ['https:', '5173-preview.e2b.app', 'wss://5173-preview.e2b.app/collaboration'],
+    ['https:', 'editor.example', 'wss://editor.example/collaboration'],
+  ])('uses the app proxy for %s%s', (protocol, host, expected) => {
+    vi.stubEnv('VITE_COLLABORATION_URL', '');
+    vi.stubGlobal('window', { location: { protocol, host } });
+    expect(collaborationServerUrl()).toBe(expected);
+  });
+
+  it('honors an explicitly configured external relay', () => {
+    vi.stubEnv('VITE_COLLABORATION_URL', 'wss://relay.example/collaboration/');
+    expect(collaborationServerUrl()).toBe('wss://relay.example/collaboration');
+  });
+});
+
+
+describe('shared snapshot file isolation', () => {
+  it('keeps the local file ID while importing shared geometry', () => {
+    const { document: remote } = geometryLineFixture();
+    const local = VectorDocument.createEmpty(); const localId = local.id;
+    const manager = new OperationManager(local); const snapshot = remote.toSnapshot();
+    applyCollaborativeSnapshot(manager, snapshot);
+    expect(local.id).toBe(localId);
+    expect(local.id).not.toBe(remote.id);
+    expect(local.nodes.size).toBe(remote.nodes.size);
+    expect(snapshot.id).toBe(remote.id);
+  });
+
+  it('does not repeatedly replace identical content solely because file IDs differ', () => {
+    const { document: remote } = geometryLineFixture(); const local = VectorDocument.createEmpty();
+    const manager = new OperationManager(local); const events = vi.fn(); manager.subscribe(events);
+    applyCollaborativeSnapshot(manager, remote.toSnapshot());
+    expect(snapshotHash({ ...local.toSnapshot(), id: remote.id })).toBe(snapshotHash(remote.toSnapshot()));
+    applyCollaborativeSnapshot(manager, remote.toSnapshot());
+    expect(events).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+it('hashes optional undefined fields the same way before and after JSON transport', () => {
+  const { document } = geometryLineFixture();
+  const snapshot = document.toSnapshot();
+  const serialized = JSON.parse(JSON.stringify(snapshot)) as DocumentSnapshot;
+  expect(snapshotHash(snapshot)).toBe(snapshotHash(serialized));
 });

@@ -339,3 +339,25 @@ describe('SVG export', () => {
     expect(svg).toContain('viewBox="0 0 120 120"');
   });
 });
+
+
+describe('SVG preview trust boundary', () => {
+  it('normalizes untrusted stroke enums instead of interpolating executable attributes', () => {
+    const document = VectorDocument.createEmpty(); const manager = new OperationManager(document);
+    const nodes: VectorNode[] = [
+      { id: createEntityId(), position: { x: 0, y: 0 }, constraintIds: [] },
+      { id: createEntityId(), position: { x: 10, y: 10 }, constraintIds: [] },
+    ];
+    const segment: Segment = { id: createEntityId(), startNodeId: nodes[0].id, endNodeId: nodes[1].id, type: 'line', role: 'geometry' };
+    addPath(document, manager, nodes, [segment]);
+    const object = [...document.objects.values()].find((item) => item.networkId === document.activeNetwork.id)!;
+    const appearance = document.getAppearance(object.appearanceId)!;
+    // Reproduce malformed peer/clipboard data reaching a typed snapshot.
+    appearance.stroke!.cap = 'round" onload="alert(1)' as 'round';
+    appearance.stroke!.join = 'round"/><script>alert(2)</script><path x="' as 'round';
+    const svg = exportDocumentToSvg(document);
+    expect(svg).toContain('stroke-linecap="round" stroke-linejoin="round"');
+    expect(svg).not.toContain('onload');
+    expect(svg).not.toContain('<script');
+  });
+});

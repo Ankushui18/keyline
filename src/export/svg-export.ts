@@ -179,7 +179,7 @@ export function exportDocumentToSvg(document: VectorDocument, options: SvgExport
       const regionAttributes = includeMetadata
         ? ` data-region-id="${escapeAttribute(region.id)}"${occurrence > 0 ? ` data-parametric-instance="${occurrence}"` : ''}`
         : '';
-      body.push(`<path d="${data}" fill="${escapeAttribute(color)}" fill-rule="${region.fillRule}"${regionAttributes}/>`);
+      body.push(`<path d="${data}" fill="${escapeAttribute(color)}" fill-rule="${region.fillRule === 'evenodd' ? 'evenodd' : 'nonzero'}"${regionAttributes}/>`);
     }
   }
 
@@ -210,7 +210,7 @@ export function exportDocumentToSvg(document: VectorDocument, options: SvgExport
     const dash = objectStroke?.dash.length
       ? ` stroke-dasharray="${objectStroke.dash.map((value) => format(value * strokeScale)).join(' ')}"`
       : '';
-    body.push(`<path d="${segmentPath(concrete, format)}" fill="none" stroke="${escapeAttribute(resolvedColor)}" stroke-width="${format(resolvedWidth)}" stroke-linecap="${objectStroke?.cap ?? 'round'}" stroke-linejoin="${objectStroke?.join ?? 'round'}"${dash}${opacityAttribute}${alignment?.attribute ?? ''}${segmentAttribute}/>`);
+    body.push(`<path d="${segmentPath(concrete, format)}" fill="none" stroke="${escapeAttribute(resolvedColor)}" stroke-width="${format(resolvedWidth)}" stroke-linecap="${objectStroke?.cap === 'butt' || objectStroke?.cap === 'square' ? objectStroke.cap : 'round'}" stroke-linejoin="${objectStroke?.join === 'miter' || objectStroke?.join === 'bevel' ? objectStroke.join : 'round'}"${dash}${opacityAttribute}${alignment?.attribute ?? ''}${segmentAttribute}/>`);
   }
 
   const metadata = includeMetadata

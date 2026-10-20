@@ -122,19 +122,23 @@ async function buildThumbnail(document: VectorDocument): Promise<string | undefi
 }
 
 export async function saveDocument(document: VectorDocument, name?: string): Promise<void> {
-  const existing = await database.documents.get(document.id);
+  // Freeze one revision before the first await. Thumbnail generation and IndexedDB
+  // reads must not mix newer geometry with older counts or document metadata.
+  const snapshot = document.toSnapshot();
+  const frozen = new VectorDocument(snapshot);
+  const existing = await database.documents.get(snapshot.id);
   const now = Date.now();
-  const artboards = realArtboards(document);
+  const artboards = realArtboards(frozen);
   await database.documents.put({
-    id: document.id,
+    id: snapshot.id,
     updatedAt: now,
     createdAt: existing?.createdAt ?? now,
     name: name?.trim() || existing?.name || DEFAULT_DOCUMENT_NAME,
-    kind: existing?.kind === 'imported' ? 'imported' : documentKind(document),
-    thumb: await buildThumbnail(document) ?? existing?.thumb,
+    kind: existing?.kind === 'imported' ? 'imported' : documentKind(frozen),
+    thumb: await buildThumbnail(frozen),
     artboardCount: artboards.length,
-    objectCount: drawnObjectCount(document),
-    snapshot: document.toSnapshot(),
+    objectCount: drawnObjectCount(frozen),
+    snapshot,
   });
 }
 
@@ -142,41 +146,77 @@ export async function markStoredDocumentImported(id: string): Promise<void> {
   await database.documents.update(id, { kind: 'imported' });
 }
 
-/** Debounced persistence attached only to committed semantic operations. */
+/** Debounced, revision-aware persistence attached only to committed operations. */
 export class DocumentPersistence {
   private timer: number | undefined;
   private unsubscribe: (() => void) | undefined;
+  private revision = 0;
+  private savedRevision = 0;
+  private requested = false;
+  private running: Promise<void> | undefined;
 
   constructor(
     private readonly manager: OperationManager,
     private readonly onStatus: (status: SaveStatus) => void,
     private readonly getName: () => string = () => DEFAULT_DOCUMENT_NAME,
+    private readonly writeDocument: typeof saveDocument = saveDocument,
   ) {}
 
   start(): void {
+    if (this.unsubscribe) return;
     this.unsubscribe = this.manager.subscribe((event) => {
       if (!event.committed) return;
+      this.revision += 1;
       this.onStatus('saving');
       window.clearTimeout(this.timer);
       this.timer = window.setTimeout(() => void this.flush(), 500);
     });
+    window.addEventListener('pagehide', this.flushPending);
+    window.document.addEventListener('visibilitychange', this.handleVisibility);
   }
 
-  async flush(): Promise<void> {
+  flush(): Promise<void> {
     window.clearTimeout(this.timer);
     this.timer = undefined;
-    try {
-      await saveDocument(this.manager.document, this.getName());
-      this.onStatus('saved');
-    } catch (error) {
-      console.error('Unable to save Keyline document.', error);
-      this.onStatus('error');
+    this.requested = true;
+    // One writer per document prevents an older, slower save from overwriting a
+    // newer revision or announcing "Saved" while another revision is pending.
+    this.running ??= this.drain().finally(() => { this.running = undefined; });
+    return this.running;
+  }
+
+  private async drain(): Promise<void> {
+    while (this.requested) {
+      this.requested = false;
+      window.clearTimeout(this.timer);
+      this.timer = undefined;
+      const revision = this.revision;
+      this.onStatus('saving');
+      try {
+        await this.writeDocument(this.manager.document, this.getName());
+        this.savedRevision = revision;
+        if (revision !== this.revision) this.requested = true;
+        if (!this.requested) this.onStatus('saved');
+      } catch (error) {
+        console.error('Unable to save Keyline document.', error);
+        this.onStatus('error');
+      }
     }
   }
+
+  private readonly flushPending = () => {
+    if (this.revision !== this.savedRevision || this.timer !== undefined) void this.flush();
+  };
+
+  private readonly handleVisibility = () => {
+    if (window.document.visibilityState === 'hidden') this.flushPending();
+  };
 
   stop(): void {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
-    if (this.timer !== undefined) void this.flush();
+    window.removeEventListener('pagehide', this.flushPending);
+    window.document.removeEventListener('visibilitychange', this.handleVisibility);
+    this.flushPending();
   }
 }

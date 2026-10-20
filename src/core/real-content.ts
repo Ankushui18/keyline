@@ -11,12 +11,39 @@ export function drawnObjectsForArtboard(document: VectorDocument, artboardId: st
   return document.objectsForArtboard(artboardId).filter((object) => isDrawnObject(document, object));
 }
 
-/** Artboards the person can see as real frames: not the hidden canvas root, and not an empty starter frame next to real ones. */
+/** Every explicit frame counts, including intentionally blank frames. */
 export function realArtboards(document: VectorDocument): Artboard[] {
-  const all = [...document.artboards.values()].filter((artboard) => !artboard.isCanvasRoot);
-  const filled = all.filter((artboard) => drawnObjectsForArtboard(document, artboard.id).length > 0);
-  if (filled.length === 0) return all.slice(0, 1);
-  return all.filter((artboard) => filled.includes(artboard) || artboard.name !== 'Artboard 1');
+  return [...document.artboards.values()].filter((artboard) => !artboard.isCanvasRoot);
+}
+
+/** Recognize the untouched, automatically migrated starter, never merely an empty or similarly named frame. */
+export function isUnusedStarterArtboard(document: VectorDocument, artboard: Artboard): boolean {
+  if (artboard.id !== `${document.id}:artboard:1` || artboard.name !== 'Artboard 1' ||
+    artboard.isCanvasRoot || artboard.clipContent || artboard.background !== '#ffffff' ||
+    artboard.frame.x !== -512 || artboard.frame.y !== -384 ||
+    artboard.frame.width !== 1024 || artboard.frame.height !== 768) return false;
+  const objects = document.objectsForArtboard(artboard.id);
+  if (objects.length !== 1) return false;
+  const object = objects[0];
+  const network = document.getNetwork(object.networkId);
+  const appearance = document.getAppearance(object.appearanceId);
+  const layer = document.getLayerForObject(object.id);
+  const root = document.getLayer(`${document.id}:layer:1`);
+  const layers = [...document.layers.values()].filter((item) => item.artboardId === artboard.id);
+  return Boolean(network && network.nodeIds.length === 0 && network.pathIds.length === 0 &&
+    object.id === `${network.id}:object` && object.name === 'Vector Network 1' &&
+    !object.appearanceRuleId && !document.geometryComponentForObject(object.id) &&
+    object.transform.x === 0 && object.transform.y === 0 && object.transform.rotation === 0 &&
+    object.transform.scaleX === 1 && object.transform.scaleY === 1 &&
+    appearance?.fills.length === 0 && appearance.opacity === 1 &&
+    appearance.stroke?.color === '#c8ced9' && appearance.stroke.width === 1.25 &&
+    appearance.stroke.visible && appearance.stroke.opacity === 1 && appearance.stroke.dash.length === 0 &&
+    appearance.stroke.cap === 'round' && appearance.stroke.join === 'round' && appearance.stroke.alignment === 'center' &&
+    layer?.id === `${network.id}:object-layer` && layer.name === 'Vector Network 1' &&
+    layer.visible && !layer.locked && layer.parentId === root?.id &&
+    root?.name === 'Layer 1' && root.visible && !root.locked && layers.length === 2 &&
+    artboard.layerIds.length === 1 && artboard.layerIds[0] === root.id &&
+    root.childIds.length === 1 && root.childIds[0] === layer.id);
 }
 
 export function drawnObjectCount(document: VectorDocument): number {

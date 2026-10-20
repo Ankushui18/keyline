@@ -1,5 +1,6 @@
 import { createEntityId } from './ids';
 import { stableRegionId } from './regions';
+import { isUnusedStarterArtboard } from './real-content';
 import type { VectorDocument } from './document';
 import type { OperationInput, OperationManager } from './operations';
 import { prepareDeleteObject } from './object-operations';
@@ -33,6 +34,22 @@ export function prepareCreateIconArtboard(
 ): CreateIconArtboardPlan {
   assertDimensions(width, height);
   const page = document.activePage;
+  const starter = document.activeArtboard;
+  // First icon start adopts the existing empty starter instead of leaving a second, oversized board behind.
+  if (document.pages.length === 1 && page.artboardIds.length === 1 && isUnusedStarterArtboard(document, starter)) {
+    const artboard: Artboard = {
+      ...starter,
+      name: nextIconName(document, width, height),
+      frame: { x: 0, y: 0, width, height },
+    };
+    return {
+      artboard,
+      operations: [
+        { type: 'UPDATE_ARTBOARD', payload: { artboardId: starter.id, updates: { name: artboard.name, frame: artboard.frame } } },
+        { type: 'SET_ACTIVE_LOCATION', payload: { pageId: page.id, artboardId: starter.id } },
+      ],
+    };
+  }
   const artboardId = createEntityId();
   const networkId = createEntityId();
   const appearanceId = createEntityId();
@@ -494,4 +511,18 @@ function cloneSegment(segment: Segment, id: EntityId, nodeIds: Map<EntityId, Ent
     center: segment.center ? { ...segment.center } : undefined,
     widthProfile: segment.widthProfile?.map((point) => ({ ...point, id: createEntityId() })),
   };
+}
+
+/** Repair old icon-only files with the exact unused starter left by onboarding. Custom/blank user frames are preserved. */
+export function removeLegacyIconStarter(manager: OperationManager): DeleteArtboardsResult | null {
+  const document = manager.document;
+  if (document.pages.length !== 1) return null;
+  const starter = document.getArtboard(`${document.id}:artboard:1`);
+  if (!starter || !isUnusedStarterArtboard(document, starter)) return null;
+  const siblings = document.activePage.artboardIds
+    .filter((id) => id !== starter.id)
+    .map((id) => document.getArtboard(id));
+  if (siblings.length === 0 || !siblings.every((artboard) => artboard && !artboard.isCanvasRoot &&
+    /^Icon \d+(?:\.\d+)?(?:×\d+(?:\.\d+)?)?(?: \d+)?$/.test(artboard.name))) return null;
+  return deleteArtboardsTransactional(manager, [starter.id]);
 }
