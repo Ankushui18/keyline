@@ -17,8 +17,8 @@
   color: var(--graphite-350);
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  font-size: 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
   white-space: nowrap;
 }
 

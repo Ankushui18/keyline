@@ -10,7 +10,7 @@
   border: 0;
 }
 
-.brand h1 { margin: 0; font-size: 14px; font-weight: 600; }
+.brand h1 { margin: 0; font-size: var(--font-size-xl); font-weight: 600; }
 
 .workspace { grid-template-columns: minmax(0, 1fr) var(--sidebar-width, 320px); }
 .right-sidebar { grid-template-rows: 34px minmax(190px, 40%) minmax(0, 1fr); }
@@ -37,8 +37,8 @@
   color: var(--fgColor-muted);
   background: transparent;
   border: 0;
-  border-radius: 4px;
-  font-size: 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
 }
 .sidebar-panel-tabs button[aria-pressed="true"],
 .sidebar-panel-tabs button:hover { color: var(--fgColor-default); background: var(--border-strong); }
@@ -48,10 +48,10 @@
   align-items: flex-start;
   padding-top: 8px;
 }
-.right-sidebar.is-collapsed .sidebar-panel-tabs button { width: 28px; padding: 0; font-size: 20px; }
+.right-sidebar.is-collapsed .sidebar-panel-tabs button { width: 28px; padding: 0; font-size: var(--font-size-4xl); }
 .sidebar-resizer {
   position: absolute;
-  z-index: 30;
+  z-index: var(--z-popover);
   inset: 0 auto 0 -4px;
   width: 8px;
   cursor: col-resize;
@@ -82,9 +82,9 @@
   color: var(--fgColor-muted);
   background: var(--bgColor-default);
   border: 1px solid var(--borderColor-default);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   list-style: none;
 }
 .location-actions summary::-webkit-details-marker { display: none; }
@@ -92,14 +92,14 @@
 .location-actions details[open] summary { color: var(--fgColor-default); border-color: var(--text-disabled); }
 .location-action-menu {
   position: absolute;
-  z-index: 20;
+  z-index: var(--z-sidebar);
   top: 34px;
   left: 0;
   width: 164px;
   padding: 4px;
   background: var(--surface-panel);
   border: 1px solid var(--graphite-600);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-floating-small);
 }
 .location-actions details:last-child .location-action-menu { left: auto; right: 0; }
@@ -110,7 +110,7 @@
   justify-content: flex-start;
   gap: 7px;
   padding: 0 9px;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
 }
 
 /* Dense desktop controls remain precise without dropping below a usable target. */
@@ -128,7 +128,7 @@
 .constraint-parameters label > span,
 .constraint-palette .selection-summary {
   color: var(--graphite-350) !important;
-  font-size: 10px !important;
+  font-size: var(--font-size-xs) !important;
 }
 .layer-footer-actions { flex-wrap: wrap; min-height: 36px; }
 .layer-row.is-dragging { opacity: .42; }
@@ -144,7 +144,7 @@
   gap: 6px;
   padding: 0 3px;
   color: var(--fgColor-muted);
-  font-size: 9px;
+  font-size: var(--font-size-2xs);
 }
 .move-layer-field select {
   min-width: 0;
@@ -153,8 +153,8 @@
   color: var(--fgColor-muted);
   background: var(--bgColor-default);
   border: 1px solid var(--borderColor-default);
-  border-radius: 4px;
-  font-size: 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
 }
 
 .multi-object-inspector {
@@ -171,17 +171,17 @@
 .canvas-tool-rail button::after { display: none !important; }
 .canvas-rail-tooltip {
   position: fixed;
-  z-index: 300;
+  z-index: var(--z-max);
   min-width: max-content;
   padding: 6px 8px;
   color: var(--fgColor-default);
   background: var(--surface-raised);
   border: 1px solid var(--borderColor-default);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-floating-small);
   pointer-events: none;
   transform: translateY(-50%);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -198,10 +198,10 @@
   color: var(--fgColor-muted);
   background: rgba(37,37,37,.96);
   border: 1px solid var(--graphite-600);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-floating-small);
   transform: translateX(-50%);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
 }
 .isolation-banner strong { color: var(--fgColor-default); }
 .isolation-banner button {
@@ -210,13 +210,13 @@
   color: var(--fgColor-default);
   background: var(--border-strong);
   border: 1px solid var(--graphite-600);
-  border-radius: 5px;
-  font-size: 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
 }
 
 .workspace-notice {
   position: fixed;
-  z-index: 120;
+  z-index: var(--z-cursor);
   left: 50%;
   bottom: 48px;
   max-width: min(560px, calc(100vw - 32px));
@@ -227,10 +227,10 @@
   color: var(--fgColor-default);
   background: var(--surface-raised);
   border: 1px solid var(--graphite-600);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-floating-small);
   transform: translateX(-50%);
-  font-size: 12px;
+  font-size: var(--font-size-md);
 }
 .workspace-notice.is-error { border-color: #8a4b50; }
 .workspace-notice button {
@@ -240,8 +240,8 @@
   color: var(--fgColor-muted);
   background: transparent;
   border: 0;
-  border-radius: 4px;
-  font-size: 18px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-3xl);
 }
 .workspace-notice button:hover { color: var(--fgColor-default); background: var(--border-strong); }
 

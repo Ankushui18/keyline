@@ -22,15 +22,15 @@
   align-items: center;
   justify-content: space-between;
   color: var(--fgColor-muted);
-  font-size: 11px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
 .semantic-control-row output {
   border: 1px dashed var(--borderColor-muted);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--fgColor-subtle);
-  font-size: 9px;
+  font-size: var(--font-size-2xs);
   font-weight: 700;
   letter-spacing: .05em;
   padding: 1px 6px;
@@ -50,28 +50,28 @@
 .construction-action-unavailable p {
   border-left: 2px dashed var(--borderColor-muted);
   color: var(--fgColor-muted);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   margin: 0;
   padding-left: 8px;
 }
 
 .construction-explanation {
   color: var(--fgColor-muted);
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   margin: 0;
 }
 
 .layer-construction-badge {
   align-items: center;
   border: 1px dashed var(--borderColor-muted);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: var(--fgColor-muted);
   display: inline-flex;
   flex: 0 0 auto;
-  font-family: 'Geist', system-ui, sans-serif;
-  font-size: 8px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-3xs);
   font-weight: 700;
   height: 14px;
   justify-content: center;

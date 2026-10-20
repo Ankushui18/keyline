@@ -18,7 +18,7 @@
 .workspace-utilities .renderer-button,
 .workspace-utilities .family-button {
   position: fixed;
-  z-index: 50;
+  z-index: var(--z-dialog);
   top: 2px;
   width: 2px !important;
   min-width: 2px !important;
@@ -31,7 +31,7 @@
 .workspace-utilities .family-button { left: 396px; }
 .constraints-button {
   position: fixed;
-  z-index: 45;
+  z-index: var(--z-popover);
   left: 10px;
   bottom: 38px;
   width: 44px;
@@ -43,7 +43,7 @@
   color: var(--graphite-300);
   background: transparent;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
 }
 .constraints-button:hover,
 .constraints-button.is-active { color: var(--text-inverse); background: var(--surface-active); }
@@ -53,7 +53,7 @@
 .constraints-button b { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; }
 .quick-frame-control {
   position: fixed;
-  z-index: 50;
+  z-index: var(--z-dialog);
   top: 2px;
   left: 410px;
   width: 2px;
@@ -92,7 +92,7 @@
 .layers-panel { position: relative; grid-template-rows: 44px minmax(0, 1fr); min-height: 0; }
 .layers-panel-heading { padding: 0 14px; }
 .layers-heading-actions { display: none; }
-.layers-location-summary { font-size: 12px; }
+.layers-location-summary { font-size: var(--font-size-md); }
 .document-location {
   position: absolute;
   z-index: 8;
@@ -111,12 +111,12 @@
 .location-selectors input { width: 2px !important; min-width: 0 !important; height: 2px; padding: 0; border: 0; }
 .location-actions { top: 0; left: 6px; }
 .layer-tree { padding: 0 14px 8px; }
-.layer-row { min-height: 30px; padding-inline: 8px; border-left-width: 2px; border-radius: 7px; }
+.layer-row { min-height: 30px; padding-inline: 8px; border-left-width: 2px; border-radius: var(--radius-md); }
 .layer-row:has(.layer-disclosure:disabled) { grid-template-columns: 18px minmax(0, 1fr) auto; }
 .layer-row .layer-disclosure:disabled { display: none; }
 .layer-row.is-selected { box-shadow: inset 2px 0 0 var(--accent); border-left-color: transparent; }
-.layer-name { font-size: 13px; }
-.layer-reference-meta { margin-left: auto; color: var(--text-muted); font-size: 12px; white-space: nowrap; }
+.layer-name { font-size: var(--font-size-lg); }
+.layer-reference-meta { margin-left: auto; color: var(--text-muted); font-size: var(--font-size-md); white-space: nowrap; }
 .layer-row .layer-order-actions { display: none; }
 .layer-row .layer-state-button {
   position: absolute;
@@ -150,16 +150,16 @@
 
 /* Inspector */
 .right-sidebar > .properties-panel { border-top: 1px solid var(--border-default); }
-.properties-panel { --inspector-pad: 14px; font-size: 13px; }
+.properties-panel { --inspector-pad: 14px; font-size: var(--font-size-lg); }
 .properties-panel .panel-heading { height: 48px; padding: 0 14px; }
-.properties-panel .panel-heading h2 { font-size: 14px; }
+.properties-panel .panel-heading h2 { font-size: var(--font-size-xl); }
 .properties-panel .no-constraints { color: var(--text-muted); }
 .properties-panel .inspector-context,
-.properties-panel .inspector-context.has-selection { font-size: 12px; }
+.properties-panel .inspector-context.has-selection { font-size: var(--font-size-md); }
 .properties-panel > .keyline-node-inspector { margin: 0; padding: 0 14px 14px; border: 0; }
 .keyline-node-inspector { display: flex; flex-direction: column; gap: 14px; }
 .keyline-field-block { display: flex; flex-direction: column; gap: 6px; }
-.keyline-field-label { color: var(--text-muted); font-size: 12px; }
+.keyline-field-label { color: var(--text-muted); font-size: var(--font-size-md); }
 .keyline-position-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .keyline-position-grid .coordinate-field {
   height: 32px;
@@ -169,12 +169,12 @@
   padding: 0 10px;
   background: var(--surface-canvas);
   border: 1px solid var(--border-default);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
 }
 .keyline-position-grid .coordinate-field > span { color: var(--text-muted); }
-.keyline-position-grid .coordinate-field input { width: 100%; min-width: 0; padding: 0; color: var(--text-primary); text-align: right; background: transparent; border: 0; font: 13px 'Geist', system-ui, sans-serif; }
-.keyline-corner-control { display: flex; padding: 3px; background: var(--surface-canvas); border: 1px solid var(--border-default); border-radius: 9px; }
-.keyline-corner-control button { flex: 1; height: 28px; color: var(--text-primary); background: transparent; border: 0; border-radius: 7px; }
+.keyline-position-grid .coordinate-field input { width: 100%; min-width: 0; padding: 0; color: var(--text-primary); text-align: right; background: transparent; border: 0; font: 13px var(--font-sans); }
+.keyline-corner-control { display: flex; padding: 3px; background: var(--surface-canvas); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.keyline-corner-control button { flex: 1; height: 28px; color: var(--text-primary); background: transparent; border: 0; border-radius: var(--radius-md); }
 .keyline-corner-control button.is-active { background: var(--surface-active); font-weight: 500; }
 .keyline-suggestion {
   padding: 12px;
@@ -184,17 +184,17 @@
   color: var(--tint-info-ink-strong);
   background: var(--surface-selected);
   border: 1px solid var(--tint-info-surface-hover);
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
 }
 .keyline-suggestion-heading { display: flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 600; }
 .keyline-suggestion-heading svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-.keyline-suggestion p { margin: 0; line-height: 1.45; }
+.keyline-suggestion p { margin: 0; line-height: var(--line-height-normal); }
 .keyline-suggestion-actions { display: flex; gap: 8px; }
-.keyline-suggestion-actions button { height: 30px; padding: 0 14px; color: var(--tint-info-ink); background: transparent; border: 0; border-radius: 8px; }
+.keyline-suggestion-actions button { height: 30px; padding: 0 14px; color: var(--tint-info-ink); background: transparent; border: 0; border-radius: var(--radius-lg); }
 .keyline-suggestion-actions .is-primary { color: var(--text-inverse); background: var(--blue-700); font-weight: 600; }
 .keyline-suggestion-actions .is-primary:hover { background: var(--accent-pressed); }
-.keyline-locked-rules { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: var(--graphite-300); border: 1px solid var(--border-default); border-radius: 10px; }
-.keyline-locked-rules output { color: var(--text-muted); font: 12px 'Geist', system-ui, sans-serif; }
+.keyline-locked-rules { height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; color: var(--graphite-300); border: 1px solid var(--border-default); border-radius: var(--radius-xl); }
+.keyline-locked-rules output { color: var(--text-muted); font: 12px var(--font-sans); }
 .properties-panel:has(.keyline-node-inspector) > :not(.panel-heading):not(.keyline-node-inspector):not(.panel-help) { display: none; }
 .properties-panel:has(.keyline-node-inspector) .panel-help { display: none; }
 
@@ -218,7 +218,7 @@
 /* Reference canvas and artboard presentation. */
 .vector-canvas { background: var(--graphite-200); }
 .canvas-wrap { background: var(--graphite-200); }
-.canvas-artboard-name-input { font-family: 'Geist', sans-serif; }
+.canvas-artboard-name-input { font-family: var(--font-sans); }
 
 .app-shell:has(.empty-start-overlay) .export-button svg { display: none; }
 .app-shell:has(.empty-start-overlay) .status-right .save-state,
@@ -239,7 +239,7 @@
 .empty-start-overlay { inset: 0 calc(var(--sidebar-width, 300px) + 1px) 0 65px; }
 .vector-edit-toolbar { left: calc(50% + 32.5px); }
 .canvas-rail-group:nth-child(2) .canvas-tool-flyout { width: 226px; }
-.canvas-hint { left: calc(50% + 32.5px); width: 442px; font-size: 13px; }
+.canvas-hint { left: calc(50% + 32.5px); width: 442px; font-size: var(--font-size-lg); }
 .properties-panel .panel-heading h2 { width: 46px; }
 
 /* Match the compact Layers section and the inspector's source-board rhythm. */
@@ -259,7 +259,7 @@
 .layer-row { height: 30px; min-height: 30px; }
 .properties-panel .panel-heading { height: 47px; }
 .properties-panel .panel-heading > * { transform: translateY(-0.5px); }
-.properties-panel .panel-heading h2 { font-size: 13px; }
+.properties-panel .panel-heading h2 { font-size: var(--font-size-lg); }
 .keyline-position-grid .coordinate-field { height: 34px; }
 
 @media (max-width: 900px) {

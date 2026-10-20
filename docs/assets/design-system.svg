@@ -9,7 +9,7 @@
   <!-- source of truth -->
   <rect x="40" y="100" width="280" height="120" rx="10" fill="#1f2023" stroke="#0d99ff" stroke-width="1.5"/>
   <text x="60" y="128" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="13" font-weight="600">tokens.css</text>
-  <text x="60" y="150" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">235 tokens · palette, semantic</text>
+  <text x="60" y="150" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">246 tokens · palette, semantic</text>
   <text x="60" y="168" fill="#a0a3ab" font-family="Geist, system-ui, sans-serif" font-size="11">roles, scales, layout metrics</text>
   <text x="60" y="196" fill="#74a0ff" font-family="Geist Mono, ui-monospace, monospace" font-size="10">--accent: #0d99ff;</text>
 
@@ -30,7 +30,7 @@
   <text x="398" y="334" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">documents, not into chrome</text>
 
   <!-- gate -->
-  <rect x="700" y="96" width="260" height="268" rx="10" fill="#12233a" stroke="#0868b6"/>
+  <rect x="700" y="96" width="260" height="284" rx="10" fill="#12233a" stroke="#0868b6"/>
   <text x="720" y="124" fill="#dce9ff" font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">npm run check:design</text>
   <text x="720" y="150" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">1 token integrity</text>
   <text x="720" y="170" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">2 palette parity (CSS ↔ TS)</text>
@@ -39,10 +39,11 @@
   <text x="720" y="230" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">5 WCAG contrast pairs</text>
   <text x="720" y="248" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">6 no dangling var(--x)</text>
   <text x="720" y="266" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">7 chrome is not canvas</text>
-  <text x="720" y="290" fill="#7fd1a0" font-family="Geist, system-ui, sans-serif" font-size="11">fails the build on drift</text>
-  <text x="720" y="324" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">runs first in CI and in</text>
-  <text x="720" y="324" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">npm run check</text>
-  <text x="720" y="344" fill="#8a8d95" font-family="Geist Mono, ui-monospace, monospace" font-size="10">37 legacy literals ratcheted</text>
+  <text x="720" y="284" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">8–10 type, radius, layering</text>
+  <text x="720" y="308" fill="#7fd1a0" font-family="Geist, system-ui, sans-serif" font-size="11">fails the build on drift</text>
+  <text x="720" y="342" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">runs first in CI and in</text>
+  <text x="720" y="342" fill="#a9bbd6" font-family="Geist, system-ui, sans-serif" font-size="11">npm run check</text>
+  <text x="720" y="360" fill="#8a8d95" font-family="Geist Mono, ui-monospace, monospace" font-size="10">37 legacy literals ratcheted</text>
 
   <!-- arrows -->
   <g stroke="#3a3d44" stroke-width="1.5" fill="none">
@@ -65,6 +66,6 @@
   <!-- migration strip -->
   <rect x="40" y="392" width="920" height="88" rx="10" fill="#1f2023" stroke="#2e3036"/>
   <text x="60" y="418" fill="#ececee" font-family="Geist, system-ui, sans-serif" font-size="12" font-weight="600">The migration that got here</text>
-  <text x="60" y="440" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">2,064 literal colours in feature CSS → 37, tokenised by a codemod that only rewrites a hex when a compatible token is within ΔE 6</text>
-  <text x="60" y="460" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">and when the token's role (ink, surface, border) matches the property. Everything that survived is pinned in baseline.json.</text>
+  <text x="60" y="440" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">2,064 literal colours → 37, and 20 font sizes → 12, 15 radii → 8, 36 z-index values → tiers. Each codemod prints every change.</text>
+  <text x="60" y="460" fill="#8a8d95" font-family="Geist, system-ui, sans-serif" font-size="11">A hex moves only when a role-compatible token is within ΔE 6; type, radius and layering snap to the nearest scale step.</text>
 </svg>

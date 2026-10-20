@@ -10,6 +10,9 @@
  *   5. contrast          — semantic text/surface pairs meet WCAG AA
  *   6. no dangling vars  — every var(--x) is declared in CSS or set at runtime
  *   7. chrome ≠ canvas   — feature CSS may not borrow overlay or canvas ink
+ *   8. typography        — sizes and families come from the type scale
+ *   9. radius            — corners come from the radius scale
+ *  10. layering          — z-index is a token, or a local layer of 0–9
  *
  * The baseline records the literals that existed when the system landed. It may
  * only shrink: deleting a fix is never easier than keeping it.
@@ -227,7 +230,33 @@ for (const file of styleFiles) {
   }
 }
 
-/* ------------------------------------------------------- 8. baseline update */
+/* ------------------------------------------------------------ 8–10. scales */
+// Colour was only the first dimension. Type, corners and layering drifted the
+// same way, so the same rule applies: a value comes from the scale.
+const SCALE_RULES = [
+  [/font-size\s*:\s*[0-9.]+px/g, 'font-size uses a px value; use var(--font-size-*)'],
+  [/font\s*:\s*[^;{}]*['"]Geist\b/g, 'font shorthand names Geist literally; use var(--font-sans)'],
+  [/font-family\s*:\s*[^;{}]*['"]Geist\b/g, 'font-family names Geist literally; use var(--font-sans)'],
+  [/border-radius\s*:\s*[^;{}]*[0-9.]+px/g, 'border-radius uses a px value; use var(--radius-*)'],
+  [/line-height\s*:\s*1\.[0-9]+/g, 'line-height uses a raw ratio; use var(--line-height-*)'],
+];
+for (const file of styleFiles) {
+  const text = await readFile(file, 'utf8');
+  for (const [pattern, message] of SCALE_RULES) {
+    for (const match of text.matchAll(pattern)) {
+      const line = text.slice(0, match.index).split('\n').length;
+      problems.push(`${relative(root, file)}:${line}: ${message}`);
+    }
+  }
+  for (const match of text.matchAll(/z-index\s*:\s*(-?\d+)/g)) {
+    if (Number(match[1]) >= 10) {
+      const line = text.slice(0, match.index).split('\n').length;
+      problems.push(`${relative(root, file)}:${line}: z-index ${match[1]} is not a token; use var(--z-*) or a local layer 0–9`);
+    }
+  }
+}
+
+/* ------------------------------------------------------- 11. baseline update */
 if (process.argv.includes('--update')) {
   const next = { colors: {} };
   const bump = (bucket, hex, n) => { bucket[hex] = (bucket[hex] ?? 0) + n; };
@@ -257,7 +286,7 @@ if (process.argv.includes('--update')) {
   process.exit(0);
 }
 
-/* -------------------------------------------------------------- 9. drift list */
+/* -------------------------------------------------------------- 12. drift list */
 if (process.argv.includes('--list')) {
   const near = new Map();
   for (const file of styleFiles) {

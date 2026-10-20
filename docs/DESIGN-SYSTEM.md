@@ -9,7 +9,7 @@ stops them from drifting.
 Before this system existed the app carried four competing `:root` blocks and 2,064 literal hex
 values across 24 feature stylesheets. Colours that should have been the same were one or two
 CIEDE2000 steps apart, so hover states, chips and panels slowly disagreed with each other. The
-system replaced that with **235 tokens, one component layer, and a build gate**.
+system replaced that with **246 tokens, one component layer, and a build gate**.
 
 ---
 
@@ -17,7 +17,7 @@ system replaced that with **235 tokens, one component layer, and a build gate**.
 
 | Path | Role |
 |---|---|
-| [`src/styles/system/tokens.css`](../src/styles/system/tokens.css) | **The only file allowed to name a colour.** 235 tokens: palette ramps, semantic roles, state tints, scales, layout metrics, legacy aliases. |
+| [`src/styles/system/tokens.css`](../src/styles/system/tokens.css) | **The only file allowed to name a colour.** 246 tokens: palette ramps, semantic roles, state tints, scales, layout metrics, legacy aliases. |
 | [`src/styles/system/base.css`](../src/styles/system/base.css) | Font faces, reset, typography defaults, one focus ring, scrollbars, reduced motion, `.sr-only`, the app shell grid. |
 | [`src/styles/system/components/ui.css`](../src/styles/system/components/ui.css) | Shared primitives (`.ui-button`, `.ui-input`, `.ui-dialog`, …) built only from tokens. |
 | [`src/design-system/tokens.ts`](../src/design-system/tokens.ts) | Resolved values for code that cannot read CSS variables: Canvas 2D, WebGL2, export. Mirrors 61 tokens. |
@@ -68,10 +68,11 @@ Feature CSS had invented roughly a dozen pale reds within ΔE 3 of each other; t
 | Scale | Values |
 |---|---|
 | Space (2px base) | `--space-0`, `--space-05` … `--space-12` → 0–48px |
-| Radius | `--radius-xs/sm/md/lg/xl/2xl/full` → 3, 4, 6, 8, 10, 12, 999px |
-| Type size | `--font-size-*` → 9–24px |
+| Radius | `--radius-xs/sm/md/lg/xl/2xl/3xl/full` → 3, 4, 6, 8, 10, 12, 16, 999px |
+| Type size | `--font-size-3xs … 6xl` → 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 32px |
+| Line height | `--line-height-tight/snug/normal/relaxed` → 1.2, 1.3, 1.45, 1.55 |
 | Motion | `--motion-fast/base/slow` → 90 / 140 / 220ms, `--ease-standard: cubic-bezier(0.2, 0, 0.2, 1)` |
-| Z-index | `--z-canvas` 0 → `--z-toast` 80 |
+| Z-index | `--z-canvas` 0 → `--z-toolbar` 10 → `--z-popover` 40 → `--z-dialog` 60 → `--z-toast` 80 → `--z-drag` 100 → `--z-cursor` 120 → `--z-alert` 160 → `--z-modal-top` 200 → `--z-critical` 240 → `--z-max` 300 |
 | Layout | `--topbar-height` 52, `--statusbar-height` 28, `--control-height` 28, `--inspector-pad` 12, `--sidebar-width` 300 (240–560 range) |
 
 Legacy aliases (`--bg`, `--surface`, `--blue`, `--bgColor-*`, `--fgColor-*`, `--di-*`) still exist
@@ -210,11 +211,15 @@ npm run check:design -- --list      # nearest token for each surviving literal
    token for UI paint. Those describe artwork and tool affordances; the only exceptions are
    preview backgrounds (`--canvas-paper`) and the two legends that deliberately mirror the canvas
    (`.hint-dot.build`, `.fill-actions`).
+8. **Typography** — no `font-size: Npx`, no literal `'Geist'` stack. Sizes and families come from
+   the type scale.
+9. **Radius** — no `border-radius: Npx`; corners come from the radius scale.
+10. **Layering** — `z-index` is a `var(--z-*)` tier, or a local layer `0–9` inside one component.
 
 Current state, from the last run:
 
 ```
-Design system: 235 tokens, 61 mirrored values.
+Design system: 246 tokens, 61 mirrored values.
 Literal colours remaining — CSS 37, TS 0 (tracked in baseline.json).
 Design-system check passed: one palette, no drift.
 ```
@@ -274,6 +279,56 @@ baseline rather than silently rounded.
 
 ---
 
+## Consistency audit
+
+The gate proves nothing *drifts*. It does not prove the product looks the same in two places.
+`npm run audit:design` measures that:
+
+```bash
+npm run audit:design            # summary
+npm run audit:design -- --details   # every off-scale value, with its file
+npm run audit:design -- --json      # machine-readable
+```
+
+It counts how many distinct values each visual dimension actually uses. Before the second
+migration pass the answer was "more than the design system owns":
+
+| Dimension | Before | After |
+|---|---|---|
+| Distinct font sizes | 20 (10 off scale: 7, 8, 8.5, 9.5, 10.5, 11.5, 15, 17, 22, 34) | **12, all on scale** |
+| Raw `font-family` / `font:` stacks | 74 literal `'Geist', system-ui, sans-serif` | **0** (all `var(--font-sans)` / `var(--font-mono)`) |
+| Distinct border radii | 15 (7 off scale: 1, 2, 5, 7, 9, 11, 14) | **8, all on scale** |
+| Distinct z-index values | 36 arbitrary numbers, −1 to 300 | **38 token references + 10 local layers (0–9)** |
+| Distinct line-heights | 13 ratios (1.2 … 1.55) | **4 ratio tokens**, plus deliberate `line-height: 1` locks |
+| Literal hex in feature CSS | 2,064 | **37** (ratcheted) |
+| Inline `px` literals in TSX | 0 | 0 |
+
+That pass is `scripts/design-system/migrate-scales.mjs` (`npm run migrate:scales`). It is a
+codemod, not a rewrite: every replacement is printed, and it only ever moves a value to the
+nearest scale step (ties resolve to the smaller step, so text and corners never grow).
+
+The z-index mapping is the careful one. It is **monotonic within each stylesheet**: a value that
+sat above another still sits above it afterwards, so no component's internal stacking can change.
+Values of 0–9 stay as plain numbers, because an inner layer of a single component is not a global
+tier.
+
+### What still differs
+
+Measured, not guessed — these are the remaining dimensions where the product is not yet uniform:
+
+| Dimension | Today | Why it is still open |
+|---|---|---|
+| Spacing | 19 distinct `gap` values, 6 off the 2px grid; 161 distinct `padding` shorthands | 1px shifts in gap and padding move real layout. This needs a browser to verify, and this sandbox has none. |
+| Button geometry | 24 bespoke button classes; 9 distinct heights (24, 25, 26, 27, 28, 30, 32, 34, 36) | Same reason, plus each height is tuned to a specific row (top bar 28, dialog footer 34). |
+| Specificity | 50 `!important` declarations | Most are legacy overrides from the pre-token slices. Removing them safely needs the same visual check. |
+| Colour | 37 literals | Frozen by the ratchet; see `--list`. |
+
+The plan for those is the same shape as the work above: measure with the audit, codemod with a
+printed diff, then ratchet. They are listed here so "the design system is done" is never a false
+claim.
+
+---
+
 ## Rules of thumb
 
 **Do**
@@ -306,3 +361,5 @@ baseline rather than silently rounded.
   read tokens, but folding them into `.ui-*` primitives is incremental work, tracked by the
   ratchet rather than done in one pass.
 - **37 literals remain** and are frozen by the baseline, not eliminated. See `--list` for the list.
+- **Spacing, button geometry and 50 `!important`s are still uneven.** The audit quantifies them
+  (above) rather than implying they are finished.

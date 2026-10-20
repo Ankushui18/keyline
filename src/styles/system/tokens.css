@@ -212,11 +212,13 @@
   --radius-lg: 8px;
   --radius-xl: 10px;
   --radius-2xl: 12px;
+  --radius-3xl: 16px;
   --radius-pill: 999px;
 
   /* Type. Geist is bundled; sizes below 12px are reserved for dense chrome. */
   --font-sans: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-size-3xs: 8px;
   --font-size-2xs: 9px;
   --font-size-xs: 10px;
   --font-size-sm: 11px;
@@ -227,12 +229,15 @@
   --font-size-3xl: 18px;
   --font-size-4xl: 20px;
   --font-size-5xl: 24px;
+  --font-size-6xl: 32px;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
   --line-height-tight: 1.2;
+  --line-height-snug: 1.3;
   --line-height-normal: 1.45;
+  --line-height-relaxed: 1.55;
   --letter-spacing-tight: -0.01em;
   --letter-spacing-wide: 0.06em;
 
@@ -258,6 +263,12 @@
   --z-popover: 40;
   --z-dialog: 60;
   --z-toast: 80;
+  --z-drag: 100;
+  --z-cursor: 120;
+  --z-alert: 160;
+  --z-modal-top: 200;
+  --z-critical: 240;
+  --z-max: 300;
 
   /* Layout metrics shared by shell, panels and dialogs. */
   --layout-topbar: 52px;

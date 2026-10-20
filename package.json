@@ -27,6 +27,8 @@
     "check:design": "node scripts/design-system/check.mjs",
     "check:docs": "node scripts/check-docs.mjs",
     "migrate:colors": "node scripts/design-system/migrate-colors.mjs",
+    "migrate:scales": "node scripts/design-system/migrate-scales.mjs",
+    "audit:design": "node scripts/design-system/audit.mjs",
     "test:browser": "node scripts/test-browser.mjs",
     "test:design": "node scripts/test-browser.mjs design",
     "test:review": "node scripts/test-browser.mjs review"
