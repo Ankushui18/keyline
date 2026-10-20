@@ -33,8 +33,8 @@ import {
   nextObjectUnderPoint,
   objectsUnderPoint,
   selectionForHit,
-  selectionForObjectHit,
 } from '../tools/select-tool';
+import { exitGroupContext, resolveObjectPress, selectionForTarget } from '../core/group-context';
 import { buildShapeBuilderResult, regionAtPoint } from '../tools/shape-builder';
 import { prepareCutPaths, prepareSplitAtPoint, prepareSplitSegment } from '../tools/cut-tool';
 import { addWidthPoint, hitTestWidthHandle, updateWidthPoint, type WidthHandle } from '../tools/width-tool';
@@ -493,8 +493,16 @@ export function VectorCanvas({
           onShapeBuilderStateChange({ regionIds: [], resultPathIds: [] });
         }
         if (selectionRef.current.mode === 'network') {
-          onSelectionChange(exitNetworkEditMode(selectionRef.current));
+          const exited = exitNetworkEditMode(selectionRef.current);
+          onSelectionChange(selectionRef.current.groupContext
+            ? { ...exited, groupContext: selectionRef.current.groupContext }
+            : exited);
           onRequestToolChange('select');
+        } else if (selectionRef.current.mode === 'object' && selectionRef.current.groupContext) {
+          // One Escape leaves one level of grouping and keeps the group selected, so the
+          // next Escape walks further out rather than clearing the selection outright.
+          const { context, target } = exitGroupContext(manager.document, selectionRef.current.groupContext);
+          onSelectionChange(selectionForTarget(selectionRef.current, target, false, context));
         } else if (toolRef.current !== 'select' && toolRef.current !== 'pen' && toolRef.current !== 'pencil' && toolRef.current !== 'brush') {
           onRequestToolChange('select');
         } else if (toolRef.current === 'select' && selectedArtboardIdsRef.current.size > 0) {
@@ -1214,10 +1222,20 @@ export function VectorCanvas({
       }
       const objectHit = hitTestObject(manager.document, world, 7 / viewport.scale);
       if (objectHit || !event.shiftKey) onArtboardSelectionChange(new Set());
-      if (objectHit && isDirectDoubleClick) {
+      // A click only resolves inside the group the user has entered when the artwork
+      // it lands on is actually in that group; anything else drops the context first.
+      // One double-click descends one level, so nested groups are walked a step at a time.
+      const press = resolveObjectPress(manager.document, selectionRef.current, objectHit?.id, {
+        doubleClick: isDirectDoubleClick,
+        additive: event.shiftKey,
+      });
+      const context = press.selection.groupContext;
+      if (objectHit && press.enteredGroup) {
+        onSelectionChange(press.selection);
+      } else if (objectHit && isDirectDoubleClick) {
         const editing = enterNetworkEditMode(manager.document, objectHit.id);
         const nextSelection = selectionForHit(editing, objectHit.geometryHit ?? null, false);
-        onSelectionChange(nextSelection);
+        onSelectionChange(context ? { ...nextSelection, groupContext: context } : nextSelection);
       } else if (!objectHit) {
         gestureRef.current = {
           kind: 'marquee',
@@ -1232,14 +1250,7 @@ export function VectorCanvas({
         marqueePreviewRef.current = { start: world, end: world, mode: 'contain' };
         canvas.setPointerCapture(event.pointerId);
       } else {
-        const nextSelection = !event.shiftKey && selectionRef.current.objectIds.has(objectHit.id)
-          ? {
-              ...selectionRef.current,
-              objectIds: new Set(selectionRef.current.objectIds),
-              nodeIds: new Set<EntityId>(),
-              segmentIds: new Set<EntityId>(),
-            }
-          : selectionForObjectHit(selectionRef.current, objectHit, event.shiftKey);
+        const nextSelection = press.selection;
         onSelectionChange(nextSelection);
         if (nextSelection.objectIds.has(objectHit.id)) {
           gestureRef.current = {
@@ -2419,6 +2430,18 @@ export function VectorCanvas({
         <div className="isolation-banner" role="status">
           <span>Editing only <strong>{layerBreadcrumb(manager.document, manager.document.isolatedLayerId)}</strong></span>
           <button type="button" onClick={() => manager.execute({ type: 'SET_LAYER_ISOLATION', payload: { layerId: undefined } })}>Exit isolation</button>
+        </div>
+      )}
+      {!manager.document.isolatedLayerId && selection.groupContext && manager.document.getLayer(selection.groupContext) && (
+        <div className="isolation-banner" role="status">
+          <span>Inside group <strong>{layerBreadcrumb(manager.document, selection.groupContext)}</strong> · <kbd>Esc</kbd> to leave</span>
+          <button
+            type="button"
+            onClick={() => {
+              const { context, target } = exitGroupContext(manager.document, selection.groupContext!);
+              onSelectionChange(selectionForTarget(selection, target, false, context));
+            }}
+          >Exit group</button>
         </div>
       )}
       {selection.mode === 'network' && (

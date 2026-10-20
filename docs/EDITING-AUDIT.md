@@ -81,7 +81,7 @@ or where it would have to be added.
 | Rotate | yes — hover just outside a corner for a rotate cursor, drag to turn, `Shift` snaps to 15° (no handle, as in Figma) | `frameHitTarget` / `prepareRotateObjects` in `src/core/object-resize.ts` | **shipped in this pass** |
 | Rotate by number | yes — the `Rotation` field and the 90° button turn about the frame centre, so typing an angle never moves the shape | `prepareRotateTo` in `src/core/object-resize.ts` | **fixed in this pass** |
 | Double-click a shape | enters point editing (also `Enter`) | `VectorCanvas.tsx:621` | works |
-| Double-click **enters a group** | **no** — clicks resolve to the leaf object; groups are selectable only in the Layers panel | `ui/LayersPanel.tsx:452`, isolation at `core/document.ts:317` | **missing** |
+| Double-click **enters a group**, `Escape` leaves one level | yes — a click selects the outermost group, each double-click descends one level, `Escape` steps out and keeps the group selected | `core/group-context.ts`, `canvas/VectorCanvas.tsx` | **shipped in this pass** |
 | `Ctrl/⌘ G` / ungroup | only when a layer row has focus | `ui/LayersPanel.tsx:452-500` | partial |
 | Layers: nest, reorder, lock, hide | yes, full keyboard reordering | `ui/LayersPanel.tsx:121-186` | works |
 | Isolate a group | yes, but it **hides** the rest of the document | `core/document.ts:317`, banner at `VectorCanvas.tsx:2285` | partial |
@@ -112,20 +112,36 @@ Behaviour worth knowing: **`Shift`** on a corner keeps the selection's aspect
 ratio, and the frame follows the object's own axes, so handles stay on a rotated
 shape instead of boxing it.
 
-### 3.2 Groups cannot be entered on the canvas
+### 3.2 Group entry and exit — done
 
-`hitTestObject` returns the leaf object, so a click inside a group always grabs
-the leaf. The Layers panel can select and group layers, but the canvas cannot
-address the group at all. The nearest existing primitive, isolation, hides every
-other object, which is a heavier mode than "step into this group".
+`hitTestObject` returns the leaf object, so a click inside a group used to grab the
+leaf whatever the user could see grouped. The Layers panel could select and group
+layers, but the canvas could not address a group at all.
 
-**Smallest change:** give `SelectionState` a `layerIds` target and resolve hits to
-the *highest* ancestor group that is not already entered, then let each subsequent
-double-click descend one level and the next one enter point editing.
+Group navigation now lives in `src/core/group-context.ts` and is expressed as one
+selection field plus four pure functions:
 
-**Cost:** this is the largest of the four — selection shape, hit-test resolution,
-renderer outline, move/resize on a group, layer-panel sync.
-**Do it after 3.1**, because group bounds reuse the object-handle work.
+- `SelectionState.groupContext` is the group the canvas is inside. Absent means the page
+  root. It is a *selection* context, not the existing layer isolation — nothing is hidden.
+- `selectionTargetForObject` resolves a hit to the outermost group containing it, or to
+  the direct child of the entered group once you are inside one. A group target carries
+  every visible descendant object, so move, resize, rotate, delete and undo keep using
+  the existing multi-object paths instead of a new group transform node.
+- `groupToEnterOnDoubleClick` descends exactly one level per double-click, so nested
+  groups are walked a step at a time and a double-click on a leaf stays point editing.
+- `exitGroupContext` leaves one level per `Escape` and keeps the group selected.
+- `resolveObjectPress` is the single press decision the canvas calls: it returns the
+  selection *and* whether the press descended into a group. A press that lands outside
+  the entered group drops the context first, so a click can never select a child of a
+  group the user is not inside.
+
+An on-canvas banner names the entered group and offers `Exit group`, matching the
+existing isolation banner; the Layers panel highlights the entered group instead of its
+members while you are inside it.
+
+The contract is pinned by `src/core/group-context.test.ts` (10 tests) and was written
+before the code. Known limit: deleting a group selection removes its objects but leaves
+the empty group layer behind.
 
 ### 3.3 Rotation — done
 
@@ -210,7 +226,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 | Step | Work | Unlocks |
 |---|---|---|
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
-| 2 | Canvas group selection and one-level entry (3.2) | nested documents, real design files |
+| 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
 | 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
 | 4 | Text and gradients (3.5) | typography and illustration, the two missing media |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
@@ -222,7 +238,7 @@ quality gain, and it needs no new model concepts.
 
 ## 6. Shipped in this pass
 
-Four changes, all small and all verified by the existing gates:
+Five changes, all small and all verified by the existing gates:
 
 - **Resize and rotate.** A quad frame on the object's own axes with eight resize
   handles and a rotate zone just outside each corner; `Shift` keeps the ratio when
@@ -234,6 +250,9 @@ Four changes, all small and all verified by the existing gates:
 - **Wheel pans the canvas.** Plain wheel or two-finger scroll pans, `Shift` +
   wheel pans horizontally, `Ctrl/⌘` + wheel or pinch zooms at the pointer, and
   `Ctrl/⌘ +` / `-` steps the zoom. See `wheelIntent` in `src/canvas/viewport.ts`.
+- **Group entry and exit.** A click selects the outermost group, each double-click
+  descends one level, `Escape` leaves one level. `src/core/group-context.ts` holds the
+  contract, `src/core/group-context.test.ts` pins it with 10 tests.
 - **Truthful inspector availability.** Every disabled control in the right panel
   names its reason in its tooltip, availability comes from the visible-and-unlocked
   set the commands act on, and a frame holding a single shape can be aligned.

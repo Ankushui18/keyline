@@ -2200,6 +2200,12 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           onPresenceCursor={(point) => collaborationRef.current?.setCursor(point)}
           onSelectionChange={(next) => {
             setSelection(next);
+            // While inside a group the Layers panel highlights the group being edited;
+            // a group selection at the root highlights every member, as it always did.
+            if (next.groupContext) {
+              setSelectedLayerIds(new Set([next.groupContext]));
+              return;
+            }
             const layerIds = [...next.objectIds]
               .map((objectId) => document.getLayerForObject(objectId)?.id)
               .filter((id): id is EntityId => Boolean(id));

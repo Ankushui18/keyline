@@ -7,7 +7,7 @@
 - **Status:** this is the P0 deliverable — a gap report, not a rewrite.
 
 > The plan this responds to describes the repository as "v0.1.0, 318 automated tests". That figure is
-> out of date: the suite at this commit is **354 tests across 59 files**, plus a real Wasm smoke test,
+> out of date: the suite at this commit is **364 tests across 60 files**, plus a real Wasm smoke test,
 > nine WebSocket relay checks, a design-system gate and a documentation gate. Everything below was
 > re-verified at `a375b5e` rather than taken from the repository description.
 
@@ -21,7 +21,7 @@ a world-class direct-selection and path-editing experience, and do not start wit
 
 | Source | What it establishes |
 |---|---|
-| `npm run check` at this commit | build, strict TypeScript, **354 tests / 59 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
+| `npm run check` at this commit | build, strict TypeScript, **364 tests / 60 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
 | Full read of `src/core/operations.ts` | 67 operation types; every document mutation is expressed as one |
 | Hit testing, transform and history read-through | the claims in the matrix below cite `file:line`, not documentation |
 | Targeted experiments | z-order hit testing (below), inspector availability, rotation about the centre |
@@ -46,7 +46,7 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 | Anchors, handles and segments have distinct hit targets | Verified | `hitTest` node-first then `hitTestSegment`, tolerances in screen space |
 | Enter/insert a point on a segment | Verified | `tools/pen-tool.ts`, `ADD_NODE`/`SPLIT_SEGMENT` operations |
 | Escape leaves the current context without losing committed edits | Verified | `exitNetworkEditMode`, one transaction per gesture |
-| Double-click **enters a group** | **Missing** | clicks resolve to the leaf object; groups are selectable only in the Layers panel (`docs/EDITING-AUDIT.md` §3.2) |
+| Double-click **enters a group**, `Escape` leaves | **Verified — added in this pass** | `core/group-context.ts` (`selectionTargetForObject`, `resolveObjectPress`, `exitGroupContext`); 10 contract tests in `src/core/group-context.test.ts` |
 | Hover preview of the object under the pointer | **Missing** | no hover state in `VectorCanvas.tsx` |
 | Command palette | **Missing** | `src/ui/` has a `CommandBar` for AI text, not a searchable command palette |
 | Keyboard-only operation of the canvas | **Partial** | canvas is focusable (`tabIndex` at `VectorCanvas.tsx:2363`), arrows nudge, but selection itself needs a pointer or the Layers panel |
@@ -124,7 +124,8 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 
 ## 3. What this pass changed
 
-Two P1 interaction defects, both found by the audit rather than reported:
+Group entry and exit (see §2.1 and `docs/EDITING-AUDIT.md` §3.2), preceded by two P1 interaction
+defects found by the audit rather than reported:
 
 1. **Selection disagreed with the picture.** `hitTestObject` walked `document.objects` in insertion
    order, while the renderer paints in layer order. Reorder a layer in the Layers panel and clicking a
@@ -143,7 +144,7 @@ Ordered by dependency and by what a designer would feel first — not by how int
 
 | # | Gap | Why it blocks | Size |
 |---|---|---|---|
-| 1 | Group entry on the canvas (double-click into a group, `Escape` out) | Nested artwork is unusable at speed; every real illustration has groups | S–M |
+| 1 | ~~Group entry on the canvas~~ (done in this pass) | — | — |
 | 2 | Hover affordance (object/segment preview before clicking) | Users cannot predict what a click will select | S |
 | 3 | Text objects (entity, editing, SVG round trip) | Excludes branding and typography entirely — the largest single missing capability | L |
 | 4 | Gradient fills | Same: branding work is not possible with solids alone | M |
@@ -171,12 +172,13 @@ These are the non-negotiables from the plan, and they already hold at this commi
 Adopt the plan's P1 milestone as stated: **direct selection and path editing**, delivered as three
 increments, each shippable on its own.
 
-1. *Selection truth* — done in this pass (paint order, cycling). Next: hover previews.
-2. *Group entry* — double-click in, `Escape` out, `Cmd/⌘`-click to select the parent; group bounds and
-   group-level transforms. This is the plan's roadmap item 2 and the largest interaction gap left.
+1. *Selection truth* — done: paint order, `Ctrl/⌘`-click cycling, hover previews still open.
+2. *Group navigation* — done: a click selects the outermost group, each double-click descends one
+   level, `Escape` steps out. Known limit: deleting a group selection leaves the empty group layer.
+   Next in this area: group outlines on canvas and `Cmd/⌘`-click to select the parent group.
 3. *Path editing polish* — insertion preview before commit, per-anchor corner/smooth state visible in
    the canvas, arc-specific handles.
 
-AI work should start only after step 2 ships, and only as operation plans validated by the same code
+AI work should start only after step 3, and only as operation plans validated by the same code
 that validates manual edits. Text and gradients are the next product-level expansion after the
 interaction layer, because they gate every non-icon audience in the plan's table.

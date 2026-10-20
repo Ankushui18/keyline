@@ -223,6 +223,7 @@ export const cloneSelection = (selection: SelectionState): SelectionState => ({
   objectIds: new Set(selection.objectIds),
   nodeIds: new Set(selection.nodeIds),
   segmentIds: new Set(selection.segmentIds),
+  groupContext: selection.groupContext,
 });
 
 export function enterNetworkEditMode(document: VectorDocument, objectId: EntityId): SelectionState {

@@ -5,6 +5,15 @@ and the project uses semantic versioning once it publishes releases.
 
 ## [Unreleased]
 
+### Added
+
+- **Group entry and exit.** A click on grouped artwork selects the outermost group (every shape
+  inside it, so the existing move/resize/rotate/delete paths apply unchanged). Double-click descends
+  one nested level, a banner names the group you are inside, and `Escape` or **Exit group** steps back
+  out one level with the group still selected. Clicking artwork outside the group leaves it. Unlike
+  isolation, entering a group hides nothing. The contract lives in `src/core/group-context.ts` and is
+  pinned by `src/core/group-context.test.ts`.
+
 ### Fixed
 
 - Clicking now selects the shape that is actually painted on top. Hit testing walked objects in

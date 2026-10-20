@@ -9,7 +9,7 @@ and export production-ready SVG, PNG, React and CSS — from your browser, with 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/Ankushui18/keyline/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
-  <img src="https://img.shields.io/badge/tests-354%20passing-brightgreen" alt="354 tests passing">
+  <img src="https://img.shields.io/badge/tests-364%20passing-brightgreen" alt="364 tests passing">
   <img src="https://img.shields.io/badge/node-20.19%2B%20%7C%2022.12%2B-339933" alt="Node 20.19+ or 22.12+">
   <img src="https://img.shields.io/badge/storage-on%20this%20device-6b7686" alt="Stored on this device">
 </p>
@@ -32,7 +32,7 @@ Keyline is a **web app you run locally**, not a hosted service. Pick the path th
 | **See what's missing** (honest list) | [Known limits](#known-limits) |
 | **Read the security/audit record** | [SECURITY.md](SECURITY.md) · [docs/AUDIT.md](docs/AUDIT.md) |
 
-> **Status: v0.1.0, source release.** Covers the icon workflow described below, verified by 354
+> **Status: v0.1.0, source release.** Covers the icon workflow described below, verified by 364
 > automated tests. It is not a hosted product and has no user accounts.
 
 ---
@@ -180,7 +180,7 @@ keyline/
 ```bash
 npm ci
 npm run check      # design gate + build + tests + Wasm smoke + relay + doc links
-npm test           # 354 tests across 59 test files
+npm test           # 364 tests across 60 test files
 npm run test:solver
 npm run test:collaboration
 npm run check:docs # every relative doc link resolves
@@ -193,7 +193,7 @@ npm run proof:design # render the design system to design-proof/index.html
 Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 
 - **Strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`) and a production Vite build.
-- **354 tests / 59 files** covering geometry, native arcs, regions, constraints, transactions,
+- **364 tests / 60 files** covering geometry, native arcs, regions, constraints, transactions,
   persistence, export fidelity and escaping, collaboration replay, and performance budgets.
 - **A real Wasm smoke test** that loads the committed artifact and checks native-arc solving —
   not a mock of the boundary.

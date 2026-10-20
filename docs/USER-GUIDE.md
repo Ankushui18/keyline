@@ -101,6 +101,14 @@ rotate handle: as in Figma, move the pointer just outside a corner and it become
 - Dragging anywhere else inside the frame moves the object, so `Alt`-drag still duplicates.
 - Clicking picks the shape painted on top, following layer order in the Layers panel. To reach a shape
   behind another, `Ctrl/⌘`-click: each click walks down the stack under the pointer and wraps.
+
+**Groups behave like containers.** A click on grouped artwork selects the whole outermost group, and
+the selection covers every shape inside it, so moving, resizing, rotating and deleting work on the
+group as one. Double-click to step inside — each double-click descends one nested level, and the
+canvas banner names the group you are in. Inside a group, clicks select that group's own children.
+`Escape` (or the banner's **Exit group** button) steps back out one level and keeps the group selected;
+clicking artwork outside the group leaves it automatically. Entering a group changes nothing about
+visibility — unlike **isolation**, which hides everything else.
 - Several selected objects share one axis-aligned frame; resizing and rotating there apply to the
   whole selection at once.
 
@@ -410,6 +418,7 @@ Modifier is `Ctrl` on Windows/Linux and `⌘` on macOS.
 | Copy / cut / paste | `Ctrl/⌘ C` / `X` / `V` |
 | Undo / redo | `Ctrl/⌘ Z` / `Ctrl/⌘ ⇧ Z` |
 | Select the shape behind another | `Ctrl/⌘` + click (cycles the stack, wrapping) |
+| Enter a group / leave one level | Double-click the group / `Escape` |
 | Nudge objects or points | Arrow keys (1 px), `Shift` + arrows (10 px) |
 | Delete selection or point | `Delete` / `Backspace` |
 | Pan | Wheel or two-finger scroll, `Shift` + wheel (horizontal), middle-drag, `Space` + drag |
