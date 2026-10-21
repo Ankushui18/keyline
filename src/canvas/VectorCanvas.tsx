@@ -1,5 +1,5 @@
 import { subscribePixelGrid } from './view-settings';
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowBothIcon } from '@primer/octicons-react/ArrowBothIcon';
 import { CursorIcon } from '@primer/octicons-react/CursorIcon';
@@ -14,6 +14,7 @@ import { CircleSlashIcon } from '@primer/octicons-react/CircleSlashIcon';
 import { DashIcon } from '@primer/octicons-react/DashIcon';
 import { DiamondIcon } from '@primer/octicons-react/DiamondIcon';
 import { StarIcon } from '@primer/octicons-react/StarIcon';
+import { TypographyIcon } from '@primer/octicons-react/TypographyIcon';
 import { SquareFillIcon } from '@primer/octicons-react/SquareFillIcon';
 import { StackAddIcon } from '@primer/octicons-react/StackAddIcon';
 import { UnlinkIcon } from '@primer/octicons-react/UnlinkIcon';
@@ -84,6 +85,8 @@ import {
   type PrimitivePreview,
 } from './renderer';
 import { renderWebGLScene } from './webgl-renderer';
+import { TextEditor } from '../ui/TextEditor';
+import { textEditorPlacement } from '../core/text-edit';
 import { Viewport, wheelIntent } from './viewport';
 
 interface ShapeBuilderState {
@@ -118,6 +121,13 @@ interface VectorCanvasProps {
   onRequestToolChange: (tool: ToolId) => void;
   onOpenConstraintMenu: (x: number, y: number) => void;
   onViewportChange: (scale: number) => void;
+  /** Live text-editing session: the object being edited and the field's current content. */
+  textEditing?: { objectId: EntityId; draft: string };
+  onTextEditChange?: (content: string) => void;
+  onTextEditCommit?: () => void;
+  /** The Text tool's click: create a text object at this world point and start editing. */
+  onCreateText?: (point: Point) => void;
+  onEditTextObject?: (objectId: EntityId) => void;
   viewportFocusRequest?: {
     id: number;
     objectIds?: EntityId[];
@@ -198,6 +208,11 @@ export function VectorCanvas({
   interactionBlocked,
   onOpenConstraintMenu,
   onViewportChange,
+  textEditing,
+  onTextEditChange,
+  onTextEditCommit,
+  onCreateText,
+  onEditTextObject,
   viewportFocusRequest,
   onNotice,
 }: VectorCanvasProps) {
@@ -269,6 +284,13 @@ export function VectorCanvas({
     if (activeTool !== 'select') setNetworkSelectExplicit(false);
   }, [activeTool]);
 
+  const textEditingRef = useRef<EntityId | undefined>(undefined);
+  textEditingRef.current = textEditing?.objectId;
+  useEffect(() => {
+    // Entering or leaving a session changes what the canvas paints; redraw on both edges.
+    requestRender();
+  }, [textEditing?.objectId, textEditing?.draft]);
+
   const requestRender = useCallback(() => {
     if (frameRef.current !== null) return;
     frameRef.current = window.requestAnimationFrame(() => {
@@ -276,6 +298,29 @@ export function VectorCanvas({
       drawRef.current();
     });
   }, []);
+
+  // The field is placed in screen space, so panning or zooming while it is open has to move it
+  // with the text; the viewport lives in a ref, so the overlay tracks it through a revision.
+  const [viewportRevision, setViewportRevision] = useState(0);
+  const syncTextOverlay = useCallback(() => {
+    if (textEditingRef.current) setViewportRevision((revision) => revision + 1);
+  }, []);
+
+  const textOverlay = useMemo(() => {
+    if (!textEditing) return undefined;
+    const object = manager.document.getObject(textEditing.objectId);
+    if (!object?.text) return undefined;
+    const appearance = manager.document.getAppearance(object.appearanceId);
+    return {
+      name: object.name,
+      placement: textEditorPlacement({
+        viewport: viewportRef.current.state,
+        transform: object.transform,
+        text: { ...object.text, content: textEditing.draft },
+        fills: appearance?.fills ?? [],
+      }),
+    };
+  }, [manager, textEditing, viewportRevision]);
 
   useEffect(() => subscribePixelGrid(requestRender), [requestRender]);
 
@@ -319,6 +364,7 @@ export function VectorCanvas({
       eraserPreview: eraserPreviewRef.current,
       primitivePreview: primitivePreviewRef.current,
       constructionLinePreview: constructionPreviewRef.current,
+      editingTextObjectId: textEditingRef.current,
       snapPreview: snapPreviewRef.current,
       hoveredRegionId: hoveredRegionRef.current,
       paintRegionHover: toolRef.current === 'paint',
@@ -445,6 +491,7 @@ export function VectorCanvas({
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     viewportRef.current.fitBounds(union, rect.width, rect.height);
+    setViewportRevision((revision) => revision + 1);
     onViewportChange(viewportRef.current.scale);
     requestRender();
   }, [manager, onViewportChange, requestRender, viewportFocusRequest]);
@@ -456,6 +503,7 @@ export function VectorCanvas({
     const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     viewportRef.current.zoomAt({ x: rect.width / 2, y: rect.height / 2 }, direction === 1 ? 1.25 : 0.8);
+    setViewportRevision((revision) => revision + 1);
     onViewportChange(viewportRef.current.scale);
     requestRender();
   }, [onViewportChange, requestRender]);
@@ -719,6 +767,11 @@ export function VectorCanvas({
     }
     const objectHit = hitTestObject(manager.document, world, 7 / viewport.scale);
     if (objectHit) {
+      if (manager.document.getObject(objectHit.id)?.text) {
+        onEditTextObject?.(objectHit.id);
+        event.preventDefault();
+        return;
+      }
       const editing = enterNetworkEditMode(manager.document, objectHit.id);
       onSelectionChange(selectionForHit(editing, objectHit.geometryHit ?? null, false));
       event.preventDefault();
@@ -750,6 +803,13 @@ export function VectorCanvas({
     );
     if (toolRef.current === 'select') lastSelectPressRef.current = { at: event.timeStamp, screen };
     else lastSelectPressRef.current = undefined;
+
+    if (toolRef.current === 'text') {
+      // One click, one text object at the pointer, then a caret — the first keystroke is the text.
+      onCreateText?.(world);
+      event.preventDefault();
+      return;
+    }
 
     if (toolRef.current === 'paint') {
       const region = regionAtPoint(manager.document, world);
@@ -1279,6 +1339,13 @@ export function VectorCanvas({
       if (objectHit && press.enteredGroup) {
         onSelectionChange(press.selection);
       } else if (objectHit && isDirectDoubleClick) {
+        // Text has nothing to enter geometrically; a double-click on it belongs in the field.
+        if (manager.document.getObject(objectHit.id)?.text) {
+          onSelectionChange({ mode: 'object', objectIds: new Set([objectHit.id]), nodeIds: new Set(), segmentIds: new Set() });
+          onEditTextObject?.(objectHit.id);
+          event.preventDefault();
+          return;
+        }
         const editing = enterNetworkEditMode(manager.document, objectHit.id);
         const nextSelection = selectionForHit(editing, objectHit.geometryHit ?? null, false);
         onSelectionChange(context ? { ...nextSelection, groupContext: context } : nextSelection);
@@ -1438,6 +1505,7 @@ export function VectorCanvas({
     if (gesture.kind === 'pan') {
       viewport.panBy(screen.x - gesture.lastScreen.x, screen.y - gesture.lastScreen.y);
       gesture.lastScreen = screen;
+      syncTextOverlay();
       requestRender();
       return;
     }
@@ -2491,8 +2559,9 @@ export function VectorCanvas({
       // The sheet follows the gesture: scrolling down walks you down the canvas.
       viewportRef.current.panBy(-intent.deltaX, -intent.deltaY);
     }
+    syncTextOverlay();
     requestRender();
-  }, [onViewportChange, requestRender]);
+  }, [onViewportChange, requestRender, syncTextOverlay]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -2520,6 +2589,17 @@ export function VectorCanvas({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       />
+      {textEditing && textOverlay && (
+        <TextEditor
+          // A new object means a new field, so the caret starts at the end of its content.
+          key={textEditing.objectId}
+          placement={textOverlay.placement}
+          label={textOverlay.name}
+          content={textEditing.draft}
+          onChange={(content) => onTextEditChange?.(content)}
+          onCommit={() => onTextEditCommit?.()}
+        />
+      )}
       {artboardRename && (
         <input
           autoFocus
@@ -2711,6 +2791,7 @@ export function VectorCanvas({
           <CanvasFlyoutTool label="Ellipse" shortcut="U" active={activeTool === 'ellipse'} icon={<CircleIcon size={16} />} onClick={() => { onRequestToolChange('ellipse'); setRailGroupOpen(undefined); }} />
           <CanvasFlyoutTool label="Polygon" active={activeTool === 'polygon'} icon={<DiamondIcon size={16} />} onClick={() => { onRequestToolChange('polygon'); setRailGroupOpen(undefined); }} />
           <CanvasFlyoutTool label="Star" active={activeTool === 'star'} icon={<StarIcon size={16} />} onClick={() => { onRequestToolChange('star'); setRailGroupOpen(undefined); }} />
+          <CanvasFlyoutTool label="Text" description="Click to type" shortcut="T" active={activeTool === 'text'} icon={<TypographyIcon size={16} />} onClick={() => { onRequestToolChange('text'); setRailGroupOpen(undefined); }} />
         </CanvasRailGroup>
         <CanvasRailGroup
           name="Edit shape"
@@ -2758,6 +2839,7 @@ export function VectorCanvas({
           <CanvasToolProxy index={13} active={activeTool === 'offset'} label="Offset (O)" disabledReason={toolDisabledReasons.offset} onClick={() => onRequestToolChange('offset')} icon={<DuplicateIcon size={18} />} />
           <CanvasToolProxy index={14} active={activeTool === 'lasso'} label="Lasso (Q)" onClick={() => onRequestToolChange('lasso')} icon={<MultiSelectIcon size={18} />} />
           <CanvasToolProxy index={15} active={activeTool === 'eraser'} label="Eraser (Shift+E)" onClick={() => onRequestToolChange('eraser')} icon={<EraserRailIcon />} />
+          <CanvasToolProxy index={16} active={activeTool === 'text'} label="Text (T)" onClick={() => onRequestToolChange('text')} icon={<TypographyIcon size={18} />} />
         </div>
       </nav>
       <div className="canvas-hint" aria-hidden="true">{toolHint(activeTool, selection, selectedArtboardIds.size)}</div>
@@ -3011,6 +3093,7 @@ function toolHint(tool: ToolId, selection: SelectionState, selectedArtboardCount
   if (tool === 'pen') return <><span className="hint-dot pen" />Click to draw · <kbd>Shift</kbd> constrain 45° · <kbd>Drag</kbd> curves · <kbd>Esc</kbd> end path</>;
   if (tool === 'pencil') return <><span className="hint-dot pen" />Drag to draw a smooth editable path <kbd>N</kbd></>;
   if (tool === 'brush') return <><span className="hint-dot pen" />Drag to draw a pressure-aware variable-width path <kbd>J</kbd></>;
+  if (tool === 'text') return <><span className="hint-dot build" />Click to type <kbd>T</kbd> · <kbd>Esc</kbd> to finish</>;
   if (tool === 'rectangle') return <><span className="hint-dot build" />Drag a rectangle <kbd>Shift</kbd> square <kbd>Alt</kbd> from center</>;
   if (tool === 'ellipse') return <><span className="hint-dot build" />Drag an ellipse <kbd>Shift</kbd> circle <kbd>Alt</kbd> from center</>;
   if (tool === 'rounded-rectangle') return <><span className="hint-dot build" />Drag a rounded rectangle <kbd>Shift</kbd> equal sides</>;

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { drawTextObject } from './renderer';
+import { drawObjectFills, drawTextObject } from './renderer';
 import { DEFAULT_TEXT } from '../core/text';
+import { VectorDocument } from '../core/document';
+import { OperationManager } from '../core/operations';
+import { prepareTextObject } from '../tools/text-tool';
 import type { AppearanceFill, TextContent } from '../core/types';
 
 /** Records the calls `drawTextObject` would make on a real 2D context. */
@@ -100,5 +103,59 @@ describe('text rendering', () => {
     const blank = recordingContext();
     drawTextObject(blank as unknown as CanvasRenderingContext2D, identity, text({ content: 'a\n\nb' }), 1, [solid()]);
     expect(blank.calls.map((call) => call.text)).toEqual(['a', 'b']);
+  });
+});
+
+/** A context that accepts every drawing call and records the strings it is asked to paint. */
+function silentContext() {
+  const painted: string[] = [];
+  const handler: ProxyHandler<Record<string, unknown>> = {
+    get: (_target, property) => {
+      if (typeof property === 'symbol') return undefined;
+      if (property === 'fillText') return (text: string) => painted.push(text);
+      if (property === 'measureText') return () => ({ width: 10 });
+      return () => {};
+    },
+    set: () => true,
+  };
+  return { context: new Proxy({}, handler) as unknown as CanvasRenderingContext2D, painted };
+}
+
+function documentWithTwoTexts() {
+  const document = VectorDocument.createEmpty();
+  const manager = new OperationManager(document);
+  const first = prepareTextObject(document, { x: 10, y: 10 }, { text: { content: 'First' } });
+  manager.beginTransaction('First text');
+  first.operations.forEach((operation) => manager.execute(operation));
+  manager.commitTransaction();
+  const second = prepareTextObject(document, { x: 10, y: 80 }, { text: { content: 'Second' } });
+  manager.beginTransaction('Second text');
+  second.operations.forEach((operation) => manager.execute(operation));
+  manager.commitTransaction();
+  return { document, first: first.objectId, second: second.objectId };
+}
+
+describe('text editing on the canvas', () => {
+  it('paints every text object when no field is open', () => {
+    const { document } = documentWithTwoTexts();
+    const { context, painted } = silentContext();
+    drawObjectFills(context, document);
+    expect(painted).toEqual(['First', 'Second']);
+  });
+
+  it('skips only the object under the field, so the field is the single source of its glyphs', () => {
+    const { document, first } = documentWithTwoTexts();
+    const { context, painted } = silentContext();
+    drawObjectFills(context, document, first);
+    expect(painted).toEqual(['Second']);
+  });
+
+  it('skips nothing once the field closes', () => {
+    const { document, first } = documentWithTwoTexts();
+    const { context, painted } = silentContext();
+    drawObjectFills(context, document, first);
+    painted.length = 0;
+    drawObjectFills(context, document);
+    expect(painted).toEqual(['First', 'Second']);
   });
 });

@@ -2,7 +2,7 @@
 
 What is verified, how to run it, and what the suites do **not** prove.
 
-Current suite: **498 tests across 76 test files**, plus a real Wasm smoke test, nine WebSocket
+Current suite: **525 tests across 79 test files**, plus a real Wasm smoke test, nine WebSocket
 integration checks, Rust unit tests, and optional browser suites.
 
 - [Run everything](#run-everything)
@@ -131,10 +131,13 @@ touching the document.
 | `ui/PropertiesPanel.gradient.test.tsx` | The fill type switch, stops and angle/radius rows, and the two-stop minimum, rendered from a static inspector. |
 | `core/fills.test.ts` | Gradient model: stop normalization, clone isolation, the operation-level write path, object-local geometry and preview CSS. |
 | `core/text.test.ts` | Text model and layout: normalization, deterministic metrics, box maths, bounds through `object-geometry`, selection, duplicate, undo, snapshot. |
-| `canvas/renderer-text.test.ts` | Text paints baselines, alignment offsets, transform, opacity and gradients; nothing without a visible fill. |
+| `canvas/renderer-text.test.ts` | Text paints baselines, alignment offsets, transform, opacity and gradients; nothing without a visible fill; and nothing at all for the object being edited on canvas. |
 | `export/svg-export.text.test.ts` | `<text>`/`<tspan>` export, anchors, escaping, gradient fills, icon-ink flattening. |
 | `import/svg-import.text.test.ts` | Text import: content, lines, anchors, transform decomposition, every text warning code, export→import round trip. |
 | `ui/PropertiesPanel.text.test.tsx` | The text section's controls, the alignment state, and the disabled Edit points reason. |
+| `core/text-edit.test.ts` | Field placement: viewport ∘ object matrix, measured box, font/line-height/alignment, ink from the first visible fill, and the key-to-action policy. |
+| `core/text-session.test.ts` | A session's semantics: it starts from the object's content, refuses non-text, writes through while typing, is one undo step, reports "unchanged", labels history, and rolls back on abort. |
+| `ui/TextEditor.test.tsx` | The field itself (jsdom): focus with the caret at the end, commits once on Escape/Tab/⌘-Enter, `Enter` inserts a line, blur commits, and styling comes from the placement. |
 | `canvas/renderer-fill.test.ts` | The canvas paints a linear and a radial gradient in local space and refuses a degenerate one. |
 | `export/svg-export.gradient.test.ts` | Gradient `<defs>` round trip, scaled occurrences, and icon-export flattening. |
 | `ui/panel-controls.test.tsx` | Every **enabled** inspector and tool control reaches the document or its callback, across nine states (jsdom). |

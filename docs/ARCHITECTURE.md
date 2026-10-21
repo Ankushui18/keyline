@@ -85,6 +85,8 @@ the geometry testable in Node and reusable by the worker.
 | `store.ts` | IndexedDB persistence, autosave controller (`DocumentPersistence`), thumbnails, dashboard summaries. |
 | `preferences.ts` | Safe `localStorage` access with an in-memory fallback. |
 | `consistency.ts` | Icon-set consistency checks (width, ends, safe area, half-pixel, small stroke). |
+| `text.ts` | One-run text: normalization, deterministic metrics fallback, line layout, box and bounds. |
+| `text-edit.ts`, `text-session.ts` | Where the on-canvas field goes (viewport ∘ object matrix, box, font, ink) and the transactional session that makes a whole typing session one undo step. |
 | `quick-edit.ts` | Deterministic phrase reader for appearance edits. No model, no network. |
 | `numeric-expression.ts` | Numeric field expressions (`24/2`, `12+4`). |
 | `real-content.ts`, `ids.ts`, `consistency.ts`, `inspector-layout.ts`, `transforms.ts` | Content helpers, ULID generation, alignment math, transforms. |
@@ -106,13 +108,14 @@ the geometry testable in Node and reusable by the worker.
 | `renderer.ts` | Canvas 2D renderer: arcs, fills, variable widths, virtual parametric instances, construction lines. |
 | `webgl-renderer.ts` | Batched WebGL2 renderer with instanced nodes, quadtree culling and triangulated fills. |
 | `viewport.ts`, `spatial-index.ts`, `view-settings.ts` | Pan/zoom math, quadtree culling and the pixel-grid preference. |
+| `text-metrics.ts` | Canvas-backed text measurement for the app; tests inject the deterministic fallback. |
 
 ### `src/tools`
 
 `select-tool.ts` (object/network selection), `pen-tool.ts`, `pencil-tool.ts`, `brush-tool.ts`,
 `primitive-tool.ts`, `shape-builder.ts`, `cut-tool.ts`, `bend-tool.ts`, `fillet-tool.ts`,
-`offset-tool.ts`, `width-tool.ts`, `lasso-tool.ts`, `eraser-tool.ts`, `path-commands.ts`,
-`snapping.ts`. Each exposes a `prepare*`/`*Plan` API that produces operations or typed geometry,
+`offset-tool.ts`, `width-tool.ts`, `lasso-tool.ts`, `eraser-tool.ts`, `text-tool.ts`,
+`path-commands.ts`, `snapping.ts`. Each exposes a `prepare*`/`*Plan` API that produces operations or typed geometry,
 never mutations.
 
 ### `src/export` and `src/import`
@@ -133,7 +136,7 @@ canonical replay and snapshot hashing.
 inspector), `DesignControls.tsx`, `SetView.tsx` (icon-set overview), `ConstraintPalette.tsx`,
 `ConstraintDiagnostics.tsx`, `CommandBar.tsx`, `ExportDialog.tsx`, `FamilyCollectionDialog.tsx`,
 `FamilyQaDialog.tsx`, `MotionWorkspace.tsx`, `KeylineDialogs.tsx` (share, settings, tidy,
-consistency), `use-modal-focus.ts`, `contrast-color.ts`.
+consistency), `TextEditor.tsx` (the overlaid field), `use-modal-focus.ts`, `contrast-color.ts`.
 
 ---
 

@@ -509,6 +509,7 @@ export type ToolId =
   | 'brush'
   | 'rectangle'
   | 'rounded-rectangle'
+  | 'text'
   | 'ellipse'
   | 'polygon'
   | 'star'

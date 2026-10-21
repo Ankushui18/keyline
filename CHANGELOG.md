@@ -7,6 +7,23 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- **On-canvas text editing, slice 2.** Text is now something you type, not only restyle. The
+  editing surface is a real `<textarea>` overlaid exactly on the object, so the caret, drag
+  selection, word/line keys, clipboard, IME composition and screen-reader access are the
+  browser's rather than a re-implementation. Placement is one testable function,
+  `textEditorPlacement` in `src/core/text-edit.ts`, which composes the viewport with the
+  object transform and returns the matrix, box, font, line height, alignment and ink the field
+  paints with; the overlay follows pan and zoom through a viewport revision, so the caret stays
+  on the glyphs. The renderer stops painting the edited object's glyphs
+  (`RenderOptions.editingTextObjectId`), so the string is never drawn twice. Edits write through
+  the existing `UPDATE_OBJECT` inside one transaction, so frames, the inspector's measured box
+  and export follow while you type and the whole session is **one undo step**. New **Text tool**
+  (`T`) creates an object at the pointer and opens the field, so the first keystroke is the
+  text; double-clicking a text object with Select opens it with the caret at the end; **More →
+  Add text** and the command palette now end in a caret too. `Enter` adds a line, `Tab` commits
+  and moves focus on, `Escape` and ⌘/Ctrl+Enter commit — reversible with one Undo. Not yet:
+  wrapping, auto-size, several styles in one object, text on a path, text stroke, or editing the
+  style inside the field.
 - **Text objects, slice 1.** Text is now a document object: `NetworkObject.text` carries content
   and style, layout lives in `src/core/text.ts`, and because text is an ordinary object, layers,
   selection, hit testing from its box, transform, opacity, duplication, undo and the document

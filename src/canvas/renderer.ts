@@ -127,6 +127,8 @@ interface RenderOptions {
   hoveredTarget?: { bounds: GeometryBounds; group: boolean };
   widthToolActive?: boolean;
   remotePresence?: CollaboratorPresence[];
+  /** A text object under the on-canvas editor: its glyphs are hidden so the field is the only text. */
+  editingTextObjectId?: EntityId;
   overlayOnly?: boolean;
 }
 
@@ -213,7 +215,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
 
   if (!overlayOnly) {
     drawArtboards(context, document, viewport.scale, true, selectedArtboardIds);
-    drawObjectFills(context, document);
+    drawObjectFills(context, document, options.editingTextObjectId);
   }
 
   drawRegionOverlays(
@@ -792,7 +794,12 @@ function withStopOpacity(color: string, opacity: number): string {
   return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${Number(opacity.toFixed(3))})`;
 }
 
-function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocument): void {
+/** Exported so the paint loop — including the text-editing skip — can be asserted headlessly. */
+export function drawObjectFills(
+  context: CanvasRenderingContext2D,
+  document: VectorDocument,
+  editingTextObjectId?: EntityId,
+): void {
   for (const object of activePageObjects(document)) {
     const appearance = document.getAppearance(object.appearanceId);
     const fills = appearance?.fills.filter((fill) => fill.visible && fill.opacity > 0) ?? [];
@@ -845,7 +852,10 @@ function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocu
       }
     }
     // Text keeps its z-order because it is painted in the same object loop as geometry.
-    if (object.text) drawTextObject(context, objectMatrix, object.text, appearance.opacity, fills);
+    // The object under the editing field is skipped: the field's own glyphs are the text.
+    if (object.text && object.id !== editingTextObjectId) {
+      drawTextObject(context, objectMatrix, object.text, appearance.opacity, fills);
+    }
   }
 }
 

@@ -401,3 +401,26 @@
 @media (min-width: 1500px) {
   .right-sidebar.mode-properties .properties-panel { --inspector-pad: 14px; }
 }
+
+/* On-canvas text editing (docs/EDITING-AUDIT.md §3.10). The field is invisible as a box:
+   it exists for the caret, selection, IME and accessibility, and sits exactly over the
+   painted text, which the renderer skips while it is open. */
+.canvas-text-editor {
+  position: absolute;
+  z-index: var(--z-popover);
+  display: block;
+  box-sizing: content-box;
+  transform-origin: 0 0;
+  background: transparent !important;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  overflow: hidden;
+  resize: none;
+  white-space: pre;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+}
+/* The selection takes the same blue-on-white pair every other AA-checked control uses;
+   --blue-400 with white ink measures 2.34:1 and would fail conformance. */
+.canvas-text-editor::selection { background: var(--blue-700); color: var(--text-inverse); }

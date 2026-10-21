@@ -446,8 +446,8 @@ operation-level write path; `src/canvas/renderer-fill.test.ts` pins the canvas p
 `src/export/svg-export.gradient.test.ts` pins the `<defs>` round trip, including a scaled
 occurrence and the icon-export flattening; `src/import/svg-import.gradients.test.ts` pins
 objectBoundingBox conversion, `userSpaceOnUse`, `href` inheritance and every warning code;
-`src/ui/PropertiesPanel.gradient.test.tsx` pins the inspector rows. The suite is **498 tests
-in 76 files** as of this section.
+`src/ui/PropertiesPanel.gradient.test.tsx` pins the inspector rows. The suite is **525 tests
+in 79 files** as of this section.
 
 ### 3.9 Text objects — slice 1 done
 
@@ -525,9 +525,9 @@ and `textLength`. A `<text>` we cannot read at all is skipped with a warning, ne
 content field, family, size, weight, line height and align, each committed as one undoable
 `UPDATE_OBJECT`; the section also shows the measured box. Insertion comes from the
 **More → Add text** menu item and the command palette, which places a text object at the active
-frame's centre and selects it. There is no text tool and no on-canvas caret yet; that is the
-next slice, and this section will be updated when it exists. The **Edit points** control is
-disabled for text with the reason "text has no points to edit" rather than opening a point
+frame's centre and selects it. Slice 1 had no text tool and no on-canvas caret; §3.10 adds both
+the `T` tool, double-click, and a caret after every insertion route. The **Edit points** control
+is disabled for text with the reason "text has no points to edit" rather than opening a point
 editor that has nothing to edit.
 
 **The WebGL preview falls back to Canvas 2D for a document containing text.** The WebGL path
@@ -547,7 +547,71 @@ gradient text; `src/export/svg-export.text.test.ts` pins the `<text>`/`<tspan>` 
 escaping and gradient fills; `src/import/svg-import.text.test.ts` pins content, lines,
 alignment, transform decomposition, every text warning code and a full export→import round
 trip; `src/ui/PropertiesPanel.text.test.tsx` and the toolbar menu test pin the controls. The
-suite is **498 tests in 76 files** as of this section.
+suite is **525 tests in 79 files** as of this section.
+
+### 3.10 Text editing on the canvas — slice 2
+
+Slice 1 could create and restyle text but not *type* it: every character went through the
+inspector. This section is the contract for typing on the canvas, written before the code.
+It adds **no persisted state** — the document still stores only content and style — so the
+whole slice is UI plus one renderer option.
+
+**The editing surface is a real text field, not a painted caret.** While a text object is
+being edited, an overlay `<textarea>` sits exactly over it, in screen space, carrying the same
+font, size, line height, colour and alignment as the painted text. That single decision buys
+the caret, selection, word/line navigation, clipboard, undo inside the field, IME composition,
+spellcheck suppression, screen-reader access and keyboard focus for free — all of them things
+a hand-drawn caret would have to re-implement, badly, without a browser to test in.
+
+**Placement is one testable function.** `textEditorPlacement` in `src/core/text-edit.ts`
+composes the viewport transform with the object transform and returns the CSS the overlay
+uses:
+
+| Property | Value | Why |
+|---|---|---|
+| `transform` | `matrix(a, b, c, d, e, f)` of viewport ∘ object, origin `0 0` | the field lives in the object's own local space, so rotation and scale are exact |
+| `width`, `height` | the measured box (`layoutText`) | the field ends where the text ends, so clicks outside it commit |
+| `font` | `weight size px family stack` — the same shorthand the canvas paints with | one source, so text does not jump when editing starts |
+| `line-height` | `size × lineHeight` px | matches `layoutText`'s line box |
+| `text-align` | the object's alignment | caret and selection follow the text, not the box |
+| `color` | the first visible fill's colour (`fillColor`) | gradient text edits against its first stop; the painted gradient returns on commit |
+
+**The painted text is skipped while editing.** `renderVectorScene` takes
+`editingTextObjectId` and does not paint that object's glyphs, so the overlay is the only text
+on screen. Two renderings of the same string with slightly different metrics would otherwise
+read as bold, smeared text.
+
+**The field follows the view.** The viewport is a ref inside the canvas, so panning and zooming
+do not re-render React on their own. The overlay keeps a revision counter that wheel zoom,
+keyboard zoom, fit-to-selection and middle-drag panning all bump; placement is derived from it,
+so the caret stays on the glyphs instead of drifting off them mid-edit.
+
+**One editing session is one undo step.** Beginning an edit opens a transaction; every change
+writes the new content through the existing `UPDATE_OBJECT` inside it; Escape, ⌘/Ctrl+Enter or
+focus leaving the field commits. Undo therefore restores the text as it was before the field
+was opened, not one character at a time. Because each keystroke does write to the document,
+the selection frame, the inspector's measured box and export all follow live.
+
+**Keys belong to the field while it has focus.** The canvas shortcut handler already ignores
+events from editable targets, so typing `r` types `r` instead of switching to the rectangle
+tool. `Enter` inserts a line (text does not wrap yet); `Tab` commits and moves focus on, so the
+field is not a keyboard trap; `Escape` **commits** rather than discarding — the same choice
+Figma makes — and the change stays reversible with a single Undo.
+
+**How editing starts.** Two routes, both landing in the same state:
+
+- the **Text** tool (`T`), where a click creates a text object at the pointer with the default
+  style and opens the field immediately, so the first keystroke is the text;
+- **double-clicking** an existing text object with the Select tool, which opens the field with
+  the caret at the end of its content.
+
+The More menu's **Add text** and the command palette still insert centred and now open the
+field too, so every route ends with a caret in a field.
+
+**Refusals, unchanged and restated.** Still no wrapping, no auto-size, no rich runs, no text on
+a path, no text stroke, and no in-field styling. A text object still cannot join a parametric
+group or a geometry component. Slice 3 is wrapping plus multiple runs, and it will need its
+own contract before code.
 
 ---
 
@@ -574,7 +638,7 @@ suite is **498 tests in 76 files** as of this section.
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
 | 3 | ~~General-purpose framing: frame presets beyond icon sizes, neutral empty state~~ (done, 3.7) | — |
-| 4 | ~~Gradients~~ (done, 3.8) · ~~Text, slice 1~~ (done, 3.9); on-canvas caret, wrapping and runs next | — |
+| 4 | ~~Gradients~~ (done, 3.8) · ~~Text, slice 1~~ (done, 3.9) · ~~On-canvas text editing~~ (done, 3.10); wrapping and rich runs next | — |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived

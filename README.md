@@ -9,7 +9,7 @@ and export production-ready SVG, PNG, React and CSS — from your browser, with 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/Ankushui18/keyline/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
-  <img src="https://img.shields.io/badge/tests-498%20passing-brightgreen" alt="498 tests passing">
+  <img src="https://img.shields.io/badge/tests-525%20passing-brightgreen" alt="525 tests passing">
   <img src="https://img.shields.io/badge/node-20.19%2B%20%7C%2022.12%2B-339933" alt="Node 20.19+ or 22.12+">
   <img src="https://img.shields.io/badge/storage-on%20this%20device-6b7686" alt="Stored on this device">
 </p>
@@ -32,7 +32,7 @@ Keyline is a **web app you run locally**, not a hosted service. Pick the path th
 | **See what's missing** (honest list) | [Known limits](#known-limits) |
 | **Read the security/audit record** | [SECURITY.md](SECURITY.md) · [docs/AUDIT.md](docs/AUDIT.md) |
 
-> **Status: v0.1.0, source release.** Covers the workflow described below, verified by 498
+> **Status: v0.1.0, source release.** Covers the workflow described below, verified by 525
 > automated tests. It is not a hosted product and has no user accounts.
 
 ---
@@ -59,7 +59,7 @@ their files.
 
 | | |
 |---|---|
-| **Drawing** | Pen, pencil, brush, rectangle, rounded rectangle, ellipse, polygon, star, line, **construction line**, native **arc**, shape builder, cut, bend, fillet, offset, variable width, region paint, lasso, eraser with healing. **Text** objects with three families, four weights and left/centre/right alignment. |
+| **Drawing** | Pen, pencil, brush, rectangle, rounded rectangle, ellipse, polygon, star, line, **construction line**, native **arc**, shape builder, cut, bend, fillet, offset, variable width, region paint, lasso, eraser with healing. **Text** objects with three families, four weights and left/centre/right alignment, typed on the canvas with the **Text** tool (`T`). |
 | **Geometry** | Eleven constraint types (`parallel`, `perpendicular`, `tangent`, `symmetric`, `equal_length`, `fixed_distance`, `fixed_angle`, `fixed_radius`, `horizontal`, `vertical`, `coincident`) with hard/medium/soft priorities, conflict diagnostics, and a deterministic solver. |
 | **Precision** | Icon frames at 24/32/48 or custom size, artboard presets, pixel grid, numeric transforms with expressions, corner radii, aspect lock, one-shot Flow arrangements. |
 | **Appearance** | Solid, **linear** and **radial** gradient fills with a stop editor, per-fill opacity and visibility, shared appearance rules so linked objects stay in sync. |
@@ -181,7 +181,7 @@ keyline/
 ```bash
 npm ci
 npm run check      # design gate + build + tests + Wasm smoke + relay + doc links
-npm test           # 498 tests across 76 test files
+npm test           # 525 tests across 79 test files
 npm run test:solver
 npm run test:collaboration
 npm run check:docs # every relative doc link resolves
@@ -194,7 +194,7 @@ npm run proof:design # render the design system to design-proof/index.html
 Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 
 - **Strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`) and a production Vite build.
-- **498 tests / 76 files** covering geometry, native arcs, regions, constraints, transactions,
+- **525 tests / 79 files** covering geometry, native arcs, regions, constraints, transactions,
   persistence, export fidelity and escaping, collaboration replay, and performance budgets.
 - **A real Wasm smoke test** that loads the committed artifact and checks native-arc solving —
   not a mock of the boundary.
@@ -253,6 +253,10 @@ Honest list — these are deliberate boundaries, not hidden defects.
 - **Maintenance follow-ups remain.** `App.tsx` and `PropertiesPanel.tsx` are large, and the CSS
   is layered by delivery phase. A modularization and bundle-budget pass is future work; it was
   intentionally not mixed into the documented fixes.
+- **Text is one run and does not wrap.** You can type on the canvas, but a text object has a
+  single style, no auto-size and no text on a path; lines end only where you press `Return`.
+  Wrapping and rich runs are the next slice and need their own contract
+  ([docs/EDITING-AUDIT.md](docs/EDITING-AUDIT.md)).
 - **Out of scope:** 3D/CAD, mobile apps, real-time multiplayer for untrusted tenants, and new
   editing tools beyond the documented set.
 

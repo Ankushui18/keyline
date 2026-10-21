@@ -148,6 +148,7 @@ a frame is selected; resizing a frame never scales the artwork inside it.
 | Line | `\` | Straight geometry segment. |
 | Construction line | `⇧ \` | Finite or infinite guide; excluded from export. |
 | Arc | `A` | Native circular arc. |
+| Text | `T` | Click to place a text object and type in it. |
 | Shape builder | `B` | Merge/subtract by dragging across regions. |
 | Paint | `⇧ B` | Bind a solid fill to a region. |
 | Cut | `C` (or `X` in point mode) | Split a segment at a point. |
@@ -266,11 +267,21 @@ Every object fill has a **Solid / Linear / Radial** switch in the Design panel.
 
 ## Text
 
-Add text from **More → Add text** (or the command palette, `⌘K`). The object appears at the
-centre of the active frame and is selected, so the Design panel's **Text** section is ready.
+Press `T` for the **Text** tool and click where the text should start, or add text from
+**More → Add text** / the command palette (`⌘K`) to place it in the centre of the active frame.
+Either way a caret opens in the object, so you can type immediately. To edit existing text,
+double-click it with the Select tool.
 
-- **Content** is a plain field: `Return` starts a new line. Text never wraps; the box is as wide
-  as its longest line.
+- While the caret is in the field: `Return` starts a new line, `Tab` finishes and moves focus
+  on, `Escape` or `⌘/Ctrl + Enter` finishes and keeps the change. Clicking anywhere else
+  finishes too.
+- A whole typing session is **one undo step** — Undo restores the text as it was before you
+  opened the field, not one character at a time.
+- The painted glyphs are hidden while you edit and the field sits exactly over them, in the same
+  font, size, colour and alignment, so the text does not jump when the field closes. Panning and
+  zooming moves the field with the text.
+- The **Content** field in the Design panel edits the same text and also starts a new line with
+  `Return`. Text never wraps; the box is as wide as its longest line.
 - **Family** — Sans, Serif or Mono, mapped to the fonts listed in `src/core/text.ts`.
 - **Weight** — Regular, Medium, Semibold or Bold.
 - **Size** and **line height** are numbers; alignment is left, centre or right.
@@ -281,9 +292,8 @@ centre of the active frame and is selected, so the Design panel's **Text** secti
   in this release.
 - SVG export writes a real `<text>` element with one `<tspan>` per line, and importing one brings
   it back as editable text.
-- Not in this release: a text tool, an on-canvas caret or selection inside the text, wrapping,
-  several styles inside one object, custom fonts, and text on a path. Importing a file that uses
-  those reports each one in the import receipt.
+- Not in this release: wrapping, auto-size, several styles inside one object, custom fonts, and
+  text on a path. Importing a file that uses those reports each one in the import receipt.
 
 ---
 
@@ -476,6 +486,7 @@ Modifier is `Ctrl` on Windows/Linux and `⌘` on macOS.
 | Select / Pen / Pencil / Brush | `V` / `P` / `N` / `J` |
 | Rectangle / Rounded rect / Ellipse | `R` / `⇧ R` / `U` |
 | Polygon / Star / Line / Arc | `G` / `S` / `\` / `A` |
+| Text | `T` |
 | Construction line | `⇧ \` |
 | Shape builder / Paint | `B` / `⇧ B` |
 | Cut / Bend / Fillet | `C` / `D` / `F` |

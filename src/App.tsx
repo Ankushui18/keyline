@@ -47,6 +47,7 @@ import type {
   HandleMirrorMode,
   NetworkObject,
   ParametricTransform,
+  Point,
   Segment,
   SelectionState,
   ToolId,
@@ -56,6 +57,9 @@ import { prepareBulkNodePositions, type BulkNodeAction } from './tools/lasso-too
 import { preparePrimitiveObject } from './tools/primitive-tool';
 import { prepareTextObject } from './tools/text-tool';
 import { DEFAULT_TEXT, textLocalBounds } from './core/text';
+import {
+  abortTextSession, applyTextDraft, beginTextSession, commitTextSession, type TextSession,
+} from './core/text-session';
 import { connectedSelection, prepareClosePath, prepareDeletePoint, prepareJoinEndpoints, prepareReversePath } from './tools/path-commands';
 import { prepareSplitAtPoint } from './tools/cut-tool';
 import { ConstraintContextMenu, ConstraintPalette } from './ui/ConstraintPalette';
@@ -1024,6 +1028,82 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
    * Inserts a text object in the active frame and selects it (docs/EDITING-AUDIT.md §3.9).
    * Slice 1 has no text tool, so this menu action is how text enters a document.
    */
+  /**
+   * One text-editing session (docs/EDITING-AUDIT.md §3.10): an open transaction, the object
+   * being edited, and the field's current content. Every change writes through the existing
+   * UPDATE_OBJECT, so the frame, panels and export follow live, and the whole session is a
+   * single history entry.
+   */
+  const [textEditing, setTextEditing] = useState<TextSession | null>(null);
+  const textEditingRef = useRef<TextSession | null>(null);
+  textEditingRef.current = textEditing;
+
+  const beginTextEditing = useCallback((objectId: EntityId) => {
+    if (textEditingRef.current?.objectId === objectId) return;
+    // Opening a second field commits the first: one session, one history entry.
+    if (textEditingRef.current) {
+      const previous = textEditingRef.current;
+      try {
+        commitTextSession(manager, previous);
+      } catch (error) {
+        console.warn('The previous text session could not be committed.', error);
+        abortTextSession(manager);
+      }
+      textEditingRef.current = null;
+      setTextEditing(null);
+    }
+    const session = beginTextSession(manager, objectId);
+    if (!session) return;
+    textEditingRef.current = session;
+    setTextEditing(session);
+    setSelection({ mode: 'object', objectIds: new Set([objectId]), nodeIds: new Set(), segmentIds: new Set() });
+    setSelectedArtboardIds(new Set());
+  }, [manager]);
+
+  const changeTextDraft = useCallback((content: string) => {
+    const session = textEditingRef.current;
+    if (!session) return;
+    try {
+      const next = applyTextDraft(manager, session, content);
+      textEditingRef.current = next;
+      setTextEditing(next);
+    } catch (error) {
+      console.warn('Text edit was rejected.', error);
+    }
+  }, [manager]);
+
+  const commitTextEditing = useCallback(() => {
+    const session = textEditingRef.current;
+    if (!session) return;
+    textEditingRef.current = null;
+    setTextEditing(null);
+    try {
+      const result = commitTextSession(manager, session);
+      if (result.changed) announce(result.label === 'Edit text' ? 'Text edited.' : `${result.label}.`);
+    } catch (error) {
+      abortTextSession(manager);
+      announce(`Unable to save the text: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
+    }
+  }, [announce, manager]);
+
+  /** The Text tool's click: create at the pointer, select it, and put a caret in it. */
+  const createTextAt = useCallback((point: Point) => {
+    try {
+      const plan = prepareTextObject(document, point);
+      manager.beginTransaction('Add text');
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+      setSelectedLayerIds(new Set([plan.layerId]));
+      setSelectedArtboardIds(new Set());
+      setShowEmptyStart(false);
+      setActiveTool('select');
+      beginTextEditing(plan.objectId);
+    } catch (error) {
+      manager.rollbackTransaction();
+      announce(`Unable to add text: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
+    }
+  }, [announce, beginTextEditing, document, manager]);
+
   const addText = useCallback(() => {
     const frame = document.activeArtboard.frame;
     const bounds = textLocalBounds(DEFAULT_TEXT);
@@ -1041,12 +1121,12 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       setSelectedArtboardIds(new Set());
       setActiveTool('select');
       setShowEmptyStart(false);
-      announce('Added a text object. Edit it in the Design panel.');
+      beginTextEditing(plan.objectId);
     } catch (error) {
       manager.rollbackTransaction();
       announce(`Unable to add text: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
     }
-  }, [announce, document, manager]);
+  }, [announce, beginTextEditing, document, manager]);
 
   const openStarterSample = useCallback(() => {
     addFrame(24, 24);
@@ -1855,6 +1935,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       tool('bend', 'Bend', 'D', 'curve'), tool('cut', 'Cut', 'X', 'split'), tool('fillet', 'Round corner', 'F', 'fillet radius'),
       tool('offset', 'Offset', 'O', 'outline copy'), tool('width', 'Stroke width', 'W', 'variable thickness'), tool('eraser', 'Eraser', '⇧ E'),
       tool('lasso', 'Lasso', 'Q', 'select points align'), tool('shape-builder', 'Shape builder', 'B', 'merge union subtract combine'), tool('paint', 'Fill areas', '⇧ B', 'paint colour'),
+      tool('text', 'Text', 'T', 'type label copy write typography'),
       { id: 'add-text', label: 'Add text', group: 'Actions', keywords: 'type label copy typography write', run: addText },
       { id: 'frame-24', label: 'New icon frame 24 × 24', group: 'Frames', keywords: 'artboard add', run: () => addFrame(24, 24) },
       { id: 'frame-32', label: 'New icon frame 32 × 32', group: 'Frames', keywords: 'artboard add', run: () => addFrame(32, 32) },
@@ -1999,6 +2080,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       if (!modifier && !event.altKey && event.code === 'Backslash') {
         changeTool(event.shiftKey ? 'construction-line' : 'line');
       }
+      if (!modifier && !event.altKey && event.key.toLowerCase() === 't') changeTool('text');
       if (!modifier && !event.altKey && event.key.toLowerCase() === 'a') changeTool('arc');
       if (!modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') changeTool('shape-builder');
       if (!modifier && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'b') changeTool('paint');
@@ -2289,6 +2371,11 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           onRequestToolChange={changeTool}
           onOpenConstraintMenu={(x, y) => setConstraintMenu({ x, y })}
           onViewportChange={setZoom}
+          textEditing={textEditing ?? undefined}
+          onTextEditChange={changeTextDraft}
+          onTextEditCommit={commitTextEditing}
+          onCreateText={createTextAt}
+          onEditTextObject={beginTextEditing}
           viewportFocusRequest={viewportFocusRequest}
           onNotice={announce}
         />
