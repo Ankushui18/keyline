@@ -1,3 +1,4 @@
+import { cloneFills } from './fills';
 import { createEntityId } from './ids';
 import { stableRegionId } from './regions';
 import { isUnusedStarterArtboard } from './real-content';
@@ -37,6 +38,7 @@ export function prepareCreateIconArtboard(
   document: VectorDocument,
   width: number,
   height: number,
+  options: { name?: string } = {},
 ): CreateIconArtboardPlan {
   assertDimensions(width, height);
   const page = document.activePage;
@@ -45,7 +47,7 @@ export function prepareCreateIconArtboard(
   if (document.pages.length === 1 && page.artboardIds.length === 1 && isUnusedStarterArtboard(document, starter)) {
     const artboard: Artboard = {
       ...starter,
-      name: nextIconName(document, width, height),
+      name: nextFrameName(document, width, height, options.name),
       frame: { x: 0, y: 0, width, height },
     };
     return {
@@ -65,7 +67,7 @@ export function prepareCreateIconArtboard(
   const artboard: Artboard = {
     id: artboardId,
     pageId: page.id,
-    name: nextIconName(document, width, height),
+    name: nextFrameName(document, width, height, options.name),
     frame,
     layerIds: [],
     background: DEFAULT_ARTBOARD_BACKGROUND,
@@ -462,8 +464,21 @@ function nextAvailableFrame(
   return { x: rightEdge + ARTBOARD_GAP, y: preferredY, width, height };
 }
 
-function nextIconName(document: VectorDocument, width: number, height: number): string {
+function nextFrameName(
+  document: VectorDocument,
+  width: number,
+  height: number,
+  preferred?: string,
+): string {
   const used = new Set([...document.artboards.values()].map((artboard) => artboard.name));
+  // A preset names its own frame; the icon workflow keeps the `Icon N` naming it has
+  // always had, so the icon regression suite keeps testing something real.
+  if (preferred) {
+    if (!used.has(preferred)) return preferred;
+    let suffix = 2;
+    while (used.has(`${preferred} ${suffix}`)) suffix += 1;
+    return `${preferred} ${suffix}`;
+  }
   const widthLabel = Number.isInteger(width) ? String(width) : String(Number(width.toFixed(2)));
   const heightLabel = Number.isInteger(height) ? String(height) : String(Number(height.toFixed(2)));
   const base = width === height ? `Icon ${widthLabel}` : `Icon ${widthLabel}×${heightLabel}`;
@@ -492,7 +507,7 @@ function cloneAppearance(appearance: Appearance, id: EntityId): Appearance {
   return {
     ...appearance,
     id,
-    fills: appearance.fills.map((fill) => ({ ...fill })),
+    fills: cloneFills(appearance.fills),
     stroke: appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined,
   };
 }

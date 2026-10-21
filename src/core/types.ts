@@ -166,12 +166,42 @@ export interface FillStyle {
 export type FillRule = 'nonzero' | 'evenodd';
 
 /** Persistent, object-level appearance. Region fills remain stable topology-bound overrides. */
-export interface AppearanceFill {
+/** One colour stop. `offset` is 0–1 along the gradient; `opacity` is 0–1. */
+export interface GradientStop {
+  offset: number;
+  color: string;
+  opacity: number;
+}
+
+export interface SolidFill {
   type: 'solid';
   color: string;
   opacity: number;
   visible: boolean;
 }
+
+/** Endpoints are object-local, like node positions, so a gradient follows its shape. */
+export interface LinearGradientFill {
+  type: 'linear';
+  start: Point;
+  end: Point;
+  stops: GradientStop[];
+  opacity: number;
+  visible: boolean;
+}
+
+/** A single circle; focal points are not represented and are reported on import. */
+export interface RadialGradientFill {
+  type: 'radial';
+  center: Point;
+  radius: number;
+  stops: GradientStop[];
+  opacity: number;
+  visible: boolean;
+}
+
+export type AppearanceFill = SolidFill | LinearGradientFill | RadialGradientFill;
+export type GradientFill = LinearGradientFill | RadialGradientFill;
 
 export interface StrokeStyle {
   color: string;
@@ -259,6 +289,27 @@ export interface ObjectTransform {
   scaleY: number;
 }
 
+export type TextFamily = 'sans' | 'serif' | 'mono';
+export type TextWeight = 400 | 500 | 600 | 700;
+export type TextAlign = 'left' | 'center' | 'right';
+
+/**
+ * A text object's content and style (docs/EDITING-AUDIT.md §3.9, slice 1). Layout — lines,
+ * widths, the box — is derived at render time from a metrics provider and never stored, so a
+ * document stays portable across fonts and machines.
+ */
+export interface TextContent {
+  /** `\n` separates lines. Text never wraps in slice 1. */
+  content: string;
+  family: TextFamily;
+  /** px, measured at object scale 1. */
+  size: number;
+  weight: TextWeight;
+  /** Multiplier of `size`, at least 0.5. */
+  lineHeight: number;
+  align: TextAlign;
+}
+
 export interface NetworkObject {
   id: EntityId;
   name: string;
@@ -267,6 +318,8 @@ export interface NetworkObject {
   /** Optional shared family style. Geometry always remains independently editable. */
   appearanceRuleId?: EntityId;
   transform: ObjectTransform;
+  /** Present only on text objects; absent on every geometric object. */
+  text?: TextContent;
 }
 
 export type LayerNodeKind = 'layer' | 'group' | 'object';
@@ -456,6 +509,7 @@ export type ToolId =
   | 'brush'
   | 'rectangle'
   | 'rounded-rectangle'
+  | 'text'
   | 'ellipse'
   | 'polygon'
   | 'star'

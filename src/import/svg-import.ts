@@ -1,8 +1,14 @@
 import { createEntityId } from '../core/ids';
+import { normalizeStops } from '../core/fills';
+import { clampTextWeight, layoutText, normalizeTextContent } from '../core/text';
 import type { ClipboardObject, VectorClipboardPayload } from '../core/clipboard';
 import type {
   Appearance,
+  AppearanceFill,
+  NetworkObject,
   Point,
+  TextAlign,
+  TextContent,
   Segment,
   StrokeStyle,
   VectorNode,
@@ -33,11 +39,22 @@ interface SvgStyle {
   visibility: string;
 }
 
+/**
+ * Something the file asked for that Keyline cannot represent. Import never drops it
+ * silently: every code here is shown in the import receipt (§3.8 of docs/EDITING-AUDIT.md).
+ */
+export interface SvgImportWarning {
+  code: string;
+  message: string;
+  element?: string;
+}
+
 export interface SvgImportResult {
   viewport: { minX: number; minY: number; width: number; height: number };
   payload: VectorClipboardPayload;
   importedElementCount: number;
   skippedElementCount: number;
+  warnings: SvgImportWarning[];
 }
 
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
@@ -52,10 +69,33 @@ const SKIP_SUBTREES = new Set(['defs', 'clipPath', 'mask', 'pattern', 'linearGra
 
 /** Converts common SVG geometry into operation-ready Keyline graph objects. */
 export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
-  const items: Array<{ name: string; paths: ParsedSubpath[]; style: SvgStyle; matrix: Matrix }> = [];
+  const items: Array<{
+    name: string; paths: ParsedSubpath[]; style: SvgStyle; matrix: Matrix;
+    localBox: { minX: number; minY: number; width: number; height: number };
+  }> = [];
   const cssRules = parseCssRules(root);
   let skippedElementCount = 0;
   const useStack = new Set<Element>();
+  const gradients = new Map<string, Element>();
+  const patterns = new Set<string>();
+  root.querySelectorAll('linearGradient, radialGradient, pattern').forEach((element) => {
+    const id = element.getAttribute('id');
+    if (!id) return;
+    if (element.localName === 'pattern') patterns.add(id); else gradients.set(id, element);
+  });
+  const textItems: Array<{
+    name: string; style: SvgStyle; matrix: Matrix; text: TextContent; origin: Point; transform: TextTransform;
+  }> = [];
+  const warnings: SvgImportWarning[] = [];
+  const warningKeys = new Set<string>();
+  const warn = (code: string, message: string, element?: string) => {
+    // One line per distinct problem keeps the receipt readable on a big file.
+    const key = `${code}|${message}`;
+    if (warningKeys.has(key) || warnings.length >= 50) return;
+    warningKeys.add(key);
+    warnings.push({ code, message, element });
+  };
+  const context: ImportContext = { gradients, patterns, warn };
 
   const visit = (element: Element, parentMatrix: Matrix, parentStyle: SvgStyle, fromUse = false) => {
     const tag = element.localName;
@@ -63,6 +103,15 @@ export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
     const style = resolveStyle(element, parentStyle, cssRules);
     if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return;
     const localMatrix = multiply(parentMatrix, parseTransform(element.getAttribute('transform')));
+    if (SHAPE_TAGS.has(tag) || CONTAINER_TAGS.has(tag)) {
+      for (const [attribute, code, label] of [
+        ['filter', 'filter-dropped', 'filter'],
+        ['mask', 'mask-dropped', 'mask'],
+        ['clip-path', 'clip-path-dropped', 'clip path'],
+      ] as const) {
+        if (element.getAttribute(attribute)) warn(code, `A ${label} is not supported, so it was dropped.`, element.localName);
+      }
+    }
 
     if (tag === 'use') {
       const href = element.getAttribute('href') ?? element.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
@@ -76,11 +125,26 @@ export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
       return;
     }
 
+    if (tag === 'text') {
+      const parsed = readTextElement(element, context, localMatrix);
+      if (parsed) {
+        textItems.push({
+          name: elementName(element, items.length + textItems.length + 1),
+          style, matrix: localMatrix, ...parsed,
+        });
+      } else skippedElementCount += 1;
+      return;
+    }
+
     if (SHAPE_TAGS.has(tag)) {
       try {
         const paths = pathsForElement(element).filter((path) => path.segments.length > 0);
-        if (paths.length > 0) items.push({ name: elementName(element, items.length + 1), paths, style, matrix: localMatrix });
-        else skippedElementCount += 1;
+        if (paths.length > 0) {
+          items.push({
+            name: elementName(element, items.length + 1), paths, style, matrix: localMatrix,
+            localBox: pathBox(paths),
+          });
+        } else skippedElementCount += 1;
       } catch {
         skippedElementCount += 1;
       }
@@ -101,7 +165,10 @@ export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
     paths: item.paths.map((path) => transformSubpath(path, item.matrix)),
   }));
   const viewport = svgViewport(root, transformed.flatMap((item) => item.paths));
-  const objects = transformed.map((item) => clipboardObject(item.name, item.paths, item.style, item.matrix));
+  const objects = [
+    ...transformed.map((item) => clipboardObject(item.name, item.paths, item.style, item.matrix, item.localBox, context)),
+    ...textItems.map((item) => textClipboardObject(item.name, item.style, item)),
+  ];
   return {
     viewport,
     payload: {
@@ -110,10 +177,18 @@ export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
     },
     importedElementCount: objects.length,
     skippedElementCount,
+    warnings,
   };
 }
 
-function clipboardObject(name: string, paths: ParsedSubpath[], style: SvgStyle, matrix: Matrix): ClipboardObject {
+function clipboardObject(
+  name: string,
+  paths: ParsedSubpath[],
+  style: SvgStyle,
+  matrix: Matrix,
+  localBox: { minX: number; minY: number; width: number; height: number },
+  context: ImportContext,
+): ClipboardObject {
   const networkId = createEntityId();
   const appearanceId = createEntityId();
   const objectId = createEntityId();
@@ -143,12 +218,26 @@ function clipboardObject(name: string, paths: ParsedSubpath[], style: SvgStyle, 
   });
 
   const hasClosedPath = paths.some((path) => path.isClosed);
-  const fill = paint(style.fill, style.color);
+  // `url(#…)` is a paint reference, not a colour: it is resolved against the gradient
+  // definitions, and anything a gradient cannot express is reported rather than dropped.
+  const fillValue = style.fill.trim();
+  const reference = /^url\(\s*['"]?#([^'")]+)['"]?\s*\)$/.exec(fillValue);
+  const gradient = reference && hasClosedPath
+    ? gradientFillFor(reference[1], { style, matrix, box: localBox, context })
+    : undefined;
+  const fill = reference ? null : paint(style.fill, style.color);
   const stroke = paint(style.stroke, style.color);
+  if (!hasClosedPath && fillValue && fillValue !== 'none') {
+    context.warn('open-path-fill', 'An open path cannot hold a fill, so its fill was dropped.', 'path');
+  }
   const strokeScale = Math.sqrt(Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2])) || 1;
   const appearance: Appearance = {
     id: appearanceId,
-    fills: fill && hasClosedPath ? [{ type: 'solid', color: fill, opacity: clamp01(style.fillOpacity), visible: true }] : [],
+    fills: gradient
+      ? [gradient]
+      : fill && hasClosedPath
+        ? [{ type: 'solid', color: fill, opacity: clamp01(style.fillOpacity), visible: true }]
+        : [],
     stroke: {
       color: stroke ?? DEFAULT_IMPORT_INK, width: Math.max(0, style.strokeWidth * strokeScale),
       cap: style.strokeLinecap, join: style.strokeLinejoin, alignment: 'center',
@@ -482,3 +571,342 @@ function samePoint(left: Point, right: Point) { return Math.abs(left.x - right.x
 function reflect(control: Point, around: Point): Point { return { x: around.x * 2 - control.x, y: around.y * 2 - control.y }; }
 function lerp(start: Point, end: Point, amount: number): Point { return { x: start.x + (end.x - start.x) * amount, y: start.y + (end.y - start.y) * amount }; }
 function vectorAngle(ux: number, uy: number, vx: number, vy: number) { return Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy); }
+
+/* ------------------------------------------------------- Paint references */
+
+const XLINK_NS = 'http://www.w3.org/1999/xlink';
+
+/**
+ * What the importer knows about the file's paint servers. Gradients are looked up by id;
+ * a reference to a pattern is remembered so the warning can say "pattern" instead of
+ * "missing".
+ */
+interface ImportContext {
+  gradients: Map<string, Element>;
+  patterns: Set<string>;
+  warn: (code: string, message: string, element?: string) => void;
+}
+
+interface GradientSource {
+  attributes: Map<string, string>;
+  stops: Array<{ offset: number; color: string; opacity: number }>;
+}
+
+/** The box a shape occupies in its own user space, before its transform is applied. */
+function pathBox(paths: ParsedSubpath[]) {
+  const points = paths.flatMap((path) => path.nodes.flatMap((node) => [
+    node.position,
+    ...(node.handleIn ? [node.handleIn] : []),
+    ...(node.handleOut ? [node.handleOut] : []),
+  ]));
+  if (points.length === 0) return { minX: 0, minY: 0, width: 0, height: 0 };
+  const minX = Math.min(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const maxY = Math.max(...points.map((point) => point.y));
+  return { minX, minY, width: maxX - minX, height: maxY - minY };
+}
+
+/** `href` / `xlink:href` on a gradient or pattern, resolved as a local id. */
+function hrefTarget(element: Element, lookup: Map<string, Element>): Element | undefined {
+  const href = element.getAttribute('href')
+    ?? element.getAttributeNS(XLINK_NS, 'href')
+    ?? element.getAttribute('xlink:href');
+  return href?.startsWith('#') ? lookup.get(href.slice(1)) : undefined;
+}
+
+function gradientSource(element: Element, lookup: Map<string, Element>, seen = new Set<Element>()): GradientSource {
+  if (seen.has(element)) return { attributes: new Map(), stops: [] };
+  seen.add(element);
+  // A gradient inherits whatever it does not set from the gradient it hrefs, which is how
+  // `<linearGradient id="b" href="#a">` recolours a shared geometry.
+  const parent = hrefTarget(element, lookup);
+  const inherited = parent && parent.localName !== 'pattern'
+    ? gradientSource(parent, lookup, seen)
+    : { attributes: new Map<string, string>(), stops: [] };
+  const attributes = new Map(inherited.attributes);
+  for (const attribute of element.attributes) attributes.set(attribute.localName, attribute.value);
+  const ownStops = [...element.children].filter((child) => child.localName === 'stop');
+  return {
+    attributes,
+    stops: ownStops.length > 0 ? ownStops.map(readGradientStop) : inherited.stops,
+  };
+}
+
+function readGradientStop(element: Element) {
+  const declarations = parseDeclarations(element.getAttribute('style') ?? '');
+  const offsetText = (declarations.get('offset') ?? element.getAttribute('offset') ?? '0').trim();
+  const offset = offsetText.endsWith('%') ? Number.parseFloat(offsetText) / 100 : Number.parseFloat(offsetText);
+  const color = (declarations.get('stop-color') ?? element.getAttribute('stop-color') ?? DEFAULT_IMPORT_INK).trim();
+  return {
+    offset: Number.isFinite(offset) ? clamp01(offset) : 0,
+    color: color === 'currentColor' ? DEFAULT_IMPORT_INK : color,
+    opacity: clamp01(numeric(declarations.get('stop-opacity') ?? element.getAttribute('stop-opacity'), 1)),
+  };
+}
+
+/**
+ * Turns a `url(#id)` fill into a gradient in the object's local space — the same space the
+ * imported geometry is baked into, which is why the fill travels with the shape afterwards.
+ *
+ * `objectBoundingBox` units (the SVG default) are multiplied by the shape's own box;
+ * `userSpaceOnUse` coordinates are used as-is. A `gradientTransform` is composed on top,
+ * which is exact for linear gradients. Radial gradients get their centre and a geometric-
+ * mean radius, and anything that changes their shape is reported.
+ */
+function gradientFillFor(
+  reference: string,
+  options: {
+    style: SvgStyle;
+    matrix: Matrix;
+    box: { minX: number; minY: number; width: number; height: number };
+    context: ImportContext;
+  },
+): AppearanceFill | undefined {
+  const { style, matrix, box, context } = options;
+  const element = context.gradients.get(reference);
+  if (!element) {
+    if (context.patterns.has(reference)) {
+      context.warn('pattern-fill', 'A pattern fill is not supported, so that fill was dropped.', 'pattern');
+    } else {
+      context.warn('gradient-missing', `A fill referenced “${reference}”, which is not defined; the fill is empty.`, 'gradient');
+    }
+    return undefined;
+  }
+  const source = gradientSource(element, context.gradients);
+  const objectBoundingBox = (source.attributes.get('gradientUnits') ?? 'objectBoundingBox').trim() !== 'userSpaceOnUse';
+  const combined = multiply(matrix, parseTransform(source.attributes.get('gradientTransform') ?? null));
+  const scale = Math.sqrt(Math.abs(combined[0] * combined[3] - combined[1] * combined[2])) || 1;
+
+  const coordinate = (name: string, fallback: number) => {
+    const raw = source.attributes.get(name);
+    if (raw === undefined || !raw.trim()) return fallback;
+    const trimmed = raw.trim();
+    if (!trimmed.endsWith('%')) {
+      const parsed = Number.parseFloat(trimmed);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    const percent = Number.parseFloat(trimmed) / 100;
+    if (!Number.isFinite(percent)) return fallback;
+    if (objectBoundingBox) return percent;
+    context.warn('gradient-units', 'A percentage gradient coordinate in user units was read as a fraction of 1.', 'gradient');
+    return percent;
+  };
+  const toDocument = (point: Point) => (objectBoundingBox
+    ? apply(combined, { x: box.minX + point.x * box.width, y: box.minY + point.y * box.height })
+    : apply(combined, point));
+
+  const spread = (source.attributes.get('spreadMethod') ?? 'pad').trim();
+  if (spread !== 'pad') {
+    context.warn('gradient-spread', `A “${spread}” gradient spread is drawn as “pad”, so the shape shows one repeat.`, 'gradient');
+  }
+  const stops = normalizeStops(source.stops);
+  const opacity = clamp01(style.fillOpacity);
+
+  if (element.localName === 'linearGradient') {
+    const start = toDocument({ x: coordinate('x1', 0), y: coordinate('y1', 0) });
+    const end = toDocument({ x: coordinate('x2', objectBoundingBox ? 1 : box.minX + box.width), y: coordinate('y2', 0) });
+    return { type: 'linear', start, end, stops, opacity, visible: true };
+  }
+
+  const focalX = source.attributes.get('fx');
+  const focalY = source.attributes.get('fy');
+  const centerFraction = objectBoundingBox ? 0.5 : undefined;
+  const center = toDocument({
+    x: coordinate('cx', centerFraction ?? box.minX + box.width / 2),
+    y: coordinate('cy', centerFraction ?? box.minY + box.height / 2),
+  });
+  if ((focalX !== undefined && focalX.trim() !== '') || (focalY !== undefined && focalY.trim() !== '')) {
+    context.warn('gradient-focal', 'A radial gradient focal point is not represented; the gradient is centred.', 'gradient');
+  }
+  if (objectBoundingBox && box.width > 1e-9 && box.height > 1e-9 &&
+    Math.abs(box.width / box.height - 1) > 0.01) {
+    context.warn('gradient-radial', 'A radial gradient in a non-square box cannot be exactly elliptical; a circle with the same area was used.', 'gradient');
+  }
+  const uniform = Math.abs(Math.hypot(combined[0], combined[1]) - Math.hypot(combined[2], combined[3])) < 1e-6
+    && Math.abs(combined[0] * combined[2] + combined[1] * combined[3]) < 1e-6;
+  if (!uniform) {
+    context.warn('gradient-transform', 'A skewed gradient transform was approximated by a uniform scale.', 'gradient');
+  }
+  const radiusFraction = coordinate('r', objectBoundingBox ? 0.5 : Math.max(box.width, box.height) / 2);
+  const radiusUser = objectBoundingBox
+    ? radiusFraction * Math.sqrt(Math.max(0, box.width * box.height))
+    : radiusFraction;
+  return {
+    type: 'radial', center,
+    radius: Math.max(1e-6, radiusUser * scale),
+    stops, opacity, visible: true,
+  };
+}
+
+/* ------------------------------------------------------------- Text import */
+
+/**
+ * Reads a `<text>` element into the slice-1 model (docs/EDITING-AUDIT.md §3.9): one run,
+ * explicit lines, no wrapping. Anything richer is reported rather than guessed at.
+ */
+function readTextElement(
+  element: Element,
+  context: ImportContext,
+  matrix: Matrix,
+): { text: TextContent; origin: Point; transform: TextTransform } | undefined {
+  const declarations = parseDeclarations(element.getAttribute('style') ?? '');
+  const attribute = (name: string) => declarations.get(name) ?? element.getAttribute(name) ?? undefined;
+  const lines = collectTextLines(element, context);
+  if (lines.length === 0) return undefined;
+
+  const runs = [...element.querySelectorAll('tspan')];
+  if (runs.some((run) => {
+    const runStyle = run.getAttribute('style') ?? '';
+    return ['fill', 'font-size', 'font-weight', 'font-family'].some((name) =>
+      run.hasAttribute(name) || runStyle.includes(`${name}:`));
+  })) {
+    context.warn('text-runs', 'Text with more than one style was imported as a single run using the element’s own style.', 'text');
+  }
+  if (attribute('letter-spacing') && attribute('letter-spacing') !== 'normal') {
+    context.warn('text-letter-spacing', 'Letter spacing is not supported; the text was imported with default spacing.', 'text');
+  }
+  if (attribute('textLength')) {
+    context.warn('text-length', 'A forced text length is not supported; the text was imported at its natural width.', 'text');
+  }
+
+  const anchor = attribute('text-anchor');
+  const align: TextAlign = anchor === 'middle' ? 'center' : anchor === 'end' ? 'right' : 'left';
+  const lineHeightText = attribute('line-height');
+  const lineHeight = lineHeightText && /^[\d.]+$/.test(lineHeightText.trim())
+    ? Number.parseFloat(lineHeightText)
+    : undefined;
+  const text = normalizeTextContent({
+    content: lines.join('\n'),
+    family: textFamilyFor(attribute('font-family'), context),
+    size: lengthFromCss(attribute('font-size')) ?? 16,
+    weight: clampTextWeight(lengthFromCss(attribute('font-weight')) ?? 400),
+    lineHeight,
+    align,
+  });
+  if (!text) return undefined;
+  const transform = textTransformFor(matrix, context);
+  if (!transform) return undefined;
+  const layout = layoutText(text);
+  // SVG places the first baseline at x/y; our box starts at its top-left. Shift so both agree.
+  const anchorY = numeric(attribute('y'), 0);
+  const anchorX = numeric(attribute('x'), 0);
+  return {
+    text,
+    origin: { x: anchorX + transform.translate.x, y: anchorY - layout.firstBaselineOffset + transform.translate.y },
+    transform,
+  };
+}
+
+interface TextTransform {
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+  translate: Point;
+}
+
+function textTransformFor(matrix: Matrix, context: ImportContext): TextTransform | undefined {
+  const scaleX = Math.hypot(matrix[0], matrix[1]);
+  if (scaleX < 1e-9) {
+    context.warn('text-transform', 'A text element with no usable size was skipped.', 'text');
+    return undefined;
+  }
+  const rotation = Math.atan2(matrix[1], matrix[0]) * 180 / Math.PI;
+  const scaleY = (matrix[0] * matrix[3] - matrix[1] * matrix[2]) / scaleX;
+  const skew = (matrix[0] * matrix[2] + matrix[1] * matrix[3]) / scaleX;
+  if (Math.abs(skew) > 1e-6) {
+    context.warn('text-transform', 'A skewed text transform was approximated by a uniform scale.', 'text');
+  }
+  return { rotation, scaleX, scaleY, translate: { x: matrix[4], y: matrix[5] } };
+}
+
+/** Lines of text, one per `tspan` that sets its own `y`/`dy`; plain runs concatenate. */
+function collectTextLines(element: Element, context: ImportContext): string[] {
+  const lines: string[] = [];
+  let current = '';
+  const walk = (node: Node) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) {
+        current += child.textContent ?? '';
+        continue;
+      }
+      if (child.nodeType !== 1) continue;
+      const childElement = child as Element;
+      if (childElement.localName === 'textPath') {
+        context.warn('text-path', 'Text on a path is not supported; its characters were imported as plain text.', 'text');
+        walk(childElement);
+        continue;
+      }
+      if (childElement.localName === 'tspan' &&
+        (childElement.hasAttribute('y') || childElement.hasAttribute('dy')) && current.trim().length > 0) {
+        lines.push(current);
+        current = '';
+      }
+      walk(childElement);
+    }
+  };
+  walk(element);
+  lines.push(current);
+  const cleaned = lines
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line, _index, all) => line.length > 0 || all.length === 1);
+  return cleaned;
+}
+
+/** Maps an SVG `font-family` onto one of the three supported stacks, saying when it changes. */
+function textFamilyFor(value: string | undefined, context: ImportContext) {
+  const first = (value ?? '').split(',')[0]?.replace(/["']/g, '').trim().toLowerCase() ?? '';
+  if (!first) return 'sans' as const;
+  if (/mono|courier|consolas|menlo/.test(first)) return 'mono' as const;
+  if (/serif|georgia|times|garamond/.test(first) && !/sans-serif/.test(first)) return 'serif' as const;
+  if (/inter|arial|helvetica|roboto|system-ui|sans/.test(first)) return 'sans' as const;
+  context.warn('text-family', `“${first}” is not one of the three bundled families; the text uses the sans stack.`, 'text');
+  return 'sans' as const;
+}
+
+/** CSS lengths as the importer understands them: px, em and percent of the default size. */
+function lengthFromCss(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim().toLowerCase();
+  const parsed = Number.parseFloat(trimmed);
+  if (!Number.isFinite(parsed)) return undefined;
+  if (trimmed.endsWith('%')) return parsed / 100 * 16;
+  if (trimmed.endsWith('em')) return parsed * 16;
+  return parsed;
+}
+
+/** A text object as a clipboard payload: an ordinary object with an empty network. */
+function textClipboardObject(
+  name: string,
+  style: SvgStyle,
+  item: { text: TextContent; origin: Point; transform: TextTransform },
+): ClipboardObject {
+  const networkId = createEntityId();
+  const appearanceId = createEntityId();
+  const objectId = createEntityId();
+  const layerId = createEntityId();
+  const { text, origin, transform } = item;
+  const fill = paint(style.fill, style.color) ?? DEFAULT_IMPORT_INK;
+  const appearance: Appearance = {
+    id: appearanceId,
+    fills: [{ type: 'solid', color: fill, opacity: clamp01(style.fillOpacity), visible: true }],
+    opacity: clamp01(style.opacity),
+  };
+  const object: NetworkObject = {
+    id: objectId, name, networkId, appearanceId,
+    transform: {
+      x: origin.x, y: origin.y,
+      rotation: transform.rotation,
+      scaleX: transform.scaleX,
+      scaleY: transform.scaleY,
+    },
+    text,
+  };
+  return {
+    object,
+    layer: { id: layerId, kind: 'object', name, artboardId: '', childIds: [], objectId, visible: true, locked: false, expanded: true },
+    appearance,
+    network: { id: networkId, nodeIds: [], pathIds: [] },
+    nodes: [], paths: [], segments: [],
+  };
+}

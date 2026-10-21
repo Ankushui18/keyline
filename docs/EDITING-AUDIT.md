@@ -87,7 +87,7 @@ or where it would have to be added.
 | `Ctrl/⌘ G` / ungroup | only when a layer row has focus | `ui/LayersPanel.tsx:452-500` | partial |
 | Layers: nest, reorder, lock, hide | yes, full keyboard reordering | `ui/LayersPanel.tsx:121-186` | works |
 | Isolate a group | yes, but it **hides** the rest of the document | `core/document.ts:317`, banner at `VectorCanvas.tsx:2285` | partial |
-| Multi-artboard documents | yes; frames are created from a menu of 24/32/48 presets plus custom size | `ui/Toolbar.tsx:165-180` | works, icon-flavoured |
+| Multi-artboard documents | yes; frames come from one grouped preset list (Interface, Web, Device, Social, Print, Artwork) plus custom size | `core/frame-presets.ts`, `ui/Toolbar.tsx` frame menu | **general-purpose since this pass** |
 | Text objects | **absent** — no text tool, no text entity in `src/core/types.ts` | — | **missing** |
 | Gradients | **absent** — fills are solid only; `core/document.ts:1110` records the old union advertised gradients without a model | — | **missing** |
 | SVG import / export | yes, with round-trip tests | `src/import/svg-import.ts`, `src/export/svg-export.ts` | works |
@@ -255,11 +255,363 @@ Modifier precedence, settled before wiring:
 4. **`Shift`-click** adds to or removes from the selection.
 5. **A plain click** selects what the preview shows.
 
-### 3.6 Typography and gradients are absent, not weak
+### 3.6 Direct path editing — done
 
-There is no text entity and no gradient fill type. These are feature projects, not
-interaction fixes, and they should be sequenced after the interaction layer —
-otherwise there is a sophisticated engine with nothing comfortable to draw with.
+Path editing is the point where the selection model stops describing boxes and starts
+describing geometry, so its contract is written here before any of it is wired.
+
+**Spaces.** Nodes, anchors and Bézier handles are stored in the edited object's
+**local** space; the pointer arrives in **world** space. One conversion, the object's
+transform and its inverse, sits at the boundary, and every path rule below is stated in
+local space. Frames are axis-aligned, so this transform is a translation, a rotation and
+a positive scale — never a reflection.
+
+**The four affordances.** One resolver, `resolvePointerTarget`, already answers what is
+under the pointer; path editing adds the last two rungs at the top of that ladder:
+
+| Rung | Target | Only while | Click behaviour |
+|---|---|---|---|
+| 1 | Bézier handle | its node is selected | drag the handle; mirroring follows the node's mode |
+| 2 | Anchor | the path is in point editing | click selects it, drag moves it and everything selected with it |
+| 3 | Segment body | the path is in point editing | click selects it, drag bends it; **double-click inserts an anchor** |
+| 4 | Pull out handles | a corner anchor in point editing | `⌥`-drag away from the anchor and its lines become curves, as one undo step |
+| 5 | Object body | always | select the object or its group |
+
+Hover is drawn from the same answer: anchors as squares, segments as a stroke highlight,
+handles as diamonds with their tether, and — in point editing — a small hollow square on
+the segment at the point where a double-click would insert an anchor. Nothing is previewed
+that a click would not take.
+
+**Inserting an anchor.** Double-clicking a segment body splits it at the point nearest the
+pointer through the existing `SPLIT_SEGMENT` inverse, so the curve is unchanged by the
+insertion: a Bézier insert is an exact cubic split, an arc stays an arc with the split
+angle, a line stays a line, and a width profile is split proportionally. Insertion is one
+undo step, lands in the same path, and the new anchor is selected afterwards.
+
+**Corner conversion.** A node has one of three persistent `handleMode`s. Conversion is
+`SET_NODE_MODES` and nothing else:
+
+- `corner` — handles are independent (`⌥`-drag one alone).
+- `smooth` — the opposite handle keeps its **length**, its direction mirrors.
+- `symmetric` — the opposite handle mirrors length and direction.
+
+Converting to `corner` keeps the handles where they are. Converting to `smooth` or
+`symmetric` **derives** the pair from the neighbours, so the anchor's own shape change is
+the only visible effect and the curve becomes tangent-continuous. Conversion is one undo
+step and works on a multi-selection. The inspector already exposes the three modes
+(`Sharp` / `Smooth` / `Mirrored`); this pass makes set-and-derive explicit rather than
+leaving the tangent to whatever handles happened to exist.
+
+**Mirroring while dragging.** The three modes are pinned by tests in this pass, because
+they were previously only implied by the labels: `angle` mirrors the direction and keeps
+the opposite handle's length, `mirror` mirrors direction and length, and an independent
+handle leaves the opposite one untouched. Conversion sets the persistent mode; dragging
+reads it.
+
+**Refusals, stated in the interface.** Infinite construction lines cannot be split (the
+operation already throws), native arcs keep their own specialist tools rather than being
+bent by dragging, and a locked or hidden object offers none of the five rungs.
+
+### 3.7 General-purpose drawing — done
+
+Everything about this editor's defaults was decided for 24 px icons: the frame menu
+offered three icon sizes, frames were all named `Icon N`, and every start card on the
+dashboard opened an icon file. A designer drawing a page, a post or a print sheet had to
+create an icon frame and then fight it. This section is the contract for the defaults that
+come before any drawing happens.
+
+**One list of frame presets.** `src/core/frame-presets.ts` is the only place frame sizes
+are described. Each preset carries a group, a label, a size and — except for the icon
+presets, which keep their existing `Icon N` naming — the name its frame is created with:
+
+| Group | Presets | Purpose |
+|---|---|---|
+| Interface | 24, 32, 48 px squares | the existing icon workflow, unchanged |
+| Web | 1440 × 1024, 1280 × 800 | page layout at 1× CSS pixels |
+| Device | 390 × 844, 768 × 1024 | phone and tablet |
+| Social | 1080 × 1080, 1200 × 630 | post and link preview |
+| Print | A4 794 × 1123, Letter 816 × 1056 | A4 and US Letter at 96 dpi, stated as such |
+| Artwork | 1000 × 1000, 1920 × 1080 | illustration and presentation |
+
+Print sizes are listed in **pixels at 96 dpi**, because the document model has no physical
+units. The preset says so in its label; nothing claims to be a print-ready PDF.
+
+**Naming follows the preset.** A frame created from a Web preset is named `Web page`, not
+`Icon 1440×1024`; duplicates get the same ` 2`, ` 3` suffix the icon path already uses.
+Icon presets keep their current names, so the icon regression suite stays meaningful.
+
+**One creation path.** Every entry point — the toolbar's New frame menu, the dashboard's
+start cards and the in-canvas start overlay — creates a frame through the same plan
+(`prepareCreateIconArtboard`, which now accepts the preset's name). The menu is grouped by
+the same groups the module defines, so the toolbar cannot drift from the list.
+
+**Neutral empty state.** The dashboard opens on "New file" with a blank canvas, a web page
+and a social post beside the icon start, and the copy no longer assumes icons ("Start with
+a blank canvas or drop an SVG or backup"). The in-canvas overlay gains the same general
+starts next to the icon one. Nothing icon-specific is removed: the icon-set view, pixel
+grid and icon exports stay where they are, as options rather than as the only door in.
+
+**Drawing anywhere already holds, and is now tested.** A new object joins the frame under
+the pointer, and joins the page-level canvas root when the pointer is outside every frame
+(`prepareArtboardPlacement`). That behaviour predates this pass; it is pinned here because
+"general-purpose" is only true if drawing outside a 24 px box works.
+
+### 3.8 Gradient fills — done
+
+Fills were solid-only, and the import path proved it: `paint()` returned `null` for any
+`url(#…)` paint, so a shape with a gradient fill imported with **no fill at all** — a silent
+data loss, which the project's second standing rule forbids. This section was written as the
+contract first, then implemented; it now describes what ships.
+
+**The model.** `AppearanceFill` becomes a discriminated union in `src/core/types.ts`:
+
+| Variant | Carried data | Notes |
+|---|---|---|
+| `solid` | `color` | unchanged; every existing document keeps working |
+| `linear` | `start`, `end`, `stops` | endpoints in **object-local** space |
+| `radial` | `center`, `radius`, `stops` | one circle, no focal point; focal points import as a warning |
+
+A stop is `{ offset, color, opacity }` with `offset` clamped to 0–1 and sorted on write.
+Every gradient carries at least two stops; `normalizeStops` is the only function that
+enforces that, so the renderer and the exporter can trust the invariant.
+
+**Coordinates are object-local, like nodes.** This is the one decision that makes the rest
+fall out: the canvas already paints fills inside the object's transform, so a local-space
+gradient needs no extra conversion to render, and exporting transforms the endpoints by the
+same source→document matrix the geometry uses — including parametric instances, which get
+their own matrix per occurrence. A gradient therefore moves, scales and rotates with its
+shape, and mirror/radial repeats carry it correctly instead of resetting it.
+
+Gradient placement uses the object's **anchor bounding box** (handles ignored) when a
+default is needed. That box never affects geometry; it only seeds new gradients and converts
+`objectBoundingBox` units on import.
+
+**Rendering.** `drawObjectFills` builds a `CanvasGradient` per fill through `fillPaint` in
+`src/canvas/renderer.ts`. Because the context is already in local space,
+`createLinearGradient(start, end)` and `createRadialGradient(center, radius)` need no
+transforms. Radial gradients under a non-uniform object scale become elliptical, exactly as
+SVG's own `objectBoundingBox` behaviour does — that is the model, not an approximation to fix
+later. A degenerate gradient (zero span or zero radius) falls back to its first stop instead
+of painting nothing. The WebGL preview path is flat-colour only, so it draws a gradient's
+first stop; the Canvas renderer is the default renderer and the one exports follow.
+
+**Export.** Each gradient fill becomes one `<linearGradient>` / `<radialGradient>` in
+`<defs>` with `gradientUnits="userSpaceOnUse"` and endpoints transformed into export space,
+referenced as `fill="url(#id)"`. Stop opacity is written as `stop-opacity`, and the fill's
+own opacity stays `fill-opacity`, so a translucent gradient survives the round trip.
+
+**Editing.** The Fill section of the inspector (`src/ui/PropertiesPanel.tsx`) gives every
+fill a **Solid / Linear / Radial** switch. Converting keeps what carries over: a solid's ink
+becomes both ends of the new gradient, and a gradient's first stop becomes the ink of a new
+solid. A new gradient is seeded from the object's anchor box, so it spans the shape the
+moment it exists. A gradient row keeps the eye, opacity and remove controls and adds:
+
+- an angle field for linear gradients, a radius field for radial ones (both commit on blur,
+  like every other numeric field in the panel);
+- one row per stop — colour well, hex field, position, stop opacity — plus add and remove;
+- remove is refused, with a reason, at the two-stop minimum.
+
+Every edit replaces the whole fill through `UPDATE_APPEARANCE`, so one edit is one history
+entry. Choosing a single colour for a gradient from the **multi-selection** swatch replaces
+the paint with a solid of that colour, which is what a colour well means; Undo restores the
+gradient.
+
+**Import, and the end of silent loss.** `parseSvgDocument` resolves `url(#…)` fills:
+
+- `linearGradient` and `radialGradient` in `<defs>` are read, including stop `offset`,
+  `stop-color`, `stop-opacity` and inheritance through `href`/`xlink:href`.
+- `gradientUnits="objectBoundingBox"` (the SVG default) is converted with the shape's own
+  box; `userSpaceOnUse` is taken as written.
+- `gradientTransform` is composed onto the endpoints, which is exact for a linear gradient.
+  A radial gradient keeps its centre and gets a geometric-mean radius; a transform that is
+  not a similarity (skew or non-uniform scale) is reported as approximate.
+- Anything that cannot be represented is **reported, not dropped**: a non-pad
+  `spreadMethod`, focal points, patterns, and filter/mask/clip-path on an element each
+  produce a structured warning with a code, a message and the element that caused it.
+- A reference that does not resolve — a missing id, or a pattern used as paint — imports as
+  **no fill plus a warning**. No colour is invented for it.
+- A fill on an open path is reported; only closed paths paint a fill.
+
+`SvgImportResult.warnings` is the contract: `{ code, message, element? }[]`. The import
+receipt names the first warning and counts the rest, and the Tidy dialog lists the count
+before the file is opened, so the user is told what the file contained that Keyline will not
+draw.
+
+**Refusals.** Region fills stay solid-only (they are topology-bound overrides, not object
+appearance). Strokes stay solid in this pass. A gradient on an open path paints nothing,
+because fills only apply to closed paths — and the import warns when it meets that case.
+
+**Tests.** `src/core/fills.test.ts` pins stop normalization, clone isolation and the
+operation-level write path; `src/canvas/renderer-fill.test.ts` pins the canvas paints;
+`src/export/svg-export.gradient.test.ts` pins the `<defs>` round trip, including a scaled
+occurrence and the icon-export flattening; `src/import/svg-import.gradients.test.ts` pins
+objectBoundingBox conversion, `userSpaceOnUse`, `href` inheritance and every warning code;
+`src/ui/PropertiesPanel.gradient.test.tsx` pins the inspector rows. The suite is **525 tests
+in 79 files** as of this section.
+
+### 3.9 Text objects — slice 1 done
+
+There was no text entity, which was the single largest missing capability in
+[`docs/PRODUCT-AUDIT.md`](PRODUCT-AUDIT.md) §4: without text, a vector editor can draw marks but
+not a page. It is also the riskiest thing to bolt on, because every existing interaction —
+selection, hit testing, bounds, transform, export — assumes nodes and segments. This section
+was written as the contract before any code; it now describes what ships, for **slice 1**
+only.
+
+**What slice 1 is.** One-run text objects that can be inserted, edited in the inspector,
+rendered on the canvas, selected, moved, rotated and scaled by the existing object transform,
+exported as SVG `<text>` and imported back. Nothing about the geometry model changed.
+
+**What slice 1 is not.** No caret, no selection inside text, no wrapping or auto-size, no
+multiple runs inside one object, no custom fonts, no text on a path, no outlines. Those are
+later slices, and each needs its own contract. Saying so here is what keeps the first slice
+small enough to verify.
+
+**The model.** `NetworkObject` gains one optional field:
+
+```ts
+interface TextContent {
+  content: string;        // '\n' separates lines; text never wraps
+  family: 'sans' | 'serif' | 'mono';
+  size: number;           // px, at object scale 1
+  weight: 400 | 500 | 600 | 700;
+  lineHeight: number;     // multiplier of size, at least 0.5
+  align: 'left' | 'center' | 'right';
+}
+```
+
+Text lives **on the existing object**, with an empty network, rather than becoming a new
+document-level entity. That single decision is what makes the slice small: layers, z-order,
+lock/visibility, the appearance rules, `UPDATE_OBJECT`, undo, duplication, clipboard and the
+document snapshot all keep working unchanged, because a text object is an object. A document
+with no text is serialised exactly as before — the field is absent, not empty.
+
+**Layout is derived, never stored.** `src/core/text.ts` turns content plus style into lines and
+a box. Measurement comes from a provider: the app installs a canvas-backed one, while node and
+the test suite use a deterministic fallback, so a test can assert numbers. Nothing measured is
+persisted, so a file opened on another machine is laid out in that machine's fonts instead of
+carrying stale pixel widths. The box is object-local — `0…width` by `0…lines × lineHeight ×
+size`, origin at the object transform's origin, top-left — which is the same convention as
+nodes, so nothing downstream needs a new coordinate space.
+
+**Bounds.** `objectLocalPoints` returns the text box corners for a text object, so selection,
+hit testing, alignment, arrangement, zoom-to-fit and artwork export bounds work with **no new
+paths and no per-tool exceptions**. Refusal: a text object cannot join a parametric group or a
+geometry component; both are geometry features and text has no geometry to substitute.
+
+**Measurement, and its one honest caveat.** The app installs a canvas-backed metrics provider
+(`src/canvas/text-metrics.ts`) at startup, so a text box matches the glyphs the canvas draws.
+Node, workers and the test suite use the deterministic fallback in `src/core/text.ts`. A
+document therefore carries no pixel widths, and a file opened where the fonts differ is laid
+out there — which is correct for text and is why nothing measured is persisted.
+
+**Rendering.** Lines are painted with the object's first visible fill — solid **or gradient**,
+in object-local space, so gradient text costs nothing extra — under the object transform, its
+opacity and its alignment. A text object's stroke is not drawn in slice 1.
+
+**Export.** One `<text>` element with the occurrence's `transform="matrix(…)"`, `font-family`
+from the family stack, `font-size`, `font-weight`, `fill`, and one `<tspan>` per line with
+`x`/`y`; alignment becomes `text-anchor`. Because the tspans carry explicit positions, another
+renderer does not have to agree with our metrics to place the lines.
+
+**Import.** `<text>` and its `<tspan>` children become a text object: content from the text
+nodes, `font-size`, `font-weight`, `text-anchor`, and the `transform` decomposed into
+translate/rotate/uniform-scale on the object. Everything this model cannot carry is
+**reported** through the same `SvgImportResult.warnings` channel as gradients (§3.8): a
+`textPath`, per-run fills in one `<text>`, a non-uniform or skewed transform, `letter-spacing`,
+and `textLength`. A `<text>` we cannot read at all is skipped with a warning, never silently.
+
+**Editing, and how text gets into a document.** Slice 1 edits text in the Design panel: a
+content field, family, size, weight, line height and align, each committed as one undoable
+`UPDATE_OBJECT`; the section also shows the measured box. Insertion comes from the
+**More → Add text** menu item and the command palette, which places a text object at the active
+frame's centre and selects it. Slice 1 had no text tool and no on-canvas caret; §3.10 adds both
+the `T` tool, double-click, and a caret after every insertion route. The **Edit points** control
+is disabled for text with the reason "text has no points to edit" rather than opening a point
+editor that has nothing to edit.
+
+**The WebGL preview falls back to Canvas 2D for a document containing text.** The WebGL path
+has no glyph atlas; drawing text as nothing would be a silent lie, so the renderer mode is
+honoured everywhere else and text always paints.
+
+**Refusals, stated rather than discovered.** No wrapping; no multi-run styling inside one
+object; no text in parametric groups or geometry components; no text on a path; no stroke on
+text; no custom or uploaded fonts (three families map to named stacks). Each refusal produces a
+warning on import where the file asks for it, and a disabled control with a reason in the
+inspector where the UI would otherwise imply support.
+
+**Tests.** `src/core/text.test.ts` pins normalization, the deterministic metrics, layout,
+bounds through `object-geometry`, selection, duplicate, undo and the snapshot round trip;
+`src/canvas/renderer-text.test.ts` pins baselines, alignment offsets, transform, opacity and
+gradient text; `src/export/svg-export.text.test.ts` pins the `<text>`/`<tspan>` export,
+escaping and gradient fills; `src/import/svg-import.text.test.ts` pins content, lines,
+alignment, transform decomposition, every text warning code and a full export→import round
+trip; `src/ui/PropertiesPanel.text.test.tsx` and the toolbar menu test pin the controls. The
+suite is **525 tests in 79 files** as of this section.
+
+### 3.10 Text editing on the canvas — slice 2
+
+Slice 1 could create and restyle text but not *type* it: every character went through the
+inspector. This section is the contract for typing on the canvas, written before the code.
+It adds **no persisted state** — the document still stores only content and style — so the
+whole slice is UI plus one renderer option.
+
+**The editing surface is a real text field, not a painted caret.** While a text object is
+being edited, an overlay `<textarea>` sits exactly over it, in screen space, carrying the same
+font, size, line height, colour and alignment as the painted text. That single decision buys
+the caret, selection, word/line navigation, clipboard, undo inside the field, IME composition,
+spellcheck suppression, screen-reader access and keyboard focus for free — all of them things
+a hand-drawn caret would have to re-implement, badly, without a browser to test in.
+
+**Placement is one testable function.** `textEditorPlacement` in `src/core/text-edit.ts`
+composes the viewport transform with the object transform and returns the CSS the overlay
+uses:
+
+| Property | Value | Why |
+|---|---|---|
+| `transform` | `matrix(a, b, c, d, e, f)` of viewport ∘ object, origin `0 0` | the field lives in the object's own local space, so rotation and scale are exact |
+| `width`, `height` | the measured box (`layoutText`) | the field ends where the text ends, so clicks outside it commit |
+| `font` | `weight size px family stack` — the same shorthand the canvas paints with | one source, so text does not jump when editing starts |
+| `line-height` | `size × lineHeight` px | matches `layoutText`'s line box |
+| `text-align` | the object's alignment | caret and selection follow the text, not the box |
+| `color` | the first visible fill's colour (`fillColor`) | gradient text edits against its first stop; the painted gradient returns on commit |
+
+**The painted text is skipped while editing.** `renderVectorScene` takes
+`editingTextObjectId` and does not paint that object's glyphs, so the overlay is the only text
+on screen. Two renderings of the same string with slightly different metrics would otherwise
+read as bold, smeared text.
+
+**The field follows the view.** The viewport is a ref inside the canvas, so panning and zooming
+do not re-render React on their own. The overlay keeps a revision counter that wheel zoom,
+keyboard zoom, fit-to-selection and middle-drag panning all bump; placement is derived from it,
+so the caret stays on the glyphs instead of drifting off them mid-edit.
+
+**One editing session is one undo step.** Beginning an edit opens a transaction; every change
+writes the new content through the existing `UPDATE_OBJECT` inside it; Escape, ⌘/Ctrl+Enter or
+focus leaving the field commits. Undo therefore restores the text as it was before the field
+was opened, not one character at a time. Because each keystroke does write to the document,
+the selection frame, the inspector's measured box and export all follow live.
+
+**Keys belong to the field while it has focus.** The canvas shortcut handler already ignores
+events from editable targets, so typing `r` types `r` instead of switching to the rectangle
+tool. `Enter` inserts a line (text does not wrap yet); `Tab` commits and moves focus on, so the
+field is not a keyboard trap; `Escape` **commits** rather than discarding — the same choice
+Figma makes — and the change stays reversible with a single Undo.
+
+**How editing starts.** Two routes, both landing in the same state:
+
+- the **Text** tool (`T`), where a click creates a text object at the pointer with the default
+  style and opens the field immediately, so the first keystroke is the text;
+- **double-clicking** an existing text object with the Select tool, which opens the field with
+  the caret at the end of its content.
+
+The More menu's **Add text** and the command palette still insert centred and now open the
+field too, so every route ends with a caret in a field.
+
+**Refusals, unchanged and restated.** Still no wrapping, no auto-size, no rich runs, no text on
+a path, no text stroke, and no in-field styling. A text object still cannot join a parametric
+group or a geometry component. Slice 3 is wrapping plus multiple runs, and it will need its
+own contract before code.
 
 ---
 
@@ -285,8 +637,8 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 |---|---|---|
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
-| 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
-| 4 | Text and gradients (3.6) | typography and illustration, the two missing media |
+| 3 | ~~General-purpose framing: frame presets beyond icon sizes, neutral empty state~~ (done, 3.7) | — |
+| 4 | ~~Gradients~~ (done, 3.8) · ~~Text, slice 1~~ (done, 3.9) · ~~On-canvas text editing~~ (done, 3.10); wrapping and rich runs next | — |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived
@@ -296,7 +648,7 @@ quality gain, and it needs no new model concepts.
 
 ## 6. Shipped in this pass
 
-Six changes, all small and all verified by the existing gates:
+Seven changes, all small and all verified by the existing gates:
 
 - **Resize and rotate.** A quad frame on the object's own axes with eight resize
   handles and a rotate zone just outside each corner; `Shift` keeps the ratio when
@@ -317,6 +669,12 @@ Six changes, all small and all verified by the existing gates:
   shape outline without touching the document. `Alt`-click selects the parent group
   (10 tests in `src/core/target-resolution.test.ts`, hover resolution measured at a
   1.4–1.6 ms median on 2000 objects).
+- **General-purpose framing.** One preset list (`core/frame-presets.ts`) feeds the frame menu,
+  the dashboard and the in-canvas start: Interface, Web, Device, Social, Print and Artwork sizes,
+  with print sizes honestly labelled "96 dpi". Non-icon frames are named after their preset
+  (`Web page`, `Social post`), duplicates get the existing numeric suffix, and the icon workflow
+  keeps its `Icon N` naming. The dashboard opens on **New file** with blank-canvas and social-post
+  starts beside the icon one (9 tests).
 - **Truthful inspector availability.** Every disabled control in the right panel
   names its reason in its tooltip, availability comes from the visible-and-unlocked
   set the commands act on, and a frame holding a single shape can be aligned.

@@ -93,7 +93,8 @@ describe('icon onboarding regression', () => {
     manager.execute({ type: 'UPDATE_APPEARANCE', payload: { appearanceId: appearance.id, updates: { fills: [{ type: 'solid', color: '#123456', opacity: 1, visible: true }] } } });
     apply(manager, prepareCreateIconArtboard(document, 24, 24).operations);
     expect(document.activeArtboardId).not.toBe(originalId);
-    expect(document.getAppearance(appearance.id)?.fills[0].color).toBe('#123456');
+    const stored = document.getAppearance(appearance.id)?.fills[0];
+    expect(stored?.type === 'solid' ? stored.color : undefined).toBe('#123456');
     expect(removeLegacyIconStarter(manager)).toBeNull();
   });
 

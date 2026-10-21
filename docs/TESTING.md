@@ -2,7 +2,7 @@
 
 What is verified, how to run it, and what the suites do **not** prove.
 
-Current suite: **401 tests across 62 test files**, plus a real Wasm smoke test, nine WebSocket
+Current suite: **525 tests across 79 test files**, plus a real Wasm smoke test, nine WebSocket
 integration checks, Rust unit tests, and optional browser suites.
 
 - [Run everything](#run-everything)
@@ -115,6 +115,7 @@ touching the document.
 | `export/code-export.test.ts` | React/CSS generation, hostile values, name collisions, bounded props. |
 | `export/delivery-export.test.ts` | Naming patterns, collisions, presets, ZIP planning. |
 | `import/svg-import.test.ts` | Path parsing, transforms, style extraction. |
+| `import/svg-import.gradients.test.ts` | `url(#…)` fills: objectBoundingBox conversion, `userSpaceOnUse`, `href` inheritance, and every warning code (pattern, missing id, spread, focal, skew, filter, open path). |
 
 ### Collaboration and UI helpers
 
@@ -127,7 +128,23 @@ touching the document.
 | `core/numeric-expression.test.ts` | Numeric field expressions. |
 | `ui/contrast-color.test.ts` | Accessible avatar/text colour selection. |
 | `ui/PropertiesPanel.states.test.tsx` | Every disabled inspector control carries a reason, rendered in three selection states. |
+| `ui/PropertiesPanel.gradient.test.tsx` | The fill type switch, stops and angle/radius rows, and the two-stop minimum, rendered from a static inspector. |
+| `core/fills.test.ts` | Gradient model: stop normalization, clone isolation, the operation-level write path, object-local geometry and preview CSS. |
+| `core/text.test.ts` | Text model and layout: normalization, deterministic metrics, box maths, bounds through `object-geometry`, selection, duplicate, undo, snapshot. |
+| `canvas/renderer-text.test.ts` | Text paints baselines, alignment offsets, transform, opacity and gradients; nothing without a visible fill; and nothing at all for the object being edited on canvas. |
+| `export/svg-export.text.test.ts` | `<text>`/`<tspan>` export, anchors, escaping, gradient fills, icon-ink flattening. |
+| `import/svg-import.text.test.ts` | Text import: content, lines, anchors, transform decomposition, every text warning code, export→import round trip. |
+| `ui/PropertiesPanel.text.test.tsx` | The text section's controls, the alignment state, and the disabled Edit points reason. |
+| `core/text-edit.test.ts` | Field placement: viewport ∘ object matrix, measured box, font/line-height/alignment, ink from the first visible fill, and the key-to-action policy. |
+| `core/text-session.test.ts` | A session's semantics: it starts from the object's content, refuses non-text, writes through while typing, is one undo step, reports "unchanged", labels history, and rolls back on abort. |
+| `ui/TextEditor.test.tsx` | The field itself (jsdom): focus with the caret at the end, commits once on Escape/Tab/⌘-Enter, `Enter` inserts a line, blur commits, and styling comes from the placement. |
+| `canvas/renderer-fill.test.ts` | The canvas paints a linear and a radial gradient in local space and refuses a degenerate one. |
+| `export/svg-export.gradient.test.ts` | Gradient `<defs>` round trip, scaled occurrences, and icon-export flattening. |
 | `ui/panel-controls.test.tsx` | Every **enabled** inspector and tool control reaches the document or its callback, across nine states (jsdom). |
+| `core/frame-presets.test.ts` | One frame-preset list: groups, preset naming, duplicate numbering, and drawing outside every frame. |
+| `ui/Toolbar.frame-menu.test.tsx` | Every preset reaches the frame menu, in its group, creating the frame it promises (jsdom). |
+| `ui/Dashboard.empty-state.test.tsx` | The dashboard opens on a general-purpose file and offers the icon start as an option (jsdom). |
+| `tools/direct-path-tool.test.ts` | Anchor insertion that preserves the curve, the anchor hit test, corner/smooth/mirrored conversion, and the three handle-mirroring modes. |
 | `core/target-resolution.test.ts` | Hover and press resolve through one pipeline: paint order, entered groups, hidden/locked ancestors, the `Alt`-click parent gesture, and a measured latency budget. |
 
 ---

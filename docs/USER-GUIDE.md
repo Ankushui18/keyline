@@ -10,6 +10,7 @@ Everything you can do in Keyline, from the first icon to a delivered set.
 - [The Design inspector](#the-design-inspector)
 - [Constraints](#constraints)
 - [Fills, regions and stroke widths](#fills-regions-and-stroke-widths)
+- [Text](#text)
 - [Parametric groups](#parametric-groups)
 - [The icon-set view and consistency check](#the-icon-set-view-and-consistency-check)
 - [Families and QA](#families-and-qa)
@@ -33,6 +34,8 @@ Starting points:
 
 | Card | Result |
 |---|---|
+| **Blank canvas** | A 1440 × 1024 web page frame — the general-purpose default. |
+| **Social post** | A 1080 × 1080 frame. |
 | **Icon set** | One 24 px frame, sized for icon work. |
 | **Logo or mark** | A 512 × 512 frame. |
 | **Import a file** | SVG or a `.keyline.json` backup, from the file picker or by dropping it on the dashboard. |
@@ -66,8 +69,16 @@ operable, and both width and split height persist on the device.
 
 - A **document** contains **pages**; a page contains **artboards** (frames). A typical icon file
   has one page and one artboard per icon.
-- Add frames from the **More (⋯)** menu (New 24×24 / 32×32 / 48×48 frame, or a custom size), the
-  command bar (`Ctrl/⌘ K`), or the Layers panel context menu.
+- Add frames from the **More (⋯)** menu, the command bar (`Ctrl/⌘ K`), or the Layers panel
+  context menu. The menu is grouped: **Interface** (24/32/48 icon frames), **Web** (1440 × 1024,
+  1280 × 800), **Device** (390 × 844 phone, 768 × 1024 tablet), **Social** (1080 × 1080,
+  1200 × 630), **Print** (A4 794 × 1123, Letter 816 × 1056 — pixels at 96 dpi, since the document
+  has no physical units) and **Artwork** (1000 × 1000, 1920 × 1080), plus a custom size. The same
+  list is one module (`src/core/frame-presets.ts`), so every entry point agrees.
+- A frame takes its name from the preset — `Web page`, `Social post` — and a second one becomes
+  `Web page 2`. Icon frames keep the `Icon 24` style of name.
+- Drawing outside every frame is allowed and lands on the page-level canvas root, so the frame
+  never decides where your artwork lives.
 - **Duplicate** copies an artboard with its content; the copy gets fresh IDs.
 - **Delete** removes selected artboards as one undoable step (no modal confirmation; use
   `Ctrl/⌘ Z` to restore).
@@ -137,6 +148,7 @@ a frame is selected; resizing a frame never scales the artwork inside it.
 | Line | `\` | Straight geometry segment. |
 | Construction line | `⇧ \` | Finite or infinite guide; excluded from export. |
 | Arc | `A` | Native circular arc. |
+| Text | `T` | Click to place a text object and type in it. |
 | Shape builder | `B` | Merge/subtract by dragging across regions. |
 | Paint | `⇧ B` | Bind a solid fill to a region. |
 | Cut | `C` (or `X` in point mode) | Split a segment at a point. |
@@ -154,6 +166,13 @@ drawn shapes.
 
 ## Tool-specific behaviour
 
+- **Point editing** — press `Enter` on a selected shape. Anchors are squares, Bézier handles
+  diamonds; drag an anchor to move it, drag a handle to reshape the curve. Double-click a segment
+  to insert an anchor exactly where the pointer meets the curve — hover first and a hollow square
+  shows where it will land — and the new anchor is selected, so the next drag moves it. `⌥`-drag a
+  corner anchor to pull a tangent pair out of it. In Design, **Sharp** / **Smooth** / **Mirrored**
+  convert the selected anchors: smooth and mirrored derive the tangent from the neighbouring
+  anchors, sharp leaves the handles where they are. Each of these is one undo step.
 - **Fillet** — choose a radius in Design, then click a corner shared by two line segments. The
   operation trims both lines, inserts a native tangent arc, and adds hard radius and tangency
   constraints in one undoable step. Fillets are arcs, not Bézier approximations.
@@ -228,6 +247,54 @@ document and constraints therefore produce the same result on every machine and 
 - Object appearance (fill and stroke) is separate from region fills. Both can coexist.
 - **Construction lines** are excluded from export and from region detection.
 
+### Gradient fills
+
+Every object fill has a **Solid / Linear / Radial** switch in the Design panel.
+
+- **Linear** gradients have an angle; **radial** gradients have a radius. Both have stops.
+- A stop row carries a colour, a hex value, a position (0–100%) and its own opacity. Add a
+  stop where you need one; remove is refused while only two remain.
+- Gradients belong to the object, so they move, scale and rotate with it — including every
+  occurrence of a mirrored or radial repeat.
+- SVG export writes a real `<linearGradient>` / `<radialGradient>` with a matching
+  `fill="url(#…)"`, so a round trip through another tool keeps the gradient.
+- Choosing a single colour for a gradient from a **multi-selection** swatch replaces the
+  gradient with that solid colour; Undo brings it back.
+- Region fills and strokes are still solid in this release. A radial gradient on a
+  non-uniformly scaled object is drawn as an ellipse, as SVG does.
+
+---
+
+## Text
+
+Press `T` for the **Text** tool and click where the text should start, or add text from
+**More → Add text** / the command palette (`⌘K`) to place it in the centre of the active frame.
+Either way a caret opens in the object, so you can type immediately. To edit existing text,
+double-click it with the Select tool.
+
+- While the caret is in the field: `Return` starts a new line, `Tab` finishes and moves focus
+  on, `Escape` or `⌘/Ctrl + Enter` finishes and keeps the change. Clicking anywhere else
+  finishes too.
+- A whole typing session is **one undo step** — Undo restores the text as it was before you
+  opened the field, not one character at a time.
+- The painted glyphs are hidden while you edit and the field sits exactly over them, in the same
+  font, size, colour and alignment, so the text does not jump when the field closes. Panning and
+  zooming moves the field with the text.
+- The **Content** field in the Design panel edits the same text and also starts a new line with
+  `Return`. Text never wraps; the box is as wide as its longest line.
+- **Family** — Sans, Serif or Mono, mapped to the fonts listed in `src/core/text.ts`.
+- **Weight** — Regular, Medium, Semibold or Bold.
+- **Size** and **line height** are numbers; alignment is left, centre or right.
+- Every edit is one undoable step, and the panel shows the measured box ("2 lines · 120 × 60 px").
+- Text is an ordinary object: it selects from its box, moves, rotates and scales with the same
+  handles as everything else, sits in the Layers list under its own words, and can be duplicated.
+- Text fills take **solid or gradient** colour like any other fill. A stroke on text is not drawn
+  in this release.
+- SVG export writes a real `<text>` element with one `<tspan>` per line, and importing one brings
+  it back as editable text.
+- Not in this release: wrapping, auto-size, several styles inside one object, custom fonts, and
+  text on a path. Importing a file that uses those reports each one in the import receipt.
+
 ---
 
 ## Parametric groups
@@ -296,6 +363,13 @@ Drop an SVG on the dashboard (or use the empty-canvas start panel), or choose **
   - **Snap to grid** (opt-in, because it moves points).
 - The dialog reports how many points will be removed; importing is always cancellable.
 - Imported content is placed as a new object and is fully undoable.
+- **Gradients import as editable gradients.** `linearGradient` and `radialGradient` fills,
+  including `href` inheritance and `objectBoundingBox` units, become Keyline fills.
+- **Anything that cannot be drawn is reported, not silently dropped.** The receipt names the
+  first problem and counts the rest; the tidy dialog shows the count before you open the
+  file. Typical warnings are a pattern fill, a missing gradient id, `spreadMethod="reflect"`,
+  a radial focal point, a skewed gradient transform, and a filter, mask or clip path on an
+  element.
 
 ---
 
@@ -412,6 +486,7 @@ Modifier is `Ctrl` on Windows/Linux and `⌘` on macOS.
 | Select / Pen / Pencil / Brush | `V` / `P` / `N` / `J` |
 | Rectangle / Rounded rect / Ellipse | `R` / `⇧ R` / `U` |
 | Polygon / Star / Line / Arc | `G` / `S` / `\` / `A` |
+| Text | `T` |
 | Construction line | `⇧ \` |
 | Shape builder / Paint | `B` / `⇧ B` |
 | Cut / Bend / Fillet | `C` / `D` / `F` |

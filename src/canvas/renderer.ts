@@ -13,6 +13,8 @@ import {
 import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
+import { fillColor, normalizeStops } from '../core/fills';
+import { layoutText, normalizeTextContent, textCssFont } from '../core/text';
 import { INTERACTION_BOUNDS_POLICY, objectBounds, type GeometryBounds } from '../core/object-geometry';
 import { axisAlignedFrame, frameHandlePoints, framePoint, objectFrame, type SelectionFrame } from '../core/object-resize';
 import {
@@ -29,7 +31,9 @@ import {
   transformPoint,
   type Matrix2D,
 } from '../core/transforms';
-import type { ConstructionExtent, Constraint, EntityId, Point, Region, Segment, SelectionState } from '../core/types';
+import type {
+  AppearanceFill, ConstructionExtent, Constraint, EntityId, Point, Region, Segment, SelectionState, TextContent,
+} from '../core/types';
 import type { Viewport } from './viewport';
 import type { PrimitiveKind } from '../tools/primitive-tool';
 import type { SnapResult } from '../tools/snapping';
@@ -117,10 +121,14 @@ interface RenderOptions {
   hoveredNodeId?: EntityId;
   hoveredSegmentId?: EntityId;
   hoveredHandle?: { nodeId: EntityId; handleType: 'in' | 'out' };
+  /** World point where a double-click would insert an anchor on the hovered segment. */
+  insertPreview?: Point;
   /** Target preview for the pointer, resolved by the shared target pipeline. */
   hoveredTarget?: { bounds: GeometryBounds; group: boolean };
   widthToolActive?: boolean;
   remotePresence?: CollaboratorPresence[];
+  /** A text object under the on-canvas editor: its glyphs are hidden so the field is the only text. */
+  editingTextObjectId?: EntityId;
   overlayOnly?: boolean;
 }
 
@@ -179,6 +187,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
     hoveredSegmentId,
     hoveredHandle,
     hoveredTarget,
+    insertPreview,
     widthToolActive,
     remotePresence,
     overlayOnly = false,
@@ -206,7 +215,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
 
   if (!overlayOnly) {
     drawArtboards(context, document, viewport.scale, true, selectedArtboardIds);
-    drawObjectFills(context, document);
+    drawObjectFills(context, document, options.editingTextObjectId);
   }
 
   drawRegionOverlays(
@@ -251,6 +260,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
     );
     drawGeometryImpactHighlights(context, document, viewport.scale, impactObjectIds);
     if (hoveredTarget) drawHoverTarget(context, hoveredTarget, viewport.scale);
+    if (insertPreview) drawInsertPreview(context, insertPreview, viewport.scale);
     if (selection.mode === 'object') drawObjectSelection(context, document, viewport.scale, selection.objectIds);
     drawParametricControls(context, document, viewport.scale, selection);
     if (remotePresence?.length) drawRemotePresence(context, document, viewport.scale, remotePresence);
@@ -754,7 +764,42 @@ function activePageObjects(document: VectorDocument) {
   return document.activePage.artboardIds.flatMap((artboardId) => document.objectsForArtboard(artboardId));
 }
 
-function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocument): void {
+/**
+ * One fill as a canvas paint. Gradients are built in local space; a degenerate gradient
+ * (zero span or radius) falls back to its first stop instead of painting nothing.
+ * Exported so the paint construction can be tested without a real canvas.
+ */
+export function fillPaint(context: CanvasRenderingContext2D, fill: AppearanceFill): string | CanvasGradient | undefined {
+  if (fill.type === 'solid') return fill.color;
+  const stops = normalizeStops(fill.stops);
+  let gradient: CanvasGradient;
+  if (fill.type === 'linear') {
+    if (Math.hypot(fill.end.x - fill.start.x, fill.end.y - fill.start.y) < 1e-9) return undefined;
+    gradient = context.createLinearGradient(fill.start.x, fill.start.y, fill.end.x, fill.end.y);
+  } else {
+    if (!(fill.radius > 1e-9)) return undefined;
+    gradient = context.createRadialGradient(fill.center.x, fill.center.y, 0, fill.center.x, fill.center.y, fill.radius);
+  }
+  for (const stop of stops) {
+    gradient.addColorStop(stop.offset, withStopOpacity(stop.color, stop.opacity));
+  }
+  return gradient;
+}
+
+function withStopOpacity(color: string, opacity: number): string {
+  if (opacity >= 1) return color;
+  const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return color;
+  const value = Number.parseInt(match[1], 16);
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${Number(opacity.toFixed(3))})`;
+}
+
+/** Exported so the paint loop — including the text-editing skip — can be asserted headlessly. */
+export function drawObjectFills(
+  context: CanvasRenderingContext2D,
+  document: VectorDocument,
+  editingTextObjectId?: EntityId,
+): void {
   for (const object of activePageObjects(document)) {
     const appearance = document.getAppearance(object.appearanceId);
     const fills = appearance?.fills.filter((fill) => fill.visible && fill.opacity > 0) ?? [];
@@ -791,7 +836,9 @@ function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocu
         context.closePath();
         for (const fill of fills) {
           context.globalAlpha = appearance.opacity * fill.opacity;
-          context.fillStyle = fill.color;
+          // The context is already in the object's local space, which is the space the
+          // gradient's endpoints are stored in, so no extra transform is needed here.
+          context.fillStyle = fillPaint(context, fill) ?? fillColor(fill);
           context.fill('nonzero');
         }
       }
@@ -804,7 +851,41 @@ function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocu
         for (const matrix of parametricInstanceMatrices(document, group)) fillPath(pathId, matrix);
       }
     }
+    // Text keeps its z-order because it is painted in the same object loop as geometry.
+    // The object under the editing field is skipped: the field's own glyphs are the text.
+    if (object.text && object.id !== editingTextObjectId) {
+      drawTextObject(context, objectMatrix, object.text, appearance.opacity, fills);
+    }
   }
+}
+
+/**
+ * Paints one text object's lines in object-local space with the object's first visible fill.
+ * A gradient works unchanged: its endpoints are already object-local. Exported so the paint
+ * path can be asserted against a recording context, like `fillPaint`.
+ */
+export function drawTextObject(
+  context: CanvasRenderingContext2D,
+  matrix: Matrix2D,
+  text: TextContent,
+  opacity: number,
+  fills: AppearanceFill[],
+): void {
+  const paintFill = fills.find((fill) => fill.visible && fill.opacity > 0);
+  if (!paintFill) return;
+  const layout = layoutText(text);
+  context.save();
+  context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
+  context.font = textCssFont(normalizeTextContent(text) ?? text);
+  context.textBaseline = 'alphabetic';
+  context.textAlign = 'left';
+  context.fillStyle = fillPaint(context, paintFill) ?? fillColor(paintFill);
+  context.globalAlpha = opacity * paintFill.opacity;
+  layout.lines.forEach((line, index) => {
+    if (line.text.length === 0) return;
+    context.fillText(line.text, layout.lineLeft(line), layout.baseline(index));
+  });
+  context.restore();
 }
 
 function drawAlignedObjectStrokes(
@@ -1109,6 +1190,23 @@ function drawGeometryImpactHighlights(
  * are solid, so the preview never reads as the persistent selection, which is a solid
  * frame with square handles.
  */
+/**
+ * The anchor a double-click would create: a small hollow square on the path itself, so
+ * point insertion is predictable before it happens.
+ */
+function drawInsertPreview(context: CanvasRenderingContext2D, point: Point, scale: number): void {
+  const size = 7 / scale;
+  context.save();
+  context.beginPath();
+  context.rect(point.x - size / 2, point.y - size / 2, size, size);
+  context.fillStyle = COLORS.panel;
+  context.fill();
+  context.lineWidth = 1.5 / scale;
+  context.strokeStyle = COLORS.selectedStrong;
+  context.stroke();
+  context.restore();
+}
+
 function drawHoverTarget(
   context: CanvasRenderingContext2D,
   target: { bounds: GeometryBounds; group: boolean },

@@ -2,6 +2,8 @@ import type { VectorDocument } from '../core/document';
 import { arcSweep } from '../core/geometry';
 import { parametricGroupsForRegion, parametricInstanceMatrices } from '../core/parametric';
 import { regionBoundaryLoops } from '../core/region-geometry';
+import { normalizeStops, transformedGradientPoints } from '../core/fills';
+import { layoutText, normalizeTextContent, TEXT_FONT_STACKS } from '../core/text';
 import { isArtworkFillPath } from '../core/segment-semantics';
 import {
   IDENTITY_MATRIX,
@@ -12,7 +14,7 @@ import {
   transformPoint,
   type Matrix2D,
 } from '../core/transforms';
-import type { EntityId, Point, Region, Segment } from '../core/types';
+import type { AppearanceFill, EntityId, NetworkObject, Point, Region, Segment, TextContent } from '../core/types';
 import { sampleWidthProfile } from '../tools/width-tool';
 import {
   DEFAULT_STROKE_COLOR,
@@ -150,11 +152,55 @@ export function exportDocumentToSvg(document: VectorDocument, options: SvgExport
       }
     }
   }
+  /**
+   * A gradient becomes one `<defs>` entry, in export space, referenced by `url(#id)`.
+   * Endpoints are stored object-local, so the occurrence's source→document matrix — the
+   * same one the geometry uses — is what turns them into export coordinates. That is why
+   * parametric instances carry their gradient instead of resetting it.
+   */
+  const paintReference = (fill: AppearanceFill, matrix?: Matrix2D): string => {
+    if (fill.type === 'solid') return fill.color;
+    const points = transformedGradientPoints(fill, matrix ?? IDENTITY_MATRIX);
+    const stops = normalizeStops(fill.stops).map((stop) => {
+      const stopOpacity = stop.opacity < 1 ? ` stop-opacity="${format(stop.opacity)}"` : '';
+      return `<stop offset="${format(stop.offset)}" stop-color="${escapeAttribute(stop.color)}"${stopOpacity}/>`;
+    }).join('');
+    const id = `fill-${++resourceId}`;
+    definitions.push(fill.type === 'linear' && points.start && points.end
+      ? `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${format(points.start.x)}" y1="${format(points.start.y)}" x2="${format(points.end.x)}" y2="${format(points.end.y)}">${stops}</linearGradient>`
+      : `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${format(points.center?.x ?? 0)}" cy="${format(points.center?.y ?? 0)}" r="${format(points.radius ?? 1)}">${stops}</radialGradient>`);
+    return `url(#${id})`;
+  };
+
+  /**
+   * A text object exports as one `<text>` in its own transform, with a `<tspan>` per line.
+   * Explicit tspan positions mean the receiving renderer does not have to agree with our
+   * metrics to place the lines, which is what keeps the round trip honest.
+   */
+  const textElement = (object: NetworkObject, text: TextContent, fills: AppearanceFill[], opacity: number): string => {
+    const normalized = normalizeTextContent(text) ?? text;
+    const layout = layoutText(normalized);
+    const matrix = objectTransformMatrix(object.transform);
+    const fill = options.fillColor ? escapeAttribute(options.fillColor) : escapeAttribute(paintReference(fills[0], IDENTITY_MATRIX));
+    const fillOpacity = opacity * (fills[0]?.opacity ?? 1);
+    const opacityAttribute = fillOpacity < 1 ? ` fill-opacity="${format(fillOpacity)}"` : '';
+    const anchor = normalized.align === 'center' ? 'middle' : normalized.align === 'right' ? 'end' : 'start';
+    const x = normalized.align === 'center' ? layout.width / 2 : normalized.align === 'right' ? layout.width : 0;
+    const spans = layout.lines.map((line, index) =>
+      `<tspan x="${format(x)}" y="${format(layout.baseline(index))}">${escapeText(line.text) || ' '}</tspan>`).join('');
+    const objectAttribute = includeMetadata ? ` data-object-id="${escapeAttribute(object.id)}"` : '';
+    return `<text transform="matrix(${format(matrix.a)} ${format(matrix.b)} ${format(matrix.c)} ${format(matrix.d)} ${format(matrix.e)} ${format(matrix.f)})" font-family="${escapeAttribute(TEXT_FONT_STACKS[normalized.family])}" font-size="${format(normalized.size)}" font-weight="${normalized.weight}" text-anchor="${anchor}" fill="${fill}"${opacityAttribute}${objectAttribute}>${spans}</text>`;
+  };
+
   for (const object of document.objectsForArtboard(artboard.id)) {
     const appearance = document.getAppearance(object.appearanceId);
     const fills = appearance?.fills.filter((fill) => fill.visible && fill.opacity > 0) ?? [];
     const network = document.getNetwork(object.networkId);
     if (!appearance || appearance.opacity <= 0 || fills.length === 0 || !network) continue;
+    if (object.text) {
+      body.push(textElement(object, object.text, fills, appearance.opacity));
+      continue;
+    }
     for (const pathId of network.pathIds) {
       const path = document.getPath(pathId);
       if (!path || !isArtworkFillPath(document, path)) continue;
@@ -168,7 +214,13 @@ export function exportDocumentToSvg(document: VectorDocument, options: SvgExport
           const opacity = appearance.opacity * fill.opacity;
           const opacityAttribute = opacity < 1 ? ` fill-opacity="${format(opacity)}"` : '';
           const objectAttribute = includeMetadata ? ` data-object-id="${escapeAttribute(object.id)}"` : '';
-          body.push(`<path d="${data}" fill="${escapeAttribute(options.fillColor ?? fill.color)}"${opacityAttribute}${objectAttribute}/>`);
+          if (options.fillColor) {
+            // An explicit override (icon export) flattens every fill to one ink on purpose.
+            body.push(`<path d="${data}" fill="${escapeAttribute(options.fillColor)}"${opacityAttribute}${objectAttribute}/>`);
+            continue;
+          }
+          const paint = paintReference(fill, items[0].transform);
+          body.push(`<path d="${data}" fill="${escapeAttribute(paint)}"${opacityAttribute}${objectAttribute}/>`);
         }
       }
     }

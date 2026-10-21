@@ -7,7 +7,7 @@
 - **Status:** this is the P0 deliverable — a gap report, not a rewrite.
 
 > The plan this responds to describes the repository as "v0.1.0, 318 automated tests". That figure is
-> out of date: the suite at this commit is **401 tests across 62 files**, plus a real Wasm smoke test,
+> out of date: the suite at this commit is **525 tests across 79 files**, plus a real Wasm smoke test,
 > nine WebSocket relay checks, a design-system gate and a documentation gate. Everything below was
 > re-verified at `a375b5e` rather than taken from the repository description.
 
@@ -21,7 +21,7 @@ a world-class direct-selection and path-editing experience, and do not start wit
 
 | Source | What it establishes |
 |---|---|
-| `npm run check` at this commit | build, strict TypeScript, **401 tests / 62 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
+| `npm run check` at this commit | build, strict TypeScript, **525 tests / 79 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
 | Full read of `src/core/operations.ts` | 67 operation types; every document mutation is expressed as one |
 | Hit testing, transform and history read-through | the claims in the matrix below cite `file:line`, not documentation |
 | Targeted experiments | z-order hit testing (below), inspector availability, rotation about the centre |
@@ -44,7 +44,9 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 | Marquee select, additive with `Shift` | Verified | `VectorCanvas.tsx:1147`, `marqueePreview` |
 | Double-click enters point editing | Verified | `VectorCanvas.tsx:1217` → `enterNetworkEditMode` |
 | Anchors, handles and segments have distinct hit targets | Verified | `hitTest` node-first then `hitTestSegment`, tolerances in screen space |
-| Enter/insert a point on a segment | Verified | `tools/pen-tool.ts`, `ADD_NODE`/`SPLIT_SEGMENT` operations |
+| Enter/insert a point on a segment | **Verified — extended in this pass** | pen tool, plus double-click on a segment in point editing (`insertAnchorAt` in `tools/direct-path-tool.ts`) with a hover preview of where the anchor will land |
+| Pull Bézier handles out of a corner | **Verified — added in this pass** | `⌥`-drag in point editing → `ADD_BEZIER_HANDLES`, one transaction per drag |
+| Corner/smooth/mirrored conversion | **Verified — added in this pass** | `convertNodeTangent` derives the tangent pair alongside `SET_NODE_MODES`; 8 contract tests in `src/tools/direct-path-tool.test.ts` |
 | Escape leaves the current context without losing committed edits | Verified | `exitNetworkEditMode`, one transaction per gesture |
 | Double-click **enters a group**, `Escape` leaves | **Verified — added in this pass** | `core/group-context.ts` (`selectionTargetForObject`, `resolveObjectPress`, `exitGroupContext`); 10 contract tests in `src/core/group-context.test.ts` |
 | Hover preview of the object under the pointer | **Verified — added in this pass** | `core/target-resolution.ts` (`resolvePointerTarget`), drawn by `drawHoverTarget` in `canvas/renderer.ts`; 10 contract tests in `src/core/target-resolution.test.ts` |
@@ -72,11 +74,11 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 | Arbitrary artwork, nested groups, layers, multiple pages and artboards | Verified | `core/document.ts` (`objectsForArtboard`, `_moveLayer`, pages/artboards) |
 | Stable ids and versioned serialization | Verified | id factory in `core/ids.ts`; `version` field and snapshot validation in `core/document.ts` |
 | Transaction boundary: no UI path mutates geometry directly | Verified | 67 operations in `core/operations.ts`; `OperationManager` is the only writer used by tools and UI |
-| Text objects | **Missing** | no text entity in `core/types.ts` |
-| Gradient fills | **Missing** | fills are `solid` only |
+| Text objects | **Partial** — slices 1–2 | `NetworkObject.text` in `core/types.ts`, layout in `core/text.ts`, inspector editing in `ui/PropertiesPanel.tsx`, on-canvas caret in `core/text-edit.ts` + `core/text-session.ts` + `ui/TextEditor.tsx`, export/import in `export/svg-export.ts` + `import/svg-import.ts`. No wrapping, auto-size or multi-run styling yet (`docs/EDITING-AUDIT.md` §3.9, §3.10) |
+| Gradient fills | Verified | `core/fills.ts` (model, normalization, cloning); Canvas paint in `canvas/renderer.ts`; `<defs>` export in `export/svg-export.ts`; `url(#…)` import in `import/svg-import.ts` |
 | Masks and clipping | **Missing** | `Clip content` is disabled and states why |
 | Images | **Missing** | no image entity |
-| Artboards as a general boundary rather than an icon frame | **Partial** | arbitrary frame sizes exist; presets are icon-flavoured (16/24/32/48) |
+| Artboards as a general boundary rather than an icon frame | Verified | arbitrary frame sizes exist; the New frame menu offers grouped interface, web, device, social, print and artwork presets (`core/frame-presets.ts`) |
 
 ### 2.4 Rendering and hit testing
 
@@ -146,11 +148,11 @@ Ordered by dependency and by what a designer would feel first — not by how int
 |---|---|---|---|
 | 1 | ~~Group entry on the canvas~~ (done in this pass) | — | — |
 | 2 | ~~Hover affordance (object/segment preview before clicking)~~ (done in this pass) | — | — |
-| 3 | Text objects (entity, editing, SVG round trip) | Excludes branding and typography entirely — the largest single missing capability | L |
-| 4 | Gradient fills | Same: branding work is not possible with solids alone | M |
+| 3 | ~~Text objects (entity, SVG round trip)~~ (slice 1, §3.9) · ~~on-canvas caret~~ (slice 2, §3.10); wrapping and rich runs remain | Still the largest gap for real typographic work | L |
+| 4 | ~~Gradient fills~~ (done, `docs/EDITING-AUDIT.md` §3.8) | — | — |
 | 5 | Command palette over existing operations | Makes 67 operations discoverable without a wider toolbar | M |
 | 6 | General boolean ops and compound paths | "Complete vector editor" claims need them; region ops only partly cover | L |
-| 7 | Import warnings for skipped SVG features (mask, clip, gradient, filter) | Silent data loss is a trust problem, and trust is the product's differentiator | S |
+| 7 | ~~Import warnings for skipped SVG features (mask, clip, gradient, filter)~~ (done, §3.8) | — | — |
 | 8 | Continuous autosave | Local-first promise is only half kept today | M |
 | 9 | Reference-document performance measurement | The 60 FPS and large-document claims are currently unverified | M |
 | 10 | AI operation plans through the existing validator (`core/quick-edit.ts` seed) | Everything above must be stable before generated geometry can be trusted | L |
@@ -179,8 +181,10 @@ increments, each shippable on its own.
    level, `Escape` steps out. Known limit: deleting a group selection leaves the empty group layer.
    Also done: hover outlines for groups and shapes, and `Alt`-click to select the parent group
    (`Alt`-drag still duplicates; the two are separated by movement).
-3. *Path editing polish* — insertion preview before commit, per-anchor corner/smooth state visible in
-   the canvas, arc-specific handles.
+3. *Path editing polish* — done in this pass for insertion and corner conversion: the insert point
+   is previewed before commit, and `Sharp` / `Smooth` / `Mirrored` derive a tangent instead of only
+   recording a mode. Still open: per-anchor corner/smooth state drawn on the canvas, and
+   arc-specific handles.
 
 AI work should start only after step 3, and only as operation plans validated by the same code
 that validates manual edits. Text and gradients are the next product-level expansion after the

@@ -1,5 +1,6 @@
 import type { VectorDocument } from './document';
 import { evaluateSegment } from './geometry';
+import { textBoxCorners } from './text';
 import { parametricInstanceMatrices, parametricSourceObjectId } from './parametric';
 import { objectTransformMatrix, transformPoint } from './transforms';
 import type { EntityId, NetworkObject, Point, Segment } from './types';
@@ -43,6 +44,8 @@ export function objectLocalPoints(
   policy: ObjectBoundsPolicy = ARTWORK_BOUNDS_POLICY,
 ): Point[] {
   const object = document.getObject(objectId);
+  // A text object has no nodes: its box is the measured layout, in the same local space.
+  if (object?.text) return textBoxCorners(object.text);
   const network = object ? document.getNetwork(object.networkId) : undefined;
   if (!network) return [];
 

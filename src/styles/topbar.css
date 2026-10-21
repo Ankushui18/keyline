@@ -46,9 +46,15 @@
 .topbar-text-button svg { fill: currentColor; }
 .topbar-frame { position: relative; }
 .topbar-frame-menu { position: absolute; z-index: var(--z-popover); top: 38px; left: 0; width: 220px; padding: var(--space-1); background: var(--surface-raised); border: 1px solid var(--graphite-650); border-radius: var(--radius-xl); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
-.topbar-frame-menu > button { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-px); padding: var(--space-15) var(--space-25); border: 0; border-radius: var(--radius-md); background: transparent; text-align: left; }
-.topbar-frame-menu > button:hover { background: var(--border-default); }
+.topbar-frame-menu { max-height: 70vh; overflow-y: auto; }
+.topbar-frame-menu > button,
+.topbar-frame-group > button { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-px); padding: var(--space-15) var(--space-25); border: 0; border-radius: var(--radius-md); background: transparent; text-align: left; }
+.topbar-frame-menu > button:hover,
+.topbar-frame-group > button:hover { background: var(--border-default); }
+.topbar-frame-group { display: flex; flex-direction: column; }
+.topbar-frame-group-label { padding: var(--space-2) var(--space-25) var(--space-05); color: var(--text-muted); font-size: var(--font-size-sm); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 .topbar-frame-menu span { color: var(--text-secondary); font-size: var(--font-size-md); }
+.topbar-frame-group-label { color: var(--text-muted); }
 .topbar-frame-custom { display: flex; gap: var(--space-15); align-items: end; padding: var(--space-15) var(--space-25) var(--space-2); }
 .topbar-frame-custom label { display: flex; flex-direction: column; gap: var(--space-05); color: var(--text-secondary); font-size: var(--font-size-sm); flex: 1; }
 .topbar-frame-custom input { width: 100%; height: 28px; padding: 0 var(--space-15); border: 1px solid var(--graphite-650); border-radius: var(--radius-md); background: var(--surface-canvas); color: var(--text-primary); }

@@ -103,7 +103,7 @@ export function ShareDialog({
 
 export type SettingsSection = 'General' | 'Canvas and grid' | 'Performance' | 'Shortcuts' | 'AI and connections';
 export const SHORTCUT_GROUPS: Array<{ title: string; items: Array<[string, string]> }> = [
-  { title: 'Tools', items: [['Select', 'V'], ['Pen', 'P'], ['Pencil', 'N'], ['Brush', 'J'], ['Rectangle', 'R'], ['Rounded rectangle', '⇧ R'], ['Ellipse', 'U'], ['Polygon', 'G'], ['Star', 'S'], ['Line', '\\'], ['Arc', 'A']] },
+  { title: 'Tools', items: [['Select', 'V'], ['Pen', 'P'], ['Pencil', 'N'], ['Brush', 'J'], ['Rectangle', 'R'], ['Rounded rectangle', '⇧ R'], ['Ellipse', 'U'], ['Polygon', 'G'], ['Star', 'S'], ['Line', '\\'], ['Arc', 'A'], ['Text', 'T']] },
   { title: 'Edit shape', items: [['Bend', 'D'], ['Cut', 'X or C'], ['Round corner', 'F'], ['Offset', 'O'], ['Stroke width', 'W'], ['Eraser', 'E'], ['Lasso', 'Q or L'], ['Shape builder', 'B'], ['Fill areas', '⇧ B']] },
   { title: 'Canvas', items: [['Pan', 'Scroll or Space + drag'], ['Zoom', `${MODIFIER_LABEL} + scroll`], ['Zoom in / out', `${MODIFIER_LABEL} + / -`], ['Nudge', 'Arrows or ⇧ + arrows']] },
   { title: 'Everywhere', items: [['Search or ask', `${MODIFIER_LABEL} K`], ['Motion', 'M'], ['Check icons', `${MODIFIER_LABEL} ⇧ C`], ['Constraints', 'K'], ['Undo', `${MODIFIER_LABEL} Z`], ['Redo', `${MODIFIER_LABEL} ⇧ Z`], ['Edit points', 'Enter'], ['Flip', '⇧ H or ⇧ V']] },
@@ -251,6 +251,12 @@ export function ImportTidyDialog({
           </div>
           <div className="kd-tidy-rules" role="group" aria-label="Suggested fixes">
             <strong className="kd-label">What we found</strong>
+            {imported.warnings?.length > 0 && (
+              <p className="kd-note">
+                {imported.warnings.length} unsupported {imported.warnings.length === 1 ? 'feature' : 'features'} will be dropped: {imported.warnings[0].message}
+                {imported.warnings.length > 1 ? ` (+${imported.warnings.length - 1} more)` : ''}
+              </p>
+            )}
             {analysis.rules.map((rule) => (
               <button type="button" role="checkbox" aria-checked={enabled.has(rule.id)} key={rule.id} className="kd-rule" onClick={() => toggle(rule.id)}>
                 <i className={enabled.has(rule.id) ? 'is-checked' : ''} aria-hidden="true">{enabled.has(rule.id) ? '✓' : ''}</i>

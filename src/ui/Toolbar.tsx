@@ -1,5 +1,6 @@
 import { contrastTextColor } from './contrast-color';
 import { useEffect, useRef, useState } from 'react';
+import { framePresetGroups, framePresetSize } from '../core/frame-presets';
 import { RedoIcon } from '@primer/octicons-react/RedoIcon';
 import { UndoIcon } from '@primer/octicons-react/UndoIcon';
 import { BrandMark } from '../design-system/BrandMark';
@@ -24,7 +25,9 @@ interface ToolbarProps {
   onOpenMotion: () => void;
   onOpenCheck: () => void;
   onOpenSet: () => void;
-  onAddIconFrame: (width: number, height: number) => void;
+  /** Creates a frame from any entry point: preset size, custom size, or a named preset. */
+  onAddFrame: (width: number, height: number, name?: string) => void;
+  onAddText: () => void;
   onToggleConstraints: () => void;
   onExport: () => void;
   onUndo: () => void;
@@ -53,7 +56,8 @@ export function Toolbar({
   onOpenMotion,
   onOpenCheck,
   onOpenSet,
-  onAddIconFrame,
+  onAddFrame,
+  onAddText,
   onToggleConstraints,
   onExport,
   onUndo,
@@ -88,9 +92,9 @@ export function Toolbar({
     };
   }, [frameMenuOpen]);
 
-  const createFrame = (width: number, height: number) => {
+  const createFrame = (width: number, height: number, name?: string) => {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
-    onAddIconFrame(width, height);
+    onAddFrame(width, height, name);
     setFrameMenuOpen(false);
     setCustomOpen(false);
   };
@@ -157,15 +161,27 @@ export function Toolbar({
           {frameMenuOpen && (
             <div className="topbar-frame-menu topbar-more-menu" role="menu" aria-label="More">
               <button type="button" role="menuitem" onClick={() => { setFrameMenuOpen(false); onOpenCommand(); }}><strong>Search or ask</strong><span>{MODIFIER_LABEL} K</span></button>
+              <button type="button" role="menuitem" aria-label="Add text" onClick={() => { setFrameMenuOpen(false); onAddText(); }}><strong>Add text</strong><span>Center of the frame</span></button>
               <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenSet(); }}><strong>Set</strong><span>All icons together</span></button>
               <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenMotion(); }}><strong>Motion</strong><span>M</span></button>
               <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenCheck(); }}><strong>Check consistency</strong><span>{MODIFIER_LABEL} ⇧ C</span></button>
               <hr />
-              {[24, 32, 48].map((size) => (
-                <button key={size} type="button" role="menuitem" onClick={() => createFrame(size, size)}>
-                  <strong>New {size}×{size} frame</strong>
-                  <span>{size === 24 ? 'Interface icon' : size === 32 ? 'Product icon' : 'Large icon'}</span>
-                </button>
+              {framePresetGroups().map(({ group, presets }) => (
+                <div key={group} className="topbar-frame-group" role="group" aria-label={`${group} frames`}>
+                  <span className="topbar-frame-group-label">{group}</span>
+                  {presets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      role="menuitem"
+                      aria-label={`New ${preset.label} frame ${framePresetSize(preset)}`}
+                      onClick={() => createFrame(preset.width, preset.height, preset.name)}
+                    >
+                      <strong>{preset.label}</strong>
+                      <span>{framePresetSize(preset)}</span>
+                    </button>
+                  ))}
+                </div>
               ))}
               <button type="button" role="menuitem" aria-expanded={customOpen} onClick={() => setCustomOpen((open) => !open)}>
                 <strong>New custom frame…</strong>

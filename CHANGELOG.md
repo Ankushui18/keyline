@@ -7,6 +7,80 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- **On-canvas text editing, slice 2.** Text is now something you type, not only restyle. The
+  editing surface is a real `<textarea>` overlaid exactly on the object, so the caret, drag
+  selection, word/line keys, clipboard, IME composition and screen-reader access are the
+  browser's rather than a re-implementation. Placement is one testable function,
+  `textEditorPlacement` in `src/core/text-edit.ts`, which composes the viewport with the
+  object transform and returns the matrix, box, font, line height, alignment and ink the field
+  paints with; the overlay follows pan and zoom through a viewport revision, so the caret stays
+  on the glyphs. The renderer stops painting the edited object's glyphs
+  (`RenderOptions.editingTextObjectId`), so the string is never drawn twice. Edits write through
+  the existing `UPDATE_OBJECT` inside one transaction, so frames, the inspector's measured box
+  and export follow while you type and the whole session is **one undo step**. New **Text tool**
+  (`T`) creates an object at the pointer and opens the field, so the first keystroke is the
+  text; double-clicking a text object with Select opens it with the caret at the end; **More →
+  Add text** and the command palette now end in a caret too. `Enter` adds a line, `Tab` commits
+  and moves focus on, `Escape` and ⌘/Ctrl+Enter commit — reversible with one Undo. Not yet:
+  wrapping, auto-size, several styles in one object, text on a path, text stroke, or editing the
+  style inside the field.
+- **Text objects, slice 1.** Text is now a document object: `NetworkObject.text` carries content
+  and style, layout lives in `src/core/text.ts`, and because text is an ordinary object, layers,
+  selection, hit testing from its box, transform, opacity, duplication, undo and the document
+  snapshot all apply with no new paths. Lines are measured by a canvas-backed metrics provider
+  in the app and a deterministic fallback in tests, and nothing measured is persisted, so a file
+  is laid out in the fonts of the machine that opens it. Add text from **More → Add text** or the
+  command palette; edit content, family (sans/serif/mono), weight, size, line height and
+  alignment in the Design panel. Text fills take solid or gradient paint, exports as SVG `<text>`
+  with a `<tspan>` per line, and imports back as editable text with warnings for anything the
+  model cannot carry (`textPath`, per-run styling, `letter-spacing`, `textLength`, unknown
+  families, skewed transforms). The WebGL preview falls back to Canvas 2D when a document
+  contains text, so text is never invisible. Not yet: a text tool, an on-canvas caret or
+  selection inside text, wrapping, multi-run styling, custom fonts, text on a path, text stroke.
+- **Gradient fills.** An object fill can now be a solid, a linear gradient or a radial gradient.
+  `AppearanceFill` is a discriminated union in `src/core/types.ts`; gradient endpoints are stored
+  **object-local**, the same space as nodes, so a gradient moves, scales and rotates with its
+  shape and appears on every occurrence of a parametric repeat without extra work. Stops
+  (`offset`, `color`, `opacity`) are sorted and clamped by `normalizeStops`, every clone goes
+  through `cloneFill`/`cloneFills` so a copy cannot share a stops array, and a gradient can never
+  have fewer than two stops. The Design panel's fill row gains a Solid/Linear/Radial switch, an
+  angle or radius field, and a stop editor; the Canvas renderer builds a real `CanvasGradient`;
+  SVG export writes `<linearGradient>`/`<radialGradient>` in `<defs>` with
+  `gradientUnits="userSpaceOnUse"`, `stop-opacity` per stop and a matching `fill="url(#…)"`, so
+  the round trip keeps the gradient.
+- **SVG import reports what it cannot draw, instead of losing it silently.** `url(#…)` fills now
+  resolve against `linearGradient`/`radialGradient` definitions, including `href`/`xlink:href`
+  inheritance and `objectBoundingBox` units converted with the shape's own box.
+  `gradientTransform` is composed onto the endpoints. Everything the model cannot express — a
+  pattern fill, a missing gradient id, a non-pad `spreadMethod`, a radial focal point, a skewed
+  gradient transform, a filter, mask or clip path on an element, a fill on an open path —
+  produces a structured `SvgImportResult.warnings` entry (`{ code, message, element? }`). The
+  import receipt names the first warning and counts the rest, and the tidy dialog shows the
+  count before the file opens.
+- **Frame presets for real work, not just icons.** The New frame menu is now grouped — Interface
+  (24/32/48), Web (1440 × 1024, 1280 × 800), Device (390 × 844, 768 × 1024), Social (1080 × 1080,
+  1200 × 630), Print (A4 and US Letter at 96 dpi, stated as such) and Artwork (1000 × 1000,
+  1920 × 1080) — plus the existing custom size. `src/core/frame-presets.ts` is the only list; the
+  menu, the command palette, the dashboard and the in-canvas start all read it, so they cannot
+  drift. Frames from a non-icon preset are named after it (`Web page`, `Social post`) and numbered
+  when duplicated; icon frames keep their `Icon N` naming.
+- **A neutral empty state.** The dashboard opens with **New file**, a blank canvas (1440 × 1024) and
+  a social post beside the icon set and logo starts, and its copy no longer assumes icons. The
+  in-canvas start overlay offers the same general sizes next to the icon one. Everything
+  icon-specific — the icon-set view, pixel grid and icon exports — remains, as an option.
+  Drawing outside every frame already landed on the page-level canvas root; that behaviour is now
+  pinned by a test.
+- **Direct path editing.** Double-click a segment in point editing to insert an anchor exactly
+  where the pointer meets the curve — the curve does not move, because the insert is the same
+  exact split the Cut tool uses (a cubic splits into two cubics, an arc keeps its radius and
+  sweep) — and the new anchor is selected, so the next drag moves it. Hovering a segment shows a
+  hollow square where that anchor would land. `⌥`-drag a corner anchor to pull a tangent pair out
+  of it as one undo step.
+- **Corner conversion derives its tangent.** `Sharp` / `Smooth` / `Mirrored` in the inspector now
+  do more than record a mode: converting to smooth or mirrored writes a tangent pair derived from
+  the anchor's neighbours, in the same undo step as the mode. Sharp leaves the handles alone.
+  The three mirroring modes are pinned by tests for the first time (`angle` mirrors direction,
+  `mirror` mirrors direction and length).
 - **Hover previews.** Pointing at the canvas now outlines what a click will select: a dashed
   outline for a group and a solid hairline for a shape, drawn as a light preview that never reads
   as the persistent selection. Hover and press resolve through one pipeline

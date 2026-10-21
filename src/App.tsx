@@ -26,6 +26,12 @@ import { copyTextToClipboard } from './core/browser-clipboard';
 import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
 import { canEditObject, editableInspectorObjects } from './app/inspector-actions';
+import { FRAME_PRESETS, framePreset, framePresetSize, isIconPreset } from './core/frame-presets';
+import { cloneFills, fillColor } from './core/fills';
+
+/** The starts the in-canvas overlay offers outside the icon workflow. */
+const GENERAL_START_PRESETS = FRAME_PRESETS.filter((preset) => ['web-1440', 'social-square', 'device-phone'].includes(preset.id));
+import { convertNodeTangent } from './tools/direct-path-tool';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
 import { prepareDeleteObject, prepareFlipObjects, prepareNudgeObjects } from './core/object-operations';
 import { DEFAULT_DOCUMENT_NAME, DocumentPersistence, listDocuments, loadDocumentById, markStoredDocumentImported, saveDocument, type SaveStatus } from './core/store';
@@ -41,6 +47,7 @@ import type {
   HandleMirrorMode,
   NetworkObject,
   ParametricTransform,
+  Point,
   Segment,
   SelectionState,
   ToolId,
@@ -48,6 +55,11 @@ import type {
 import { emptySelection, enterNetworkEditMode, exitNetworkEditMode } from './tools/select-tool';
 import { prepareBulkNodePositions, type BulkNodeAction } from './tools/lasso-tool';
 import { preparePrimitiveObject } from './tools/primitive-tool';
+import { prepareTextObject } from './tools/text-tool';
+import { DEFAULT_TEXT, textLocalBounds } from './core/text';
+import {
+  abortTextSession, applyTextDraft, beginTextSession, commitTextSession, type TextSession,
+} from './core/text-session';
 import { connectedSelection, prepareClosePath, prepareDeletePoint, prepareJoinEndpoints, prepareReversePath } from './tools/path-commands';
 import { prepareSplitAtPoint } from './tools/cut-tool';
 import { ConstraintContextMenu, ConstraintPalette } from './ui/ConstraintPalette';
@@ -854,6 +866,24 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     }
   }, [document, manager]);
 
+  /**
+   * Corner conversion is two operations, not one: deriving a tangent writes handles, and
+   * the persistent mode is what makes the opposite handle follow later drags. One
+   * transaction covers both, so a single undo returns the anchor to a corner.
+   */
+  const convertNodeMode = useCallback((nodeIds: EntityId[], mode: 'corner' | 'smooth' | 'symmetric') => {
+    const plan = convertNodeTangent(document, nodeIds, mode);
+    if (!plan) return;
+    try {
+      manager.beginTransaction(mode === 'corner' ? 'Make anchor a corner' : mode === 'smooth' ? 'Smooth anchor' : 'Mirror anchor');
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+    } catch (error) {
+      manager.rollbackTransaction();
+      announce(error instanceof Error ? error.message : 'Anchor conversion was rejected.', 'error');
+    }
+  }, [announce, document, manager]);
+
   const setObjectLayerState = useCallback((objectIds: EntityId[], updates: { locked?: boolean; visible?: boolean }) => {
     const layers = objectIds
       .map((id) => document.getLayerForObject(id))
@@ -969,10 +999,10 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     return pastePayload(payload);
   }, [announce, pastePayload]);
 
-  const addIconFrame = useCallback((width: number, height: number) => {
+  const addFrame = useCallback((width: number, height: number, name?: string) => {
     try {
-      const plan = prepareCreateIconArtboard(document, width, height);
-      manager.beginTransaction('Add icon frame');
+      const plan = prepareCreateIconArtboard(document, width, height, { name });
+      manager.beginTransaction(name ? `Add ${name} frame` : 'Add icon frame');
       plan.operations.forEach((operation) => manager.execute(operation));
       manager.commitTransaction();
       setSelection(emptySelection());
@@ -994,8 +1024,112 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     }
   }, [announce, document, manager]);
 
+  /**
+   * Inserts a text object in the active frame and selects it (docs/EDITING-AUDIT.md §3.9).
+   * Slice 1 has no text tool, so this menu action is how text enters a document.
+   */
+  /**
+   * One text-editing session (docs/EDITING-AUDIT.md §3.10): an open transaction, the object
+   * being edited, and the field's current content. Every change writes through the existing
+   * UPDATE_OBJECT, so the frame, panels and export follow live, and the whole session is a
+   * single history entry.
+   */
+  const [textEditing, setTextEditing] = useState<TextSession | null>(null);
+  const textEditingRef = useRef<TextSession | null>(null);
+  textEditingRef.current = textEditing;
+
+  const beginTextEditing = useCallback((objectId: EntityId) => {
+    if (textEditingRef.current?.objectId === objectId) return;
+    // Opening a second field commits the first: one session, one history entry.
+    if (textEditingRef.current) {
+      const previous = textEditingRef.current;
+      try {
+        commitTextSession(manager, previous);
+      } catch (error) {
+        console.warn('The previous text session could not be committed.', error);
+        abortTextSession(manager);
+      }
+      textEditingRef.current = null;
+      setTextEditing(null);
+    }
+    const session = beginTextSession(manager, objectId);
+    if (!session) return;
+    textEditingRef.current = session;
+    setTextEditing(session);
+    setSelection({ mode: 'object', objectIds: new Set([objectId]), nodeIds: new Set(), segmentIds: new Set() });
+    setSelectedArtboardIds(new Set());
+  }, [manager]);
+
+  const changeTextDraft = useCallback((content: string) => {
+    const session = textEditingRef.current;
+    if (!session) return;
+    try {
+      const next = applyTextDraft(manager, session, content);
+      textEditingRef.current = next;
+      setTextEditing(next);
+    } catch (error) {
+      console.warn('Text edit was rejected.', error);
+    }
+  }, [manager]);
+
+  const commitTextEditing = useCallback(() => {
+    const session = textEditingRef.current;
+    if (!session) return;
+    textEditingRef.current = null;
+    setTextEditing(null);
+    try {
+      const result = commitTextSession(manager, session);
+      if (result.changed) announce(result.label === 'Edit text' ? 'Text edited.' : `${result.label}.`);
+    } catch (error) {
+      abortTextSession(manager);
+      announce(`Unable to save the text: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
+    }
+  }, [announce, manager]);
+
+  /** The Text tool's click: create at the pointer, select it, and put a caret in it. */
+  const createTextAt = useCallback((point: Point) => {
+    try {
+      const plan = prepareTextObject(document, point);
+      manager.beginTransaction('Add text');
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+      setSelectedLayerIds(new Set([plan.layerId]));
+      setSelectedArtboardIds(new Set());
+      setShowEmptyStart(false);
+      setActiveTool('select');
+      beginTextEditing(plan.objectId);
+    } catch (error) {
+      manager.rollbackTransaction();
+      announce(`Unable to add text: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
+    }
+  }, [announce, beginTextEditing, document, manager]);
+
+  const addText = useCallback(() => {
+    const frame = document.activeArtboard.frame;
+    const bounds = textLocalBounds(DEFAULT_TEXT);
+    const origin = {
+      x: frame.x + (frame.width - bounds.width) / 2,
+      y: frame.y + (frame.height - bounds.height) / 2,
+    };
+    try {
+      const plan = prepareTextObject(document, origin);
+      manager.beginTransaction('Add text');
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+      setSelection({ mode: 'object', objectIds: new Set([plan.objectId]), nodeIds: new Set(), segmentIds: new Set() });
+      setSelectedLayerIds(new Set([plan.layerId]));
+      setSelectedArtboardIds(new Set());
+      setActiveTool('select');
+      setShowEmptyStart(false);
+      beginTextEditing(plan.objectId);
+    } catch (error) {
+      manager.rollbackTransaction();
+      announce(`Unable to add text: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
+    }
+  }, [announce, beginTextEditing, document, manager]);
+
   const openStarterSample = useCallback(() => {
-    addIconFrame(24, 24);
+    addFrame(24, 24);
     const frame = document.activeArtboard.frame;
     const triangle = preparePrimitiveObject(
       document,
@@ -1098,7 +1232,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       manager.rollbackTransaction();
       announce(`Unable to open the starter sample: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
     }
-  }, [addIconFrame, announce, document, manager]);
+  }, [addFrame, announce, document, manager]);
 
   const renameDocument = useCallback((name: string) => {
     const next = name.trim() || DEFAULT_DOCUMENT_NAME;
@@ -1130,9 +1264,15 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       if (documentNameRef.current === DEFAULT_DOCUMENT_NAME) renameDocument(sourceName.replace(/\.svg$/i, '') || DEFAULT_DOCUMENT_NAME);
       void persistence.flush().then(() => markStoredDocumentImported(document.id));
       const skipped = imported.skippedElementCount > 0 ? ` ${imported.skippedElementCount} unsupported elements were skipped.` : '';
+      // Import never loses a feature silently: the first warning is named, the rest counted.
+      const warningCount = imported.warnings?.length ?? 0;
+      const warned = warningCount > 0
+        ? ` ${warningCount} unsupported SVG ${warningCount === 1 ? 'feature' : 'features'} reported: ${imported.warnings[0].message}${warningCount > 1 ? ` (+${warningCount - 1} more)` : ''}`
+        : '';
+      if (warningCount > 0) console.warn('SVG import warnings', imported.warnings);
       announce(imported.importedElementCount > 0
-        ? `Imported ${imported.importedElementCount} editable ${imported.importedElementCount === 1 ? 'shape' : 'shapes'} from ${sourceName}.${skipped}`
-        : `Created a frame from ${sourceName}, but no supported SVG paths or shapes were found.${skipped}`,
+        ? `Imported ${imported.importedElementCount} editable ${imported.importedElementCount === 1 ? 'shape' : 'shapes'} from ${sourceName}.${skipped}${warned}`
+        : `Created a frame from ${sourceName}, but no supported SVG paths or shapes were found.${skipped}${warned}`,
       );
     } catch (error) {
       manager.rollbackTransaction();
@@ -1656,12 +1796,19 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   useEffect(() => {
     if (!start || startedRef.current) return;
     startedRef.current = true;
-    if (start.kind === 'icon') { applyIconStartStyle(); addIconFrame(start.size, start.size); }
-    else if (start.kind === 'logo') addIconFrame(start.width, start.height);
+    if (start.kind === 'icon') { applyIconStartStyle(); addFrame(start.size, start.size); }
+    else if (start.kind === 'logo') addFrame(start.width, start.height);
+    else if (start.kind === 'preset') {
+      const preset = framePreset(start.presetId);
+      if (preset) {
+        if (isIconPreset(preset)) applyIconStartStyle();
+        addFrame(preset.width, preset.height, preset.name);
+      }
+    }
     else if (start.kind === 'sample') openStarterSample();
     else if (start.kind === 'svg') void importSvgSource(start.source, start.name);
     setShowEmptyStart(false);
-  }, [addIconFrame, applyIconStartStyle, importSvgSource, openStarterSample, start]);
+  }, [addFrame, applyIconStartStyle, importSvgSource, openStarterSample, start]);
 
   useEffect(() => {
     window.document.documentElement.dataset.reduceMotion = String(reduceMotion);
@@ -1700,7 +1847,8 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       strokeCap: stroke?.cap,
       strokeJoin: stroke?.join,
       strokeColor: stroke?.color,
-      fillColor: appearance.fills.find((fill) => fill.visible)?.color,
+      // A gradient has no single colour; the quick-edit surface reports its first stop.
+      fillColor: (() => { const fill = appearance.fills.find((item) => item.visible); return fill ? fillColor(fill) : undefined; })(),
     }];
   }), [document, editTargetIds, revision]);
   const applyQuickEdit = useCallback((plan: QuickEditPlan) => {
@@ -1787,9 +1935,18 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       tool('bend', 'Bend', 'D', 'curve'), tool('cut', 'Cut', 'X', 'split'), tool('fillet', 'Round corner', 'F', 'fillet radius'),
       tool('offset', 'Offset', 'O', 'outline copy'), tool('width', 'Stroke width', 'W', 'variable thickness'), tool('eraser', 'Eraser', '⇧ E'),
       tool('lasso', 'Lasso', 'Q', 'select points align'), tool('shape-builder', 'Shape builder', 'B', 'merge union subtract combine'), tool('paint', 'Fill areas', '⇧ B', 'paint colour'),
-      { id: 'frame-24', label: 'New icon frame 24 × 24', group: 'Frames', keywords: 'artboard add', run: () => addIconFrame(24, 24) },
-      { id: 'frame-32', label: 'New icon frame 32 × 32', group: 'Frames', keywords: 'artboard add', run: () => addIconFrame(32, 32) },
-      { id: 'frame-48', label: 'New icon frame 48 × 48', group: 'Frames', keywords: 'artboard add', run: () => addIconFrame(48, 48) },
+      tool('text', 'Text', 'T', 'type label copy write typography'),
+      { id: 'add-text', label: 'Add text', group: 'Actions', keywords: 'type label copy typography write', run: addText },
+      { id: 'frame-24', label: 'New icon frame 24 × 24', group: 'Frames', keywords: 'artboard add', run: () => addFrame(24, 24) },
+      { id: 'frame-32', label: 'New icon frame 32 × 32', group: 'Frames', keywords: 'artboard add', run: () => addFrame(32, 32) },
+      ...FRAME_PRESETS.filter((preset) => !isIconPreset(preset)).map((preset) => ({
+        id: `frame-${preset.id}`,
+        label: `New ${preset.label} frame ${framePresetSize(preset)}`,
+        group: 'Frames' as const,
+        keywords: `artboard add ${preset.group.toLowerCase()} general purpose`,
+        run: () => addFrame(preset.width, preset.height, preset.name),
+      })),
+      { id: 'frame-48', label: 'New icon frame 48 × 48', group: 'Frames', keywords: 'artboard add', run: () => addFrame(48, 48) },
       { id: 'export', label: 'Export SVG or code', group: 'Actions', keywords: 'download save react css', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: () => setExportOpen(true) },
       { id: 'motion', label: 'Animate (Motion)', group: 'Actions', shortcut: 'M', keywords: 'animation draw on pulse', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: openMotion },
       { id: 'set', label: 'See the whole icon set', group: 'Actions', keywords: 'grid library overview all icons', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: openSet },
@@ -1803,7 +1960,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       { id: 'redo', label: 'Redo', group: 'Actions', shortcut: `${MODIFIER_LABEL} ⇧ Z`, disabledReason: manager.canRedo ? undefined : 'Nothing to redo', run: () => manager.redo() },
       { id: 'home', label: 'All files', group: 'Actions', keywords: 'dashboard home projects', run: () => void goHome() },
     ];
-  }, [addIconFrame, changeTool, goHome, isEmptyDocument, manager, openCheck, openMotion, openSet, revision, toolDisabledReasons]);
+  }, [addFrame, changeTool, goHome, isEmptyDocument, manager, openCheck, openMotion, openSet, revision, toolDisabledReasons]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -1923,6 +2080,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       if (!modifier && !event.altKey && event.code === 'Backslash') {
         changeTool(event.shiftKey ? 'construction-line' : 'line');
       }
+      if (!modifier && !event.altKey && event.key.toLowerCase() === 't') changeTool('text');
       if (!modifier && !event.altKey && event.key.toLowerCase() === 'a') changeTool('arc');
       if (!modifier && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') changeTool('shape-builder');
       if (!modifier && !event.altKey && event.shiftKey && event.key.toLowerCase() === 'b') changeTool('paint');
@@ -2021,7 +2179,8 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
         onOpenMotion={openMotion}
         onOpenCheck={openCheck}
         onOpenSet={openSet}
-        onAddIconFrame={addIconFrame}
+        onAddFrame={addFrame}
+        onAddText={addText}
         onToggleConstraints={() => setConstraintsOpen((open) => !open)}
         onExport={() => setExportOpen(true)}
         onUndo={() => manager.undo()}
@@ -2212,6 +2371,11 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           onRequestToolChange={changeTool}
           onOpenConstraintMenu={(x, y) => setConstraintMenu({ x, y })}
           onViewportChange={setZoom}
+          textEditing={textEditing ?? undefined}
+          onTextEditChange={changeTextDraft}
+          onTextEditCommit={commitTextEditing}
+          onCreateText={createTextAt}
+          onEditTextObject={beginTextEditing}
           viewportFocusRequest={viewportFocusRequest}
           onNotice={announce}
         />
@@ -2228,8 +2392,24 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
                   <h3>Icon set</h3>
                   <p>A square frame with a pixel grid. Exports as SVG or a React component.</p>
                   <div className="empty-start-presets" role="group" aria-label="Icon frame size">
-                    {[24, 32, 48].map((size) => <button key={size} type="button" onClick={() => { applyIconStartStyle(); addIconFrame(size, size); setShowEmptyStart(false); }}>{size}</button>)}
-                    <button type="button" onClick={() => { applyIconStartStyle(); addIconFrame(64, 64); setShowEmptyStart(false); }}>Custom</button>
+                    {[24, 32, 48].map((size) => <button key={size} type="button" onClick={() => { applyIconStartStyle(); addFrame(size, size); setShowEmptyStart(false); }}>{size}</button>)}
+                    <button type="button" onClick={() => { applyIconStartStyle(); addFrame(64, 64); setShowEmptyStart(false); }}>Custom</button>
+                  </div>
+                </article>
+                <article className="empty-start-option">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M7 13h6"/></svg>
+                  <h3>Page or post</h3>
+                  <p>General-purpose frames for layout and illustration: drawing outside any frame lands on the canvas.</p>
+                  <div className="empty-start-presets" role="group" aria-label="General frame size">
+                    {GENERAL_START_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => { addFrame(preset.width, preset.height, preset.name); setShowEmptyStart(false); }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
                 </article>
                 <article className="empty-start-option">
@@ -2237,8 +2417,8 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
                   <h3>Logo or mark</h3>
                   <p>A free artboard for brand shapes, with mirror and radial repeat ready.</p>
                   <div className="empty-start-presets" role="group" aria-label="Logo frame size">
-                    <button type="button" onClick={() => { addIconFrame(512, 512); setShowEmptyStart(false); }}>Square 512</button>
-                    <button type="button" onClick={() => { addIconFrame(1024, 512); setShowEmptyStart(false); }}>Wide 1024 × 512</button>
+                    <button type="button" onClick={() => { addFrame(512, 512); setShowEmptyStart(false); }}>Square 512</button>
+                    <button type="button" onClick={() => { addFrame(1024, 512); setShowEmptyStart(false); }}>Wide 1024 × 512</button>
                   </div>
                 </article>
                 <label
@@ -2388,9 +2568,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
             onUpdateConstraint={updateConstraint}
             onBulkConstraintParameter={updateConstraintParameters}
             onRemoveConstraint={removeConstraint}
-            onSetNodeMode={(nodeIds, mode) => manager.execute({
-              type: 'SET_NODE_MODES', payload: { modes: nodeIds.map((nodeId) => ({ nodeId, mode })) },
-            })}
+            onSetNodeMode={convertNodeMode}
             onPathCommand={runPathCommand}
             onUpdateObject={updateObject}
             onUpdateAppearance={updateAppearance}
@@ -2485,7 +2663,7 @@ function appearanceRuleValue(appearance: Appearance): AppearanceRule['appearance
 
 function cloneRuleAppearance(appearance: AppearanceRule['appearance']): AppearanceRule['appearance'] {
   return {
-    fills: appearance.fills.map((fill) => ({ ...fill })),
+    fills: cloneFills(appearance.fills),
     stroke: appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined,
     opacity: appearance.opacity,
   };
@@ -2497,8 +2675,8 @@ function mergeAppearance(appearance: Appearance, updates: Partial<Appearance>): 
     ...updates,
     id: appearance.id,
     fills: updates.fills
-      ? updates.fills.map((fill) => ({ ...fill }))
-      : appearance.fills.map((fill) => ({ ...fill })),
+      ? cloneFills(updates.fills)
+      : cloneFills(appearance.fills),
     stroke: updates.stroke
       ? { ...updates.stroke, dash: [...updates.stroke.dash] }
       : appearance.stroke
@@ -2530,13 +2708,22 @@ function applyAppearanceUpdates(
   if (updates.strokeCap !== undefined && stroke) stroke.cap = updates.strokeCap;
   if (updates.strokeJoin !== undefined && stroke) stroke.join = updates.strokeJoin;
   if (updates.strokeColor !== undefined && stroke) stroke.color = updates.strokeColor;
+  const firstFill = appearance.fills[0];
+  const rest = cloneFills(appearance.fills.slice(1));
+  // Picking one colour for a gradient replaces the paint rather than editing one stop:
+  // the swatch means "this fill is this ink", and the change is one Undo away.
   const fills = updates.fillRemoved
     ? []
     : updates.fillColor
-    ? appearance.fills.length > 0
-      ? [{ ...appearance.fills[0], color: updates.fillColor }, ...appearance.fills.slice(1).map((fill) => ({ ...fill }))]
-      : [{ type: 'solid' as const, color: updates.fillColor, opacity: 1, visible: true }]
-    : appearance.fills.map((fill) => ({ ...fill }));
+      ? firstFill
+        ? [
+          firstFill.type === 'solid'
+            ? { ...firstFill, color: updates.fillColor }
+            : { type: 'solid' as const, color: updates.fillColor, opacity: firstFill.opacity, visible: firstFill.visible },
+          ...rest,
+        ]
+        : [{ type: 'solid' as const, color: updates.fillColor, opacity: 1, visible: true }]
+      : cloneFills(appearance.fills);
   return {
     id: appearance.id,
     fills,

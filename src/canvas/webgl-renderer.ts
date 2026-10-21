@@ -9,6 +9,7 @@ import type { VectorDocument } from '../core/document';
 import { evaluateSegment, pointInPolygon } from '../core/geometry';
 import { parametricGroupsForRegion, parametricInstanceMatrices } from '../core/parametric';
 import { regionBoundaryLoops, triangulateRegionLoops } from '../core/region-geometry';
+import { fillColor } from '../core/fills';
 import { isArtworkFillPath } from '../core/segment-semantics';
 import { IDENTITY_MATRIX, matrixScale, multiplyMatrices, objectTransformMatrix, transformPoint } from '../core/transforms';
 import type { EntityId, Point, Region, SelectionState } from '../core/types';
@@ -496,7 +497,9 @@ function appendObjectFillTriangles(
         }
         if (points.length < 3) continue;
         for (const fill of fills) {
-          appendPolygonTriangles(output, points, fill.color, appearance.opacity * fill.opacity);
+          // The WebGL path is a flat-colour preview; a gradient is drawn as its first stop
+          // here and in full by the Canvas renderer, which is the default renderer.
+          appendPolygonTriangles(output, points, fillColor(fill), appearance.opacity * fill.opacity);
         }
       }
     }
