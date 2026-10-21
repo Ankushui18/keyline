@@ -26,6 +26,10 @@ import { copyTextToClipboard } from './core/browser-clipboard';
 import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
 import { canEditObject, editableInspectorObjects } from './app/inspector-actions';
+import { FRAME_PRESETS, framePreset, framePresetSize, isIconPreset } from './core/frame-presets';
+
+/** The starts the in-canvas overlay offers outside the icon workflow. */
+const GENERAL_START_PRESETS = FRAME_PRESETS.filter((preset) => ['web-1440', 'social-square', 'device-phone'].includes(preset.id));
 import { convertNodeTangent } from './tools/direct-path-tool';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
 import { prepareDeleteObject, prepareFlipObjects, prepareNudgeObjects } from './core/object-operations';
@@ -988,10 +992,10 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     return pastePayload(payload);
   }, [announce, pastePayload]);
 
-  const addIconFrame = useCallback((width: number, height: number) => {
+  const addFrame = useCallback((width: number, height: number, name?: string) => {
     try {
-      const plan = prepareCreateIconArtboard(document, width, height);
-      manager.beginTransaction('Add icon frame');
+      const plan = prepareCreateIconArtboard(document, width, height, { name });
+      manager.beginTransaction(name ? `Add ${name} frame` : 'Add icon frame');
       plan.operations.forEach((operation) => manager.execute(operation));
       manager.commitTransaction();
       setSelection(emptySelection());
@@ -1014,7 +1018,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   }, [announce, document, manager]);
 
   const openStarterSample = useCallback(() => {
-    addIconFrame(24, 24);
+    addFrame(24, 24);
     const frame = document.activeArtboard.frame;
     const triangle = preparePrimitiveObject(
       document,
@@ -1117,7 +1121,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       manager.rollbackTransaction();
       announce(`Unable to open the starter sample: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
     }
-  }, [addIconFrame, announce, document, manager]);
+  }, [addFrame, announce, document, manager]);
 
   const renameDocument = useCallback((name: string) => {
     const next = name.trim() || DEFAULT_DOCUMENT_NAME;
@@ -1675,12 +1679,19 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   useEffect(() => {
     if (!start || startedRef.current) return;
     startedRef.current = true;
-    if (start.kind === 'icon') { applyIconStartStyle(); addIconFrame(start.size, start.size); }
-    else if (start.kind === 'logo') addIconFrame(start.width, start.height);
+    if (start.kind === 'icon') { applyIconStartStyle(); addFrame(start.size, start.size); }
+    else if (start.kind === 'logo') addFrame(start.width, start.height);
+    else if (start.kind === 'preset') {
+      const preset = framePreset(start.presetId);
+      if (preset) {
+        if (isIconPreset(preset)) applyIconStartStyle();
+        addFrame(preset.width, preset.height, preset.name);
+      }
+    }
     else if (start.kind === 'sample') openStarterSample();
     else if (start.kind === 'svg') void importSvgSource(start.source, start.name);
     setShowEmptyStart(false);
-  }, [addIconFrame, applyIconStartStyle, importSvgSource, openStarterSample, start]);
+  }, [addFrame, applyIconStartStyle, importSvgSource, openStarterSample, start]);
 
   useEffect(() => {
     window.document.documentElement.dataset.reduceMotion = String(reduceMotion);
@@ -1806,9 +1817,16 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       tool('bend', 'Bend', 'D', 'curve'), tool('cut', 'Cut', 'X', 'split'), tool('fillet', 'Round corner', 'F', 'fillet radius'),
       tool('offset', 'Offset', 'O', 'outline copy'), tool('width', 'Stroke width', 'W', 'variable thickness'), tool('eraser', 'Eraser', '⇧ E'),
       tool('lasso', 'Lasso', 'Q', 'select points align'), tool('shape-builder', 'Shape builder', 'B', 'merge union subtract combine'), tool('paint', 'Fill areas', '⇧ B', 'paint colour'),
-      { id: 'frame-24', label: 'New icon frame 24 × 24', group: 'Frames', keywords: 'artboard add', run: () => addIconFrame(24, 24) },
-      { id: 'frame-32', label: 'New icon frame 32 × 32', group: 'Frames', keywords: 'artboard add', run: () => addIconFrame(32, 32) },
-      { id: 'frame-48', label: 'New icon frame 48 × 48', group: 'Frames', keywords: 'artboard add', run: () => addIconFrame(48, 48) },
+      { id: 'frame-24', label: 'New icon frame 24 × 24', group: 'Frames', keywords: 'artboard add', run: () => addFrame(24, 24) },
+      { id: 'frame-32', label: 'New icon frame 32 × 32', group: 'Frames', keywords: 'artboard add', run: () => addFrame(32, 32) },
+      ...FRAME_PRESETS.filter((preset) => !isIconPreset(preset)).map((preset) => ({
+        id: `frame-${preset.id}`,
+        label: `New ${preset.label} frame ${framePresetSize(preset)}`,
+        group: 'Frames' as const,
+        keywords: `artboard add ${preset.group.toLowerCase()} general purpose`,
+        run: () => addFrame(preset.width, preset.height, preset.name),
+      })),
+      { id: 'frame-48', label: 'New icon frame 48 × 48', group: 'Frames', keywords: 'artboard add', run: () => addFrame(48, 48) },
       { id: 'export', label: 'Export SVG or code', group: 'Actions', keywords: 'download save react css', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: () => setExportOpen(true) },
       { id: 'motion', label: 'Animate (Motion)', group: 'Actions', shortcut: 'M', keywords: 'animation draw on pulse', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: openMotion },
       { id: 'set', label: 'See the whole icon set', group: 'Actions', keywords: 'grid library overview all icons', disabledReason: isEmptyDocument ? 'Draw something first' : undefined, run: openSet },
@@ -1822,7 +1840,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       { id: 'redo', label: 'Redo', group: 'Actions', shortcut: `${MODIFIER_LABEL} ⇧ Z`, disabledReason: manager.canRedo ? undefined : 'Nothing to redo', run: () => manager.redo() },
       { id: 'home', label: 'All files', group: 'Actions', keywords: 'dashboard home projects', run: () => void goHome() },
     ];
-  }, [addIconFrame, changeTool, goHome, isEmptyDocument, manager, openCheck, openMotion, openSet, revision, toolDisabledReasons]);
+  }, [addFrame, changeTool, goHome, isEmptyDocument, manager, openCheck, openMotion, openSet, revision, toolDisabledReasons]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2040,7 +2058,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
         onOpenMotion={openMotion}
         onOpenCheck={openCheck}
         onOpenSet={openSet}
-        onAddIconFrame={addIconFrame}
+        onAddFrame={addFrame}
         onToggleConstraints={() => setConstraintsOpen((open) => !open)}
         onExport={() => setExportOpen(true)}
         onUndo={() => manager.undo()}
@@ -2247,8 +2265,24 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
                   <h3>Icon set</h3>
                   <p>A square frame with a pixel grid. Exports as SVG or a React component.</p>
                   <div className="empty-start-presets" role="group" aria-label="Icon frame size">
-                    {[24, 32, 48].map((size) => <button key={size} type="button" onClick={() => { applyIconStartStyle(); addIconFrame(size, size); setShowEmptyStart(false); }}>{size}</button>)}
-                    <button type="button" onClick={() => { applyIconStartStyle(); addIconFrame(64, 64); setShowEmptyStart(false); }}>Custom</button>
+                    {[24, 32, 48].map((size) => <button key={size} type="button" onClick={() => { applyIconStartStyle(); addFrame(size, size); setShowEmptyStart(false); }}>{size}</button>)}
+                    <button type="button" onClick={() => { applyIconStartStyle(); addFrame(64, 64); setShowEmptyStart(false); }}>Custom</button>
+                  </div>
+                </article>
+                <article className="empty-start-option">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><path d="M7 13h6"/></svg>
+                  <h3>Page or post</h3>
+                  <p>General-purpose frames for layout and illustration: drawing outside any frame lands on the canvas.</p>
+                  <div className="empty-start-presets" role="group" aria-label="General frame size">
+                    {GENERAL_START_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => { addFrame(preset.width, preset.height, preset.name); setShowEmptyStart(false); }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
                 </article>
                 <article className="empty-start-option">
@@ -2256,8 +2290,8 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
                   <h3>Logo or mark</h3>
                   <p>A free artboard for brand shapes, with mirror and radial repeat ready.</p>
                   <div className="empty-start-presets" role="group" aria-label="Logo frame size">
-                    <button type="button" onClick={() => { addIconFrame(512, 512); setShowEmptyStart(false); }}>Square 512</button>
-                    <button type="button" onClick={() => { addIconFrame(1024, 512); setShowEmptyStart(false); }}>Wide 1024 × 512</button>
+                    <button type="button" onClick={() => { addFrame(512, 512); setShowEmptyStart(false); }}>Square 512</button>
+                    <button type="button" onClick={() => { addFrame(1024, 512); setShowEmptyStart(false); }}>Wide 1024 × 512</button>
                   </div>
                 </article>
                 <label

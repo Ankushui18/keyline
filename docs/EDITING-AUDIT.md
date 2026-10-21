@@ -87,7 +87,7 @@ or where it would have to be added.
 | `Ctrl/⌘ G` / ungroup | only when a layer row has focus | `ui/LayersPanel.tsx:452-500` | partial |
 | Layers: nest, reorder, lock, hide | yes, full keyboard reordering | `ui/LayersPanel.tsx:121-186` | works |
 | Isolate a group | yes, but it **hides** the rest of the document | `core/document.ts:317`, banner at `VectorCanvas.tsx:2285` | partial |
-| Multi-artboard documents | yes; frames are created from a menu of 24/32/48 presets plus custom size | `ui/Toolbar.tsx:165-180` | works, icon-flavoured |
+| Multi-artboard documents | yes; frames come from one grouped preset list (Interface, Web, Device, Social, Print, Artwork) plus custom size | `core/frame-presets.ts`, `ui/Toolbar.tsx` frame menu | **general-purpose since this pass** |
 | Text objects | **absent** — no text tool, no text entity in `src/core/types.ts` | — | **missing** |
 | Gradients | **absent** — fills are solid only; `core/document.ts:1110` records the old union advertised gradients without a model | — | **missing** |
 | SVG import / export | yes, with round-trip tests | `src/import/svg-import.ts`, `src/export/svg-export.ts` | works |
@@ -312,7 +312,51 @@ reads it.
 operation already throws), native arcs keep their own specialist tools rather than being
 bent by dragging, and a locked or hidden object offers none of the five rungs.
 
-### 3.7 Typography and gradients are absent, not weak
+### 3.7 General-purpose drawing — done
+
+Everything about this editor's defaults was decided for 24 px icons: the frame menu
+offered three icon sizes, frames were all named `Icon N`, and every start card on the
+dashboard opened an icon file. A designer drawing a page, a post or a print sheet had to
+create an icon frame and then fight it. This section is the contract for the defaults that
+come before any drawing happens.
+
+**One list of frame presets.** `src/core/frame-presets.ts` is the only place frame sizes
+are described. Each preset carries a group, a label, a size and — except for the icon
+presets, which keep their existing `Icon N` naming — the name its frame is created with:
+
+| Group | Presets | Purpose |
+|---|---|---|
+| Interface | 24, 32, 48 px squares | the existing icon workflow, unchanged |
+| Web | 1440 × 1024, 1280 × 800 | page layout at 1× CSS pixels |
+| Device | 390 × 844, 768 × 1024 | phone and tablet |
+| Social | 1080 × 1080, 1200 × 630 | post and link preview |
+| Print | A4 794 × 1123, Letter 816 × 1056 | A4 and US Letter at 96 dpi, stated as such |
+| Artwork | 1000 × 1000, 1920 × 1080 | illustration and presentation |
+
+Print sizes are listed in **pixels at 96 dpi**, because the document model has no physical
+units. The preset says so in its label; nothing claims to be a print-ready PDF.
+
+**Naming follows the preset.** A frame created from a Web preset is named `Web page`, not
+`Icon 1440×1024`; duplicates get the same ` 2`, ` 3` suffix the icon path already uses.
+Icon presets keep their current names, so the icon regression suite stays meaningful.
+
+**One creation path.** Every entry point — the toolbar's New frame menu, the dashboard's
+start cards and the in-canvas start overlay — creates a frame through the same plan
+(`prepareCreateIconArtboard`, which now accepts the preset's name). The menu is grouped by
+the same groups the module defines, so the toolbar cannot drift from the list.
+
+**Neutral empty state.** The dashboard opens on "New file" with a blank canvas, a web page
+and a social post beside the icon start, and the copy no longer assumes icons ("Start with
+a blank canvas or drop an SVG or backup"). The in-canvas overlay gains the same general
+starts next to the icon one. Nothing icon-specific is removed: the icon-set view, pixel
+grid and icon exports stay where they are, as options rather than as the only door in.
+
+**Drawing anywhere already holds, and is now tested.** A new object joins the frame under
+the pointer, and joins the page-level canvas root when the pointer is outside every frame
+(`prepareArtboardPlacement`). That behaviour predates this pass; it is pinned here because
+"general-purpose" is only true if drawing outside a 24 px box works.
+
+### 3.8 Typography and gradients are absent, not weak
 
 There is no text entity and no gradient fill type. These are feature projects, not
 interaction fixes, and they should be sequenced after the interaction layer —
@@ -342,8 +386,8 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 |---|---|---|
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
-| 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
-| 4 | Text and gradients (3.7) | typography and illustration, the two missing media |
+| 3 | ~~General-purpose framing: frame presets beyond icon sizes, neutral empty state~~ (done, 3.7) | — |
+| 4 | Text and gradients (3.8) | typography and illustration, the two missing media |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived
@@ -353,7 +397,7 @@ quality gain, and it needs no new model concepts.
 
 ## 6. Shipped in this pass
 
-Six changes, all small and all verified by the existing gates:
+Seven changes, all small and all verified by the existing gates:
 
 - **Resize and rotate.** A quad frame on the object's own axes with eight resize
   handles and a rotate zone just outside each corner; `Shift` keeps the ratio when
@@ -374,6 +418,12 @@ Six changes, all small and all verified by the existing gates:
   shape outline without touching the document. `Alt`-click selects the parent group
   (10 tests in `src/core/target-resolution.test.ts`, hover resolution measured at a
   1.4–1.6 ms median on 2000 objects).
+- **General-purpose framing.** One preset list (`core/frame-presets.ts`) feeds the frame menu,
+  the dashboard and the in-canvas start: Interface, Web, Device, Social, Print and Artwork sizes,
+  with print sizes honestly labelled "96 dpi". Non-icon frames are named after their preset
+  (`Web page`, `Social post`), duplicates get the existing numeric suffix, and the icon workflow
+  keeps its `Icon N` naming. The dashboard opens on **New file** with blank-canvas and social-post
+  starts beside the icon one (9 tests).
 - **Truthful inspector availability.** Every disabled control in the right panel
   names its reason in its tooltip, availability comes from the visible-and-unlocked
   set the commands act on, and a frame holding a single shape can be aligned.

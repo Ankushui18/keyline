@@ -7,6 +7,19 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- **Frame presets for real work, not just icons.** The New frame menu is now grouped — Interface
+  (24/32/48), Web (1440 × 1024, 1280 × 800), Device (390 × 844, 768 × 1024), Social (1080 × 1080,
+  1200 × 630), Print (A4 and US Letter at 96 dpi, stated as such) and Artwork (1000 × 1000,
+  1920 × 1080) — plus the existing custom size. `src/core/frame-presets.ts` is the only list; the
+  menu, the command palette, the dashboard and the in-canvas start all read it, so they cannot
+  drift. Frames from a non-icon preset are named after it (`Web page`, `Social post`) and numbered
+  when duplicated; icon frames keep their `Icon N` naming.
+- **A neutral empty state.** The dashboard opens with **New file**, a blank canvas (1440 × 1024) and
+  a social post beside the icon set and logo starts, and its copy no longer assumes icons. The
+  in-canvas start overlay offers the same general sizes next to the icon one. Everything
+  icon-specific — the icon-set view, pixel grid and icon exports — remains, as an option.
+  Drawing outside every frame already landed on the page-level canvas root; that behaviour is now
+  pinned by a test.
 - **Direct path editing.** Double-click a segment in point editing to insert an anchor exactly
   where the pointer meets the curve — the curve does not move, because the insert is the same
   exact split the Cut tool uses (a cubic splits into two cubics, an arc keeps its radius and

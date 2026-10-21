@@ -33,6 +33,8 @@ Starting points:
 
 | Card | Result |
 |---|---|
+| **Blank canvas** | A 1440 × 1024 web page frame — the general-purpose default. |
+| **Social post** | A 1080 × 1080 frame. |
 | **Icon set** | One 24 px frame, sized for icon work. |
 | **Logo or mark** | A 512 × 512 frame. |
 | **Import a file** | SVG or a `.keyline.json` backup, from the file picker or by dropping it on the dashboard. |
@@ -66,8 +68,16 @@ operable, and both width and split height persist on the device.
 
 - A **document** contains **pages**; a page contains **artboards** (frames). A typical icon file
   has one page and one artboard per icon.
-- Add frames from the **More (⋯)** menu (New 24×24 / 32×32 / 48×48 frame, or a custom size), the
-  command bar (`Ctrl/⌘ K`), or the Layers panel context menu.
+- Add frames from the **More (⋯)** menu, the command bar (`Ctrl/⌘ K`), or the Layers panel
+  context menu. The menu is grouped: **Interface** (24/32/48 icon frames), **Web** (1440 × 1024,
+  1280 × 800), **Device** (390 × 844 phone, 768 × 1024 tablet), **Social** (1080 × 1080,
+  1200 × 630), **Print** (A4 794 × 1123, Letter 816 × 1056 — pixels at 96 dpi, since the document
+  has no physical units) and **Artwork** (1000 × 1000, 1920 × 1080), plus a custom size. The same
+  list is one module (`src/core/frame-presets.ts`), so every entry point agrees.
+- A frame takes its name from the preset — `Web page`, `Social post` — and a second one becomes
+  `Web page 2`. Icon frames keep the `Icon 24` style of name.
+- Drawing outside every frame is allowed and lands on the page-level canvas root, so the frame
+  never decides where your artwork lives.
 - **Duplicate** copies an artboard with its content; the copy gets fresh IDs.
 - **Delete** removes selected artboards as one undoable step (no modal confirmation; use
   `Ctrl/⌘ Z` to restore).

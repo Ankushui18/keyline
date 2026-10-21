@@ -13,6 +13,7 @@ import { BrandMark } from '../design-system/BrandMark';
 
 export type StartAction =
   | { kind: 'blank' }
+  | { kind: 'preset'; presetId: string }
   | { kind: 'icon'; size: number }
   | { kind: 'logo'; width: number; height: number }
   | { kind: 'sample' }
@@ -196,13 +197,19 @@ export function Dashboard({
         <span className="dashboard-device-note">Saved on this device</span>
         <input ref={fileInputRef} type="file" accept="image/svg+xml,.svg,application/json,.json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void readImportFile(file); event.target.value = ''; }} />
         <button type="button" className="dashboard-button" onClick={() => fileInputRef.current?.click()}>Import</button>
-        <button type="button" className="dashboard-button is-primary" onClick={() => onStart({ kind: 'icon', size: 24 })}>New icon set</button>
+        <button type="button" className="dashboard-button is-primary" onClick={() => onStart({ kind: 'preset', presetId: 'web-1440' })}>New file</button>
       </header>
 
       <main className="dashboard-main">
         <section aria-label="Start something">
           <h2 className="dashboard-label">Start something</h2>
           <div className="dashboard-starts">
+            <StartCard title="Blank canvas" detail="1440 × 1024" onClick={() => onStart({ kind: 'preset', presetId: 'web-1440' })}>
+              <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /></svg>
+            </StartCard>
+            <StartCard title="Social post" detail="1080 × 1080" onClick={() => onStart({ kind: 'preset', presetId: 'social-square' })}>
+              <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" /><circle cx="9" cy="9" r="1.6" /><path d="m5 17 4.5-4.5L13 16l2.5-2.5L19 17" /></svg>
+            </StartCard>
             <StartCard title="Icon set" detail="24 px frame" onClick={() => onStart({ kind: 'icon', size: 24 })}>
               <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 15 12 8l4 7" /></svg>
             </StartCard>
@@ -226,7 +233,7 @@ export function Dashboard({
             </div>
           </div>
           {files === null ? <p className="dashboard-note" role="status">Loading your files…</p> : !hasFiles ? (
-            <div className="ui-empty ui-empty--framed"><strong>No files yet</strong><span>Start with an icon set or drop an SVG or backup anywhere on this page. Your work is saved here automatically.</span></div>
+            <div className="ui-empty ui-empty--framed"><strong>No files yet</strong><span>Start with a blank canvas, a social post or an icon set — or drop an SVG or backup anywhere on this page. Your work is saved here automatically.</span></div>
           ) : visible.length === 0 ? (
             <div className="ui-empty"><strong>Nothing matches</strong><span>{query ? `No file name contains “${query}”.` : 'No files of this type yet.'}</span></div>
           ) : (
