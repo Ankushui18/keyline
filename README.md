@@ -9,7 +9,7 @@ and export production-ready SVG, PNG, React and CSS — from your browser, with 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/Ankushui18/keyline/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
-  <img src="https://img.shields.io/badge/tests-421%20passing-brightgreen" alt="421 tests passing">
+  <img src="https://img.shields.io/badge/tests-459%20passing-brightgreen" alt="459 tests passing">
   <img src="https://img.shields.io/badge/node-20.19%2B%20%7C%2022.12%2B-339933" alt="Node 20.19+ or 22.12+">
   <img src="https://img.shields.io/badge/storage-on%20this%20device-6b7686" alt="Stored on this device">
 </p>
@@ -32,7 +32,7 @@ Keyline is a **web app you run locally**, not a hosted service. Pick the path th
 | **See what's missing** (honest list) | [Known limits](#known-limits) |
 | **Read the security/audit record** | [SECURITY.md](SECURITY.md) · [docs/AUDIT.md](docs/AUDIT.md) |
 
-> **Status: v0.1.0, source release.** Covers the icon workflow described below, verified by 421
+> **Status: v0.1.0, source release.** Covers the workflow described below, verified by 459
 > automated tests. It is not a hosted product and has no user accounts.
 
 ---
@@ -62,9 +62,10 @@ their files.
 | **Drawing** | Pen, pencil, brush, rectangle, rounded rectangle, ellipse, polygon, star, line, **construction line**, native **arc**, shape builder, cut, bend, fillet, offset, variable width, region paint, lasso, eraser with healing. |
 | **Geometry** | Eleven constraint types (`parallel`, `perpendicular`, `tangent`, `symmetric`, `equal_length`, `fixed_distance`, `fixed_angle`, `fixed_radius`, `horizontal`, `vertical`, `coincident`) with hard/medium/soft priorities, conflict diagnostics, and a deterministic solver. |
 | **Precision** | Icon frames at 24/32/48 or custom size, artboard presets, pixel grid, numeric transforms with expressions, corner radii, aspect lock, one-shot Flow arrangements. |
+| **Appearance** | Solid, **linear** and **radial** gradient fills with a stop editor, per-fill opacity and visibility, shared appearance rules so linked objects stay in sync. |
 | **Icon set view** | See every icon at once, search by name, and run consistency checks for stroke width, line ends, safe area, half-pixel alignment and minimum readable stroke. |
 | **Families** | Link variants to a source with stable topology maps, propagate changes with a preview, keep intentional overrides, and run family QA with one-click undoable fixes. |
-| **Import & tidy** | Drop an SVG anywhere. Optional tidy rules (straighten near-straight lines, merge collinear points, snap to grid) show their effect before import. |
+| **Import & tidy** | Drop an SVG anywhere. Gradients import as editable gradients; anything the model cannot draw is reported by code in the import receipt rather than dropped. Optional tidy rules (straighten near-straight lines, merge collinear points, snap to grid) show their effect before import. |
 | **Export** | SVG (artboard or artwork bounds, optional background), PNG at 1×/2×/3×/custom, batch ZIP with naming patterns and presets, React + TypeScript component, CSS variables, and a family change manifest. |
 | **Motion** | Turn an exported SVG into a self-contained animated SVG using CSS keyframes — draw-on, pulse, swing or pop, with duration, delay, stagger, easing and loop controls. |
 | **Collaboration** | Share a room link, edit together over Yjs, work offline and resync, and see remote cursors and selections. Room joins keep a **separate local file identity**. |
@@ -180,7 +181,7 @@ keyline/
 ```bash
 npm ci
 npm run check      # design gate + build + tests + Wasm smoke + relay + doc links
-npm test           # 421 tests across 66 test files
+npm test           # 459 tests across 71 test files
 npm run test:solver
 npm run test:collaboration
 npm run check:docs # every relative doc link resolves
@@ -193,7 +194,7 @@ npm run proof:design # render the design system to design-proof/index.html
 Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 
 - **Strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`) and a production Vite build.
-- **421 tests / 66 files** covering geometry, native arcs, regions, constraints, transactions,
+- **459 tests / 71 files** covering geometry, native arcs, regions, constraints, transactions,
   persistence, export fidelity and escaping, collaboration replay, and performance budgets.
 - **A real Wasm smoke test** that loads the committed artifact and checks native-arc solving —
   not a mock of the boundary.

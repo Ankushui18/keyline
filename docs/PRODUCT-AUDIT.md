@@ -7,7 +7,7 @@
 - **Status:** this is the P0 deliverable — a gap report, not a rewrite.
 
 > The plan this responds to describes the repository as "v0.1.0, 318 automated tests". That figure is
-> out of date: the suite at this commit is **421 tests across 66 files**, plus a real Wasm smoke test,
+> out of date: the suite at this commit is **459 tests across 71 files**, plus a real Wasm smoke test,
 > nine WebSocket relay checks, a design-system gate and a documentation gate. Everything below was
 > re-verified at `a375b5e` rather than taken from the repository description.
 
@@ -21,7 +21,7 @@ a world-class direct-selection and path-editing experience, and do not start wit
 
 | Source | What it establishes |
 |---|---|
-| `npm run check` at this commit | build, strict TypeScript, **421 tests / 66 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
+| `npm run check` at this commit | build, strict TypeScript, **459 tests / 71 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
 | Full read of `src/core/operations.ts` | 67 operation types; every document mutation is expressed as one |
 | Hit testing, transform and history read-through | the claims in the matrix below cite `file:line`, not documentation |
 | Targeted experiments | z-order hit testing (below), inspector availability, rotation about the centre |
@@ -75,10 +75,10 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 | Stable ids and versioned serialization | Verified | id factory in `core/ids.ts`; `version` field and snapshot validation in `core/document.ts` |
 | Transaction boundary: no UI path mutates geometry directly | Verified | 67 operations in `core/operations.ts`; `OperationManager` is the only writer used by tools and UI |
 | Text objects | **Missing** | no text entity in `core/types.ts` |
-| Gradient fills | **Missing** | fills are `solid` only |
+| Gradient fills | Verified | `core/fills.ts` (model, normalization, cloning); Canvas paint in `canvas/renderer.ts`; `<defs>` export in `export/svg-export.ts`; `url(#…)` import in `import/svg-import.ts` |
 | Masks and clipping | **Missing** | `Clip content` is disabled and states why |
 | Images | **Missing** | no image entity |
-| Artboards as a general boundary rather than an icon frame | **Partial** | arbitrary frame sizes exist; presets are icon-flavoured (16/24/32/48) |
+| Artboards as a general boundary rather than an icon frame | Verified | arbitrary frame sizes exist; the New frame menu offers grouped interface, web, device, social, print and artwork presets (`core/frame-presets.ts`) |
 
 ### 2.4 Rendering and hit testing
 
@@ -149,10 +149,10 @@ Ordered by dependency and by what a designer would feel first — not by how int
 | 1 | ~~Group entry on the canvas~~ (done in this pass) | — | — |
 | 2 | ~~Hover affordance (object/segment preview before clicking)~~ (done in this pass) | — | — |
 | 3 | Text objects (entity, editing, SVG round trip) | Excludes branding and typography entirely — the largest single missing capability | L |
-| 4 | Gradient fills | Same: branding work is not possible with solids alone | M |
+| 4 | ~~Gradient fills~~ (done, `docs/EDITING-AUDIT.md` §3.8) | — | — |
 | 5 | Command palette over existing operations | Makes 67 operations discoverable without a wider toolbar | M |
 | 6 | General boolean ops and compound paths | "Complete vector editor" claims need them; region ops only partly cover | L |
-| 7 | Import warnings for skipped SVG features (mask, clip, gradient, filter) | Silent data loss is a trust problem, and trust is the product's differentiator | S |
+| 7 | ~~Import warnings for skipped SVG features (mask, clip, gradient, filter)~~ (done, §3.8) | — | — |
 | 8 | Continuous autosave | Local-first promise is only half kept today | M |
 | 9 | Reference-document performance measurement | The 60 FPS and large-document claims are currently unverified | M |
 | 10 | AI operation plans through the existing validator (`core/quick-edit.ts` seed) | Everything above must be stable before generated geometry can be trusted | L |

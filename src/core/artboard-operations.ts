@@ -1,3 +1,4 @@
+import { cloneFills } from './fills';
 import { createEntityId } from './ids';
 import { stableRegionId } from './regions';
 import { isUnusedStarterArtboard } from './real-content';
@@ -506,7 +507,7 @@ function cloneAppearance(appearance: Appearance, id: EntityId): Appearance {
   return {
     ...appearance,
     id,
-    fills: appearance.fills.map((fill) => ({ ...fill })),
+    fills: cloneFills(appearance.fills),
     stroke: appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined,
   };
 }

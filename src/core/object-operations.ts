@@ -1,3 +1,4 @@
+import { cloneFills } from './fills';
 import { createEntityId } from './ids';
 import type { VectorDocument } from './document';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from './object-geometry';
@@ -54,7 +55,7 @@ export function prepareDuplicateObject(document: VectorDocument, objectId: Entit
       appearance: {
         ...sourceAppearance,
         id: appearanceId,
-        fills: sourceAppearance.fills.map((fill) => ({ ...fill })),
+        fills: cloneFills(sourceAppearance.fills),
         stroke: sourceAppearance.stroke
           ? { ...sourceAppearance.stroke, dash: [...sourceAppearance.stroke.dash] }
           : undefined,

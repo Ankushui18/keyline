@@ -245,6 +245,22 @@ document and constraints therefore produce the same result on every machine and 
 - Object appearance (fill and stroke) is separate from region fills. Both can coexist.
 - **Construction lines** are excluded from export and from region detection.
 
+### Gradient fills
+
+Every object fill has a **Solid / Linear / Radial** switch in the Design panel.
+
+- **Linear** gradients have an angle; **radial** gradients have a radius. Both have stops.
+- A stop row carries a colour, a hex value, a position (0–100%) and its own opacity. Add a
+  stop where you need one; remove is refused while only two remain.
+- Gradients belong to the object, so they move, scale and rotate with it — including every
+  occurrence of a mirrored or radial repeat.
+- SVG export writes a real `<linearGradient>` / `<radialGradient>` with a matching
+  `fill="url(#…)"`, so a round trip through another tool keeps the gradient.
+- Choosing a single colour for a gradient from a **multi-selection** swatch replaces the
+  gradient with that solid colour; Undo brings it back.
+- Region fills and strokes are still solid in this release. A radial gradient on a
+  non-uniformly scaled object is drawn as an ellipse, as SVG does.
+
 ---
 
 ## Parametric groups
@@ -313,6 +329,13 @@ Drop an SVG on the dashboard (or use the empty-canvas start panel), or choose **
   - **Snap to grid** (opt-in, because it moves points).
 - The dialog reports how many points will be removed; importing is always cancellable.
 - Imported content is placed as a new object and is fully undoable.
+- **Gradients import as editable gradients.** `linearGradient` and `radialGradient` fills,
+  including `href` inheritance and `objectBoundingBox` units, become Keyline fills.
+- **Anything that cannot be drawn is reported, not silently dropped.** The receipt names the
+  first problem and counts the rest; the tidy dialog shows the count before you open the
+  file. Typical warnings are a pattern fill, a missing gradient id, `spreadMethod="reflect"`,
+  a radial focal point, a skewed gradient transform, and a filter, mask or clip path on an
+  element.
 
 ---
 

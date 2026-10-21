@@ -1,3 +1,4 @@
+import { cloneFills } from './fills';
 import { createEntityId } from './ids';
 import type { VectorDocument } from './document';
 import type { OperationInput } from './operations';
@@ -422,7 +423,7 @@ function cloneLayer(layer: LayerNode): LayerNode {
 function cloneAppearance(appearance: Appearance): Appearance {
   return {
     ...appearance,
-    fills: appearance.fills.map((fill) => ({ ...fill })),
+    fills: cloneFills(appearance.fills),
     stroke: appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined,
   };
 }

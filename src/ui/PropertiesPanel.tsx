@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { isPixelGridVisible, setPixelGridVisible, subscribePixelGrid } from '../canvas/view-settings';
-import { useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type FocusEvent as ReactFocusEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { constraintActions, constraintDisplayName, constraintsForSelection } from '../constraints/catalog';
 import type { VectorDocument } from '../core/document';
 import { applyCornerRadii, currentRadii, inspectCorners } from '../core/corner-radius';
@@ -12,6 +12,10 @@ import {
   type GeometryVariantImpact,
 } from '../core/geometry-components';
 import { evaluateSegment } from '../core/geometry';
+import {
+  cloneFills, defaultLinearGradient, defaultRadialGradient, fillColor as fillColorOf,
+  fillPreviewStyle, gradientColorAt, linearGradientAngle, normalizeStops, rotateLinearGradient,
+} from '../core/fills';
 import { FamilyQaDialog } from './FamilyQaDialog';
 import { evaluateNumericExpression } from '../core/numeric-expression';
 import {
@@ -25,12 +29,15 @@ import { parametricSourceObjectId, validateParametricGroup } from '../core/param
 import { objectConstructionComposition, selectionIsConstructionOnly } from '../core/segment-semantics';
 import type {
   Appearance,
+  AppearanceFill,
   AppearanceRule,
   ConstructionExtent,
   Constraint,
   ConstraintType,
   DrawingStyle,
   EntityId,
+  GradientFill,
+  GradientStop,
   HandleMirrorMode,
   NetworkObject,
   ParametricGroup,
@@ -1388,14 +1395,16 @@ function normalizeHex(value: string): string | null {
 }
 
 function PaintRow({
-  label, color, opacity, visible, onColor, onOpacity, onToggle, onRemove,
+  label, color, opacity, visible, onColor, onOpacity, onToggle, onRemove, typeControl,
 }: {
   label: string; color: string; opacity: number; visible: boolean;
+  typeControl?: ReactNode;
   onColor: (color: string) => void; onOpacity: (opacity: number) => void; onToggle: () => void; onRemove: () => void;
 }) {
   return (
     <div className={`paint-row${visible ? '' : ' is-hidden'}`}>
-      <div className="paint-value-group">
+      <div className={`paint-value-group${typeControl ? ' has-type' : ''}`}>
+      {typeControl}
       <label className="paint-swatch" title={`${label} colour`}>
         <input type="color" value={color} aria-label={`${label} colour`} onChange={(event) => onColor(event.target.value)} />
         <span style={{ background: color }} />
@@ -1429,6 +1438,169 @@ function PaintRow({
       </div>
       <button type="button" className="icon-button" aria-label={visible ? `Hide ${label}` : `Show ${label}`} title={visible ? 'Hide' : 'Show'} onClick={onToggle}><PanelIcon d={visible ? EYE : EYE_OFF} /></button>
       <button type="button" className="icon-button" aria-label={`Remove ${label}`} title={`Remove ${label.toLowerCase()}`} onClick={onRemove}><PanelIcon d={MINUS} /></button>
+    </div>
+  );
+}
+
+/** A number that commits on blur, matching every other numeric field in the inspector. */
+function BlurNumber({ label, value, min, max, suffix, onCommit }: {
+  label: string; value: number; min: number; max: number; suffix: string; onCommit: (value: number) => void;
+}) {
+  return (
+    <span className="paint-opacity">
+      <input
+        aria-label={label}
+        defaultValue={Math.round(value)}
+        key={value}
+        inputMode="numeric"
+        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+        onBlur={(event) => {
+          const parsed = Number.parseFloat(event.target.value);
+          if (!Number.isFinite(parsed)) { event.target.value = String(Math.round(value)); return; }
+          onCommit(Math.min(max, Math.max(min, parsed)));
+        }}
+      />
+      {suffix}
+    </span>
+  );
+}
+
+/**
+ * A gradient fill row: the same eye/opacity/remove controls as a solid fill, plus the
+ * stops and the geometry that make the gradient editable. Every edit replaces the whole
+ * fill, so the operation layer sees one value and Undo has one step to restore.
+ */
+function GradientFillRow({ label, fill, onPatch, onType, onToggle, onRemove }: {
+  label: string;
+  fill: GradientFill;
+  onPatch: (patch: Partial<GradientFill>) => void;
+  onType: (type: 'solid' | 'linear' | 'radial') => void;
+  onToggle: () => void;
+  onRemove: () => void;
+}) {
+  const stops = normalizeStops(fill.stops);
+  const setStop = (index: number, patch: Partial<GradientStop>) => {
+    onPatch({ stops: stops.map((stop, i) => (i === index ? { ...stop, ...patch } : stop)) } as Partial<GradientFill>);
+  };
+  const addStop = () => {
+    // The widest gap is where one more stop buys the most control.
+    let widest = -1;
+    let at = 0.5;
+    for (let index = 0; index < stops.length - 1; index += 1) {
+      const gap = stops[index + 1].offset - stops[index].offset;
+      if (gap > widest) { widest = gap; at = (stops[index].offset + stops[index + 1].offset) / 2; }
+    }
+    const stopsWithNew = [...stops, { offset: at, color: gradientColorAt(fill, at), opacity: 1 }]
+      .sort((left, right) => left.offset - right.offset);
+    onPatch({ stops: stopsWithNew } as Partial<GradientFill>);
+  };
+  return (
+    <div className={`paint-fill-block${fill.visible ? '' : ' is-hidden'}`}>
+      <div className="paint-row paint-gradient-row">
+        <div className="paint-value-group has-type">
+          <select
+            className="paint-type"
+            aria-label={`${label} type`}
+            value={fill.type}
+            onChange={(event) => onType(event.target.value as 'solid' | 'linear' | 'radial')}
+          >
+            <option value="solid">Solid</option>
+            <option value="linear">Linear</option>
+            <option value="radial">Radial</option>
+          </select>
+          <span className="paint-swatch paint-gradient-preview" title={`${label} gradient`}>
+            <span style={{ background: fillPreviewStyle(fill) }} />
+          </span>
+          <BlurNumber
+            label={`${label} opacity`}
+            value={fill.opacity * 100}
+            min={0}
+            max={100}
+            suffix="%"
+            onCommit={(value) => onPatch({ opacity: value / 100 } as Partial<GradientFill>)}
+          />
+        </div>
+        <button type="button" className="icon-button" aria-label={fill.visible ? `Hide ${label}` : `Show ${label}`} title={fill.visible ? 'Hide' : 'Show'} onClick={onToggle}><PanelIcon d={fill.visible ? EYE : EYE_OFF} /></button>
+        <button type="button" className="icon-button" aria-label={`Remove ${label}`} title={`Remove ${label.toLowerCase()}`} onClick={onRemove}><PanelIcon d={MINUS} /></button>
+      </div>
+      <div className="paint-gradient-geometry">
+        {fill.type === 'linear' ? (
+          <label className="paint-gradient-field">
+            <span>Angle</span>
+            <BlurNumber
+              label={`${label} gradient angle`}
+              value={linearGradientAngle(fill)}
+              min={-360}
+              max={360}
+              suffix="°"
+              onCommit={(value) => onPatch(rotateLinearGradient(fill as Extract<GradientFill, { type: 'linear' }>, value) as Partial<GradientFill>)}
+            />
+          </label>
+        ) : (
+          <label className="paint-gradient-field">
+            <span>Radius</span>
+            <BlurNumber
+              label={`${label} gradient radius`}
+              value={fill.radius}
+              min={0.5}
+              max={100000}
+              suffix="px"
+              onCommit={(radius) => onPatch({ radius } as Partial<GradientFill>)}
+            />
+          </label>
+        )}
+        <span className="paint-gradient-stops-head">Stops · {stops.length}</span>
+        <button type="button" className="icon-button paint-add-stop" aria-label={`Add ${label.toLowerCase()} stop`} title="Add stop" onClick={addStop}><PanelIcon d={PLUS} /></button>
+      </div>
+      <div className="paint-gradient-stops">
+        {stops.map((stop, index) => (
+          <div className="paint-stop-row" key={index}>
+            <label className="paint-swatch" title={`${label} stop ${index + 1} colour`}>
+              <input type="color" value={stop.color} aria-label={`${label} stop ${index + 1} colour`} onChange={(event) => setStop(index, { color: event.target.value })} />
+              <span style={{ background: stop.color }} />
+            </label>
+            <input
+              className="paint-hex"
+              aria-label={`${label} stop ${index + 1} hex`}
+              defaultValue={stop.color.replace('#', '').toUpperCase()}
+              key={stop.color}
+              spellCheck={false}
+              onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+              onBlur={(event) => {
+                const next = normalizeHex(event.target.value);
+                if (next && next !== stop.color) setStop(index, { color: next });
+                else event.target.value = stop.color.replace('#', '').toUpperCase();
+              }}
+            />
+            <BlurNumber
+              label={`${label} stop ${index + 1} position`}
+              value={stop.offset * 100}
+              min={0}
+              max={100}
+              suffix="%"
+              onCommit={(value) => setStop(index, { offset: value / 100 })}
+            />
+            <BlurNumber
+              label={`${label} stop ${index + 1} opacity`}
+              value={stop.opacity * 100}
+              min={0}
+              max={100}
+              suffix="%"
+              onCommit={(value) => setStop(index, { opacity: value / 100 })}
+            />
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={`Remove ${label} stop ${index + 1}`}
+              title={stops.length <= 2 ? 'A gradient needs at least two stops' : `Remove stop ${index + 1}`}
+              disabled={stops.length <= 2}
+              onClick={() => onPatch({ stops: stops.filter((_stop, i) => i !== index) } as Partial<GradientFill>)}
+            >
+              <PanelIcon d={MINUS} />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -1532,8 +1704,41 @@ function ObjectInspector({
   const canRound = corners.closed && (corners.sharp.length > 0 || (remembered !== undefined && corners.roundedRadii.length > 0));
   const fills = appearance?.fills ?? [];
   const setFills = (next: typeof fills) => appearance && onUpdateAppearance(appearance.id, { fills: next });
-  const patchFill = (index: number, patch: Partial<(typeof fills)[number]>) =>
-    setFills(fills.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  const replaceFill = (index: number, next: (typeof fills)[number]) =>
+    setFills(fills.map((item, i) => (i === index ? next : item)));
+  /**
+   * Switching a fill's type keeps what carries over: the ink becomes the first stop and the
+   * last stop of a new gradient, the first stop becomes the ink of a new solid. A new
+   * gradient is seeded from the object's own box, so it spans the shape the moment it exists.
+   */
+  const convertFill = (index: number, type: 'solid' | 'linear' | 'radial') => {
+    const current = fills[index];
+    if (!current || current.type === type) return;
+    if (type === 'solid') {
+      replaceFill(index, { type: 'solid', color: fillColorOf(current), opacity: current.opacity, visible: current.visible });
+      return;
+    }
+    const stops = normalizeStops(current.type === 'solid'
+      ? [{ offset: 0, color: current.color, opacity: 1 }, { offset: 1, color: current.color, opacity: 1 }]
+      : current.stops);
+    const colors = { from: stops[0].color, to: stops[stops.length - 1].color };
+    const gradient = type === 'linear'
+      ? defaultLinearGradient(document, object.id, 90, colors, current.opacity)
+      : defaultRadialGradient(document, object.id, colors, current.opacity);
+    replaceFill(index, { ...gradient, stops, visible: current.visible });
+  };
+  const typeControl = (index: number, type: (typeof fills)[number]['type']) => (
+    <select
+      className="paint-type"
+      aria-label="Fill type"
+      value={type}
+      onChange={(event) => convertFill(index, event.target.value as 'solid' | 'linear' | 'radial')}
+    >
+      <option value="solid">Solid</option>
+      <option value="linear">Linear</option>
+      <option value="radial">Radial</option>
+    </select>
+  );
 
   const layer = document.getLayerForObject(object.id);
   const owningFrame = layer ? document.getArtboard(layer.artboardId) : undefined;
@@ -1580,7 +1785,7 @@ function ObjectInspector({
           label={fills.some((fill) => fill.visible) ? 'Hide all fills' : 'Show all fills'}
           disabled={fills.length === 0 || constructionOnly}
           disabledReason={constructionOnly ? 'construction geometry has no fills' : 'this shape has no fills'}
-          onClick={() => { const visible = !fills.some((fill) => fill.visible); setFills(fills.map((fill) => ({ ...fill, visible }))); }}
+          onClick={() => { const visible = !fills.some((fill) => fill.visible); setFills(cloneFills(fills).map((fill) => ({ ...fill, visible }))); }}
         /></DesignSectionHead>
         <div className="di-appearance-row"><div className="di-two-columns">
           <div className="di-control-block"><span className="di-label">Opacity</span><DesignNumberField label="Object opacity" icon="opacity" suffix="%" value={appearance.opacity * 100} min={0} max={100} onCommit={(value) => onUpdateAppearance(appearance.id, { opacity: value / 100 })} /></div>
@@ -1601,7 +1806,32 @@ function ObjectInspector({
       </section>}
       {appearance && <section className="di-section di-fill-section">
         <DesignSectionHead title="Fill"><DesignIconButton icon="plus" label="Add fill" disabled={constructionOnly} disabledReason="construction geometry has no fills" onClick={() => setFills([...fills, { type: 'solid', color: fills.length ? DEFAULT_FIRST_FILL : DEFAULT_FILL_COLOR, opacity: 1, visible: true }])} /></DesignSectionHead>
-        {constructionOnly ? <p className="di-note">Fill is unavailable for construction geometry.</p> : fills.length === 0 ? <p className="di-note">No fill</p> : fills.map((fill, index) => <PaintRow key={index} label="Fill" color={fill.color} opacity={fill.opacity ?? 1} visible={fill.visible} onColor={(color) => patchFill(index, { color })} onOpacity={(opacity) => patchFill(index, { opacity })} onToggle={() => patchFill(index, { visible: !fill.visible })} onRemove={() => setFills(fills.filter((_item, i) => i !== index))} />)}
+        {constructionOnly ? <p className="di-note">Fill is unavailable for construction geometry.</p> : fills.length === 0 ? <p className="di-note">No fill</p> : fills.map((fill, index) => fill.type === 'solid'
+          ? (
+            <PaintRow
+              key={index}
+              label="Fill"
+              color={fill.color}
+              opacity={fill.opacity ?? 1}
+              visible={fill.visible}
+              typeControl={typeControl(index, fill.type)}
+              onColor={(color) => replaceFill(index, { ...fill, color })}
+              onOpacity={(opacity) => replaceFill(index, { ...fill, opacity })}
+              onToggle={() => replaceFill(index, { ...fill, visible: !fill.visible })}
+              onRemove={() => setFills(fills.filter((_item, i) => i !== index))}
+            />
+          )
+          : (
+            <GradientFillRow
+              key={index}
+              label="Fill"
+              fill={fill}
+              onPatch={(patch) => replaceFill(index, { ...fill, ...patch } as (typeof fills)[number])}
+              onType={(type) => convertFill(index, type)}
+              onToggle={() => replaceFill(index, { ...fill, visible: !fill.visible })}
+              onRemove={() => setFills(fills.filter((_item, i) => i !== index))}
+            />
+          ))}
       </section>}
       {appearance && (
         <section className="di-section appearance-stroke-section">
@@ -2301,7 +2531,7 @@ function SharedAppearanceImpactDialog({
   onApply: (appearance: AppearanceRule['appearance'], detachObjectIds: EntityId[]) => void;
 }) {
   const cloneAppearance = (appearance: AppearanceRule['appearance']): AppearanceRule['appearance'] => ({
-    fills: appearance.fills.map((fill) => ({ ...fill })),
+    fills: cloneFills(appearance.fills),
     stroke: appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined,
     opacity: appearance.opacity,
   });
@@ -2317,6 +2547,11 @@ function SharedAppearanceImpactDialog({
   const firstFill = draft.fills[0];
   const originalStroke = rule.appearance.stroke;
   const originalFill = rule.appearance.fills[0];
+  // Only a solid fill has one ink to review in an input; a gradient is reviewed as a whole.
+  const firstSolidFill = firstFill?.type === 'solid' ? firstFill : undefined;
+  const describeFill = (fill: AppearanceFill | undefined) => fill?.type === 'solid'
+    ? fill.color.toUpperCase()
+    : fill ? `${fill.type === 'linear' ? 'Linear' : 'Radial'} gradient · ${normalizeStops(fill.stops).length} stops` : '';
   const changes: Array<{ label: string; before: string; after: string }> = [];
   if (stroke && originalStroke && Math.abs(stroke.width - originalStroke.width) > 1e-9) {
     changes.push({ label: 'Stroke width', before: `${originalStroke.width}px`, after: `${stroke.width}px` });
@@ -2333,8 +2568,8 @@ function SharedAppearanceImpactDialog({
   if (stroke && originalStroke && stroke.alignment !== originalStroke.alignment) {
     changes.push({ label: 'Alignment', before: originalStroke.alignment, after: stroke.alignment });
   }
-  if (firstFill && originalFill && firstFill.color !== originalFill.color) {
-    changes.push({ label: 'Fill', before: originalFill.color.toUpperCase(), after: firstFill.color.toUpperCase() });
+  if (firstFill && originalFill && describeFill(firstFill) !== describeFill(originalFill)) {
+    changes.push({ label: 'Fill', before: describeFill(originalFill), after: describeFill(firstFill) });
   }
   if (Math.abs(draft.opacity - rule.appearance.opacity) > 1e-9) {
     changes.push({ label: 'Opacity', before: `${Math.round(rule.appearance.opacity * 100)}%`, after: `${Math.round(draft.opacity * 100)}%` });
@@ -2412,10 +2647,11 @@ function SharedAppearanceImpactDialog({
                 </label>
                 <div className="impact-color-grid">
                   <label><span>Stroke</span><input aria-label="Impact stroke color" type="color" value={stroke.color} onChange={(event) => updateStroke({ color: event.currentTarget.value })} /><code>{stroke.color.toUpperCase()}</code></label>
-                  {firstFill && <label><span>Fill</span><input aria-label="Impact fill color" type="color" value={firstFill.color} onChange={(event) => {
+                  {firstSolidFill && <label><span>Fill</span><input aria-label="Impact fill color" type="color" value={firstSolidFill.color} onChange={(event) => {
                     const color = event.currentTarget.value;
-                    setDraft((current) => ({ ...current, fills: [{ ...firstFill, color }, ...current.fills.slice(1)] }));
-                  }} /><code>{firstFill.color.toUpperCase()}</code></label>}
+                    setDraft((current) => ({ ...current, fills: [{ ...firstSolidFill, color }, ...current.fills.slice(1)] }));
+                  }} /><code>{firstSolidFill.color.toUpperCase()}</code></label>}
+                  {firstFill && !firstSolidFill && <p className="impact-note">This style's fill is {describeFill(firstFill).toLowerCase()}; detach and edit the gradient on the object to change it.</p>}
                 </div>
                 <div className="impact-select-grid">
                   <label><span>Cap</span><select aria-label="Impact stroke cap" value={stroke.cap} onChange={(event) => updateStroke({ cap: event.currentTarget.value as typeof stroke.cap })}><option value="butt">Butt</option><option value="round">Round</option><option value="square">Square</option></select></label>
@@ -2427,13 +2663,16 @@ function SharedAppearanceImpactDialog({
                 </fieldset>
               </>
             )}
-            {!stroke && firstFill && (
+            {!stroke && firstSolidFill && (
               <div className="impact-color-grid impact-fill-only">
-                <label><span>Fill</span><input aria-label="Impact fill color" type="color" value={firstFill.color} onChange={(event) => {
+                <label><span>Fill</span><input aria-label="Impact fill color" type="color" value={firstSolidFill.color} onChange={(event) => {
                   const color = event.currentTarget.value;
-                  setDraft((current) => ({ ...current, fills: [{ ...firstFill, color }, ...current.fills.slice(1)] }));
-                }} /><code>{firstFill.color.toUpperCase()}</code></label>
+                  setDraft((current) => ({ ...current, fills: [{ ...firstSolidFill, color }, ...current.fills.slice(1)] }));
+                }} /><code>{firstSolidFill.color.toUpperCase()}</code></label>
               </div>
+            )}
+            {!stroke && firstFill && !firstSolidFill && (
+              <p className="impact-note">This style's fill is {describeFill(firstFill).toLowerCase()}; detach and edit the gradient on the object to change it.</p>
             )}
             <label className="impact-number-field">
               <span>Opacity</span>
@@ -2545,7 +2784,11 @@ function MultiObjectInspector({
       return path?.isClosed && path.segmentIds.every((segmentId) => !document.getSegment(segmentId)?.widthProfile?.length);
     }));
   });
-  const fillColors = appearances.map((appearance) => appearance.fills[0]?.color).filter((value): value is string => Boolean(value));
+  // A gradient has no single ink, so a selection containing one reports "Mixed" rather than
+  // pretending its first stop is the fill.
+  const fillColors = appearances
+    .map((appearance) => (appearance.fills[0]?.type === 'solid' ? appearance.fills[0].color : undefined))
+    .filter((value): value is string => Boolean(value));
   const fillColor = fillColors.length === appearances.length && fillColors.every((value) => value === fillColors[0])
     ? fillColors[0]
     : undefined;

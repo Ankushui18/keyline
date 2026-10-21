@@ -356,11 +356,106 @@ the pointer, and joins the page-level canvas root when the pointer is outside ev
 (`prepareArtboardPlacement`). That behaviour predates this pass; it is pinned here because
 "general-purpose" is only true if drawing outside a 24 px box works.
 
-### 3.8 Typography and gradients are absent, not weak
+### 3.8 Gradient fills — done
 
-There is no text entity and no gradient fill type. These are feature projects, not
-interaction fixes, and they should be sequenced after the interaction layer —
-otherwise there is a sophisticated engine with nothing comfortable to draw with.
+Fills were solid-only, and the import path proved it: `paint()` returned `null` for any
+`url(#…)` paint, so a shape with a gradient fill imported with **no fill at all** — a silent
+data loss, which the project's second standing rule forbids. This section was written as the
+contract first, then implemented; it now describes what ships.
+
+**The model.** `AppearanceFill` becomes a discriminated union in `src/core/types.ts`:
+
+| Variant | Carried data | Notes |
+|---|---|---|
+| `solid` | `color` | unchanged; every existing document keeps working |
+| `linear` | `start`, `end`, `stops` | endpoints in **object-local** space |
+| `radial` | `center`, `radius`, `stops` | one circle, no focal point; focal points import as a warning |
+
+A stop is `{ offset, color, opacity }` with `offset` clamped to 0–1 and sorted on write.
+Every gradient carries at least two stops; `normalizeStops` is the only function that
+enforces that, so the renderer and the exporter can trust the invariant.
+
+**Coordinates are object-local, like nodes.** This is the one decision that makes the rest
+fall out: the canvas already paints fills inside the object's transform, so a local-space
+gradient needs no extra conversion to render, and exporting transforms the endpoints by the
+same source→document matrix the geometry uses — including parametric instances, which get
+their own matrix per occurrence. A gradient therefore moves, scales and rotates with its
+shape, and mirror/radial repeats carry it correctly instead of resetting it.
+
+Gradient placement uses the object's **anchor bounding box** (handles ignored) when a
+default is needed. That box never affects geometry; it only seeds new gradients and converts
+`objectBoundingBox` units on import.
+
+**Rendering.** `drawObjectFills` builds a `CanvasGradient` per fill through `fillPaint` in
+`src/canvas/renderer.ts`. Because the context is already in local space,
+`createLinearGradient(start, end)` and `createRadialGradient(center, radius)` need no
+transforms. Radial gradients under a non-uniform object scale become elliptical, exactly as
+SVG's own `objectBoundingBox` behaviour does — that is the model, not an approximation to fix
+later. A degenerate gradient (zero span or zero radius) falls back to its first stop instead
+of painting nothing. The WebGL preview path is flat-colour only, so it draws a gradient's
+first stop; the Canvas renderer is the default renderer and the one exports follow.
+
+**Export.** Each gradient fill becomes one `<linearGradient>` / `<radialGradient>` in
+`<defs>` with `gradientUnits="userSpaceOnUse"` and endpoints transformed into export space,
+referenced as `fill="url(#id)"`. Stop opacity is written as `stop-opacity`, and the fill's
+own opacity stays `fill-opacity`, so a translucent gradient survives the round trip.
+
+**Editing.** The Fill section of the inspector (`src/ui/PropertiesPanel.tsx`) gives every
+fill a **Solid / Linear / Radial** switch. Converting keeps what carries over: a solid's ink
+becomes both ends of the new gradient, and a gradient's first stop becomes the ink of a new
+solid. A new gradient is seeded from the object's anchor box, so it spans the shape the
+moment it exists. A gradient row keeps the eye, opacity and remove controls and adds:
+
+- an angle field for linear gradients, a radius field for radial ones (both commit on blur,
+  like every other numeric field in the panel);
+- one row per stop — colour well, hex field, position, stop opacity — plus add and remove;
+- remove is refused, with a reason, at the two-stop minimum.
+
+Every edit replaces the whole fill through `UPDATE_APPEARANCE`, so one edit is one history
+entry. Choosing a single colour for a gradient from the **multi-selection** swatch replaces
+the paint with a solid of that colour, which is what a colour well means; Undo restores the
+gradient.
+
+**Import, and the end of silent loss.** `parseSvgDocument` resolves `url(#…)` fills:
+
+- `linearGradient` and `radialGradient` in `<defs>` are read, including stop `offset`,
+  `stop-color`, `stop-opacity` and inheritance through `href`/`xlink:href`.
+- `gradientUnits="objectBoundingBox"` (the SVG default) is converted with the shape's own
+  box; `userSpaceOnUse` is taken as written.
+- `gradientTransform` is composed onto the endpoints, which is exact for a linear gradient.
+  A radial gradient keeps its centre and gets a geometric-mean radius; a transform that is
+  not a similarity (skew or non-uniform scale) is reported as approximate.
+- Anything that cannot be represented is **reported, not dropped**: a non-pad
+  `spreadMethod`, focal points, patterns, and filter/mask/clip-path on an element each
+  produce a structured warning with a code, a message and the element that caused it.
+- A reference that does not resolve — a missing id, or a pattern used as paint — imports as
+  **no fill plus a warning**. No colour is invented for it.
+- A fill on an open path is reported; only closed paths paint a fill.
+
+`SvgImportResult.warnings` is the contract: `{ code, message, element? }[]`. The import
+receipt names the first warning and counts the rest, and the Tidy dialog lists the count
+before the file is opened, so the user is told what the file contained that Keyline will not
+draw.
+
+**Refusals.** Region fills stay solid-only (they are topology-bound overrides, not object
+appearance). Strokes stay solid in this pass. A gradient on an open path paints nothing,
+because fills only apply to closed paths — and the import warns when it meets that case.
+
+**Tests.** `src/core/fills.test.ts` pins stop normalization, clone isolation and the
+operation-level write path; `src/canvas/renderer-fill.test.ts` pins the canvas paints;
+`src/export/svg-export.gradient.test.ts` pins the `<defs>` round trip, including a scaled
+occurrence and the icon-export flattening; `src/import/svg-import.gradients.test.ts` pins
+objectBoundingBox conversion, `userSpaceOnUse`, `href` inheritance and every warning code;
+`src/ui/PropertiesPanel.gradient.test.tsx` pins the inspector rows. The suite is **459 tests
+in 71 files** as of this section.
+
+### 3.9 Typography is absent, and why
+
+There is no text entity. Gradients landed in 3.8; text is the remaining half of roadmap
+step 4. Text is a feature project, not an interaction fix: it needs an entity type, glyph
+runs with their own hit-testing and editing model, and an SVG round trip. It should be
+sequenced after the interaction layer — otherwise there is a sophisticated engine with
+nothing comfortable to write with — and it needs its own contract section before any code.
 
 ---
 
@@ -387,7 +482,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
 | 3 | ~~General-purpose framing: frame presets beyond icon sizes, neutral empty state~~ (done, 3.7) | — |
-| 4 | Text and gradients (3.8) | typography and illustration, the two missing media |
+| 4 | ~~Gradients~~ (done, 3.8); text still absent (3.9) | — |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived

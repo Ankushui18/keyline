@@ -1,3 +1,4 @@
+import { cloneFills } from './fills';
 import { createEntityId } from './ids';
 import { validateSegmentGeometry, VectorDocument } from './document';
 import { assertValidParametricGroup } from './parametric';
@@ -1272,7 +1273,7 @@ export class OperationManager {
           ...current,
           ...updates,
           id: appearanceId,
-          fills: updates.fills ? updates.fills.map((fill) => ({ ...fill })) : current.fills.map((fill) => ({ ...fill })),
+          fills: updates.fills ? cloneFills(updates.fills) : cloneFills(current.fills),
           stroke: updates.stroke
             ? { ...updates.stroke, dash: [...updates.stroke.dash] }
             : current.stroke
@@ -1954,7 +1955,7 @@ function cloneObject(object: NetworkObject): NetworkObject {
 function cloneAppearance(appearance: Appearance): Appearance {
   return {
     ...appearance,
-    fills: appearance.fills.map((fill) => ({ ...fill })),
+    fills: cloneFills(appearance.fills),
     stroke: appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined,
   };
 }
@@ -1963,7 +1964,7 @@ function cloneAppearanceRule(rule: AppearanceRule): AppearanceRule {
   return {
     ...rule,
     appearance: {
-      fills: rule.appearance.fills.map((fill) => ({ ...fill })),
+      fills: cloneFills(rule.appearance.fills),
       stroke: rule.appearance.stroke
         ? { ...rule.appearance.stroke, dash: [...rule.appearance.stroke.dash] }
         : undefined,

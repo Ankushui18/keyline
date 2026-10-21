@@ -2,6 +2,7 @@ import type { VectorDocument } from '../core/document';
 import { arcSweep } from '../core/geometry';
 import { parametricGroupsForRegion, parametricInstanceMatrices } from '../core/parametric';
 import { regionBoundaryLoops } from '../core/region-geometry';
+import { normalizeStops, transformedGradientPoints } from '../core/fills';
 import { isArtworkFillPath } from '../core/segment-semantics';
 import {
   IDENTITY_MATRIX,
@@ -12,7 +13,7 @@ import {
   transformPoint,
   type Matrix2D,
 } from '../core/transforms';
-import type { EntityId, Point, Region, Segment } from '../core/types';
+import type { AppearanceFill, EntityId, Point, Region, Segment } from '../core/types';
 import { sampleWidthProfile } from '../tools/width-tool';
 import {
   DEFAULT_STROKE_COLOR,
@@ -150,6 +151,26 @@ export function exportDocumentToSvg(document: VectorDocument, options: SvgExport
       }
     }
   }
+  /**
+   * A gradient becomes one `<defs>` entry, in export space, referenced by `url(#id)`.
+   * Endpoints are stored object-local, so the occurrence's source→document matrix — the
+   * same one the geometry uses — is what turns them into export coordinates. That is why
+   * parametric instances carry their gradient instead of resetting it.
+   */
+  const paintReference = (fill: AppearanceFill, matrix?: Matrix2D): string => {
+    if (fill.type === 'solid') return fill.color;
+    const points = transformedGradientPoints(fill, matrix ?? IDENTITY_MATRIX);
+    const stops = normalizeStops(fill.stops).map((stop) => {
+      const stopOpacity = stop.opacity < 1 ? ` stop-opacity="${format(stop.opacity)}"` : '';
+      return `<stop offset="${format(stop.offset)}" stop-color="${escapeAttribute(stop.color)}"${stopOpacity}/>`;
+    }).join('');
+    const id = `fill-${++resourceId}`;
+    definitions.push(fill.type === 'linear' && points.start && points.end
+      ? `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${format(points.start.x)}" y1="${format(points.start.y)}" x2="${format(points.end.x)}" y2="${format(points.end.y)}">${stops}</linearGradient>`
+      : `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${format(points.center?.x ?? 0)}" cy="${format(points.center?.y ?? 0)}" r="${format(points.radius ?? 1)}">${stops}</radialGradient>`);
+    return `url(#${id})`;
+  };
+
   for (const object of document.objectsForArtboard(artboard.id)) {
     const appearance = document.getAppearance(object.appearanceId);
     const fills = appearance?.fills.filter((fill) => fill.visible && fill.opacity > 0) ?? [];
@@ -168,7 +189,13 @@ export function exportDocumentToSvg(document: VectorDocument, options: SvgExport
           const opacity = appearance.opacity * fill.opacity;
           const opacityAttribute = opacity < 1 ? ` fill-opacity="${format(opacity)}"` : '';
           const objectAttribute = includeMetadata ? ` data-object-id="${escapeAttribute(object.id)}"` : '';
-          body.push(`<path d="${data}" fill="${escapeAttribute(options.fillColor ?? fill.color)}"${opacityAttribute}${objectAttribute}/>`);
+          if (options.fillColor) {
+            // An explicit override (icon export) flattens every fill to one ink on purpose.
+            body.push(`<path d="${data}" fill="${escapeAttribute(options.fillColor)}"${opacityAttribute}${objectAttribute}/>`);
+            continue;
+          }
+          const paint = paintReference(fill, items[0].transform);
+          body.push(`<path d="${data}" fill="${escapeAttribute(paint)}"${opacityAttribute}${objectAttribute}/>`);
         }
       }
     }

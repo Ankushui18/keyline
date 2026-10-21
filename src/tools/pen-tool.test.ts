@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { VectorDocument } from '../core/document';
+import { fillColor } from '../core/fills';
 import { OperationManager } from '../core/operations';
 import { prepareSplitAtPoint } from './cut-tool';
 import { PenTool } from './pen-tool';
@@ -238,7 +239,8 @@ describe('PenTool', () => {
     expect(document.getAppearance(object!.appearanceId)?.stroke).toMatchObject({
       color: '#00ff00', width: 7, cap: 'square', join: 'bevel', alignment: 'inside', visible: true,
     });
-    expect(document.getAppearance(object!.appearanceId)?.fills[0]?.color).toBe('#112233');
+    // The fill model is a union now, so the test asserts through the shared accessor.
+    expect(fillColor(document.getAppearance(object!.appearanceId)!.fills[0])).toBe('#112233');
 
     pen.setDrawingStyle({
       strokeEnabled: false, strokeColor: '#00ff00', strokeWidth: 7, strokeCap: 'square', strokeJoin: 'bevel',

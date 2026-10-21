@@ -27,6 +27,7 @@ import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
 import { canEditObject, editableInspectorObjects } from './app/inspector-actions';
 import { FRAME_PRESETS, framePreset, framePresetSize, isIconPreset } from './core/frame-presets';
+import { cloneFills, fillColor } from './core/fills';
 
 /** The starts the in-canvas overlay offers outside the icon workflow. */
 const GENERAL_START_PRESETS = FRAME_PRESETS.filter((preset) => ['web-1440', 'social-square', 'device-phone'].includes(preset.id));
@@ -1153,9 +1154,15 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       if (documentNameRef.current === DEFAULT_DOCUMENT_NAME) renameDocument(sourceName.replace(/\.svg$/i, '') || DEFAULT_DOCUMENT_NAME);
       void persistence.flush().then(() => markStoredDocumentImported(document.id));
       const skipped = imported.skippedElementCount > 0 ? ` ${imported.skippedElementCount} unsupported elements were skipped.` : '';
+      // Import never loses a feature silently: the first warning is named, the rest counted.
+      const warningCount = imported.warnings?.length ?? 0;
+      const warned = warningCount > 0
+        ? ` ${warningCount} unsupported SVG ${warningCount === 1 ? 'feature' : 'features'} reported: ${imported.warnings[0].message}${warningCount > 1 ? ` (+${warningCount - 1} more)` : ''}`
+        : '';
+      if (warningCount > 0) console.warn('SVG import warnings', imported.warnings);
       announce(imported.importedElementCount > 0
-        ? `Imported ${imported.importedElementCount} editable ${imported.importedElementCount === 1 ? 'shape' : 'shapes'} from ${sourceName}.${skipped}`
-        : `Created a frame from ${sourceName}, but no supported SVG paths or shapes were found.${skipped}`,
+        ? `Imported ${imported.importedElementCount} editable ${imported.importedElementCount === 1 ? 'shape' : 'shapes'} from ${sourceName}.${skipped}${warned}`
+        : `Created a frame from ${sourceName}, but no supported SVG paths or shapes were found.${skipped}${warned}`,
       );
     } catch (error) {
       manager.rollbackTransaction();
@@ -1730,7 +1737,8 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       strokeCap: stroke?.cap,
       strokeJoin: stroke?.join,
       strokeColor: stroke?.color,
-      fillColor: appearance.fills.find((fill) => fill.visible)?.color,
+      // A gradient has no single colour; the quick-edit surface reports its first stop.
+      fillColor: (() => { const fill = appearance.fills.find((item) => item.visible); return fill ? fillColor(fill) : undefined; })(),
     }];
   }), [document, editTargetIds, revision]);
   const applyQuickEdit = useCallback((plan: QuickEditPlan) => {
@@ -2536,7 +2544,7 @@ function appearanceRuleValue(appearance: Appearance): AppearanceRule['appearance
 
 function cloneRuleAppearance(appearance: AppearanceRule['appearance']): AppearanceRule['appearance'] {
   return {
-    fills: appearance.fills.map((fill) => ({ ...fill })),
+    fills: cloneFills(appearance.fills),
     stroke: appearance.stroke ? { ...appearance.stroke, dash: [...appearance.stroke.dash] } : undefined,
     opacity: appearance.opacity,
   };
@@ -2548,8 +2556,8 @@ function mergeAppearance(appearance: Appearance, updates: Partial<Appearance>): 
     ...updates,
     id: appearance.id,
     fills: updates.fills
-      ? updates.fills.map((fill) => ({ ...fill }))
-      : appearance.fills.map((fill) => ({ ...fill })),
+      ? cloneFills(updates.fills)
+      : cloneFills(appearance.fills),
     stroke: updates.stroke
       ? { ...updates.stroke, dash: [...updates.stroke.dash] }
       : appearance.stroke
@@ -2581,13 +2589,22 @@ function applyAppearanceUpdates(
   if (updates.strokeCap !== undefined && stroke) stroke.cap = updates.strokeCap;
   if (updates.strokeJoin !== undefined && stroke) stroke.join = updates.strokeJoin;
   if (updates.strokeColor !== undefined && stroke) stroke.color = updates.strokeColor;
+  const firstFill = appearance.fills[0];
+  const rest = cloneFills(appearance.fills.slice(1));
+  // Picking one colour for a gradient replaces the paint rather than editing one stop:
+  // the swatch means "this fill is this ink", and the change is one Undo away.
   const fills = updates.fillRemoved
     ? []
     : updates.fillColor
-    ? appearance.fills.length > 0
-      ? [{ ...appearance.fills[0], color: updates.fillColor }, ...appearance.fills.slice(1).map((fill) => ({ ...fill }))]
-      : [{ type: 'solid' as const, color: updates.fillColor, opacity: 1, visible: true }]
-    : appearance.fills.map((fill) => ({ ...fill }));
+      ? firstFill
+        ? [
+          firstFill.type === 'solid'
+            ? { ...firstFill, color: updates.fillColor }
+            : { type: 'solid' as const, color: updates.fillColor, opacity: firstFill.opacity, visible: firstFill.visible },
+          ...rest,
+        ]
+        : [{ type: 'solid' as const, color: updates.fillColor, opacity: 1, visible: true }]
+      : cloneFills(appearance.fills);
   return {
     id: appearance.id,
     fills,

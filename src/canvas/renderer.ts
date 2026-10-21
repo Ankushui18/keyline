@@ -13,6 +13,7 @@ import {
 import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
+import { fillColor, normalizeStops } from '../core/fills';
 import { INTERACTION_BOUNDS_POLICY, objectBounds, type GeometryBounds } from '../core/object-geometry';
 import { axisAlignedFrame, frameHandlePoints, framePoint, objectFrame, type SelectionFrame } from '../core/object-resize';
 import {
@@ -29,7 +30,7 @@ import {
   transformPoint,
   type Matrix2D,
 } from '../core/transforms';
-import type { ConstructionExtent, Constraint, EntityId, Point, Region, Segment, SelectionState } from '../core/types';
+import type { AppearanceFill, ConstructionExtent, Constraint, EntityId, Point, Region, Segment, SelectionState } from '../core/types';
 import type { Viewport } from './viewport';
 import type { PrimitiveKind } from '../tools/primitive-tool';
 import type { SnapResult } from '../tools/snapping';
@@ -758,6 +759,36 @@ function activePageObjects(document: VectorDocument) {
   return document.activePage.artboardIds.flatMap((artboardId) => document.objectsForArtboard(artboardId));
 }
 
+/**
+ * One fill as a canvas paint. Gradients are built in local space; a degenerate gradient
+ * (zero span or radius) falls back to its first stop instead of painting nothing.
+ * Exported so the paint construction can be tested without a real canvas.
+ */
+export function fillPaint(context: CanvasRenderingContext2D, fill: AppearanceFill): string | CanvasGradient | undefined {
+  if (fill.type === 'solid') return fill.color;
+  const stops = normalizeStops(fill.stops);
+  let gradient: CanvasGradient;
+  if (fill.type === 'linear') {
+    if (Math.hypot(fill.end.x - fill.start.x, fill.end.y - fill.start.y) < 1e-9) return undefined;
+    gradient = context.createLinearGradient(fill.start.x, fill.start.y, fill.end.x, fill.end.y);
+  } else {
+    if (!(fill.radius > 1e-9)) return undefined;
+    gradient = context.createRadialGradient(fill.center.x, fill.center.y, 0, fill.center.x, fill.center.y, fill.radius);
+  }
+  for (const stop of stops) {
+    gradient.addColorStop(stop.offset, withStopOpacity(stop.color, stop.opacity));
+  }
+  return gradient;
+}
+
+function withStopOpacity(color: string, opacity: number): string {
+  if (opacity >= 1) return color;
+  const match = /^#([0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return color;
+  const value = Number.parseInt(match[1], 16);
+  return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${Number(opacity.toFixed(3))})`;
+}
+
 function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocument): void {
   for (const object of activePageObjects(document)) {
     const appearance = document.getAppearance(object.appearanceId);
@@ -795,7 +826,9 @@ function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocu
         context.closePath();
         for (const fill of fills) {
           context.globalAlpha = appearance.opacity * fill.opacity;
-          context.fillStyle = fill.color;
+          // The context is already in the object's local space, which is the space the
+          // gradient's endpoints are stored in, so no extra transform is needed here.
+          context.fillStyle = fillPaint(context, fill) ?? fillColor(fill);
           context.fill('nonzero');
         }
       }

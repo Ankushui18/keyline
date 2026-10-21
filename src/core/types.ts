@@ -166,12 +166,42 @@ export interface FillStyle {
 export type FillRule = 'nonzero' | 'evenodd';
 
 /** Persistent, object-level appearance. Region fills remain stable topology-bound overrides. */
-export interface AppearanceFill {
+/** One colour stop. `offset` is 0–1 along the gradient; `opacity` is 0–1. */
+export interface GradientStop {
+  offset: number;
+  color: string;
+  opacity: number;
+}
+
+export interface SolidFill {
   type: 'solid';
   color: string;
   opacity: number;
   visible: boolean;
 }
+
+/** Endpoints are object-local, like node positions, so a gradient follows its shape. */
+export interface LinearGradientFill {
+  type: 'linear';
+  start: Point;
+  end: Point;
+  stops: GradientStop[];
+  opacity: number;
+  visible: boolean;
+}
+
+/** A single circle; focal points are not represented and are reported on import. */
+export interface RadialGradientFill {
+  type: 'radial';
+  center: Point;
+  radius: number;
+  stops: GradientStop[];
+  opacity: number;
+  visible: boolean;
+}
+
+export type AppearanceFill = SolidFill | LinearGradientFill | RadialGradientFill;
+export type GradientFill = LinearGradientFill | RadialGradientFill;
 
 export interface StrokeStyle {
   color: string;

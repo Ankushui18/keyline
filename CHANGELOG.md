@@ -7,6 +7,26 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- **Gradient fills.** An object fill can now be a solid, a linear gradient or a radial gradient.
+  `AppearanceFill` is a discriminated union in `src/core/types.ts`; gradient endpoints are stored
+  **object-local**, the same space as nodes, so a gradient moves, scales and rotates with its
+  shape and appears on every occurrence of a parametric repeat without extra work. Stops
+  (`offset`, `color`, `opacity`) are sorted and clamped by `normalizeStops`, every clone goes
+  through `cloneFill`/`cloneFills` so a copy cannot share a stops array, and a gradient can never
+  have fewer than two stops. The Design panel's fill row gains a Solid/Linear/Radial switch, an
+  angle or radius field, and a stop editor; the Canvas renderer builds a real `CanvasGradient`;
+  SVG export writes `<linearGradient>`/`<radialGradient>` in `<defs>` with
+  `gradientUnits="userSpaceOnUse"`, `stop-opacity` per stop and a matching `fill="url(#…)"`, so
+  the round trip keeps the gradient.
+- **SVG import reports what it cannot draw, instead of losing it silently.** `url(#…)` fills now
+  resolve against `linearGradient`/`radialGradient` definitions, including `href`/`xlink:href`
+  inheritance and `objectBoundingBox` units converted with the shape's own box.
+  `gradientTransform` is composed onto the endpoints. Everything the model cannot express — a
+  pattern fill, a missing gradient id, a non-pad `spreadMethod`, a radial focal point, a skewed
+  gradient transform, a filter, mask or clip path on an element, a fill on an open path —
+  produces a structured `SvgImportResult.warnings` entry (`{ code, message, element? }`). The
+  import receipt names the first warning and counts the rest, and the tidy dialog shows the
+  count before the file opens.
 - **Frame presets for real work, not just icons.** The New frame menu is now grouped — Interface
   (24/32/48), Web (1440 × 1024, 1280 × 800), Device (390 × 844, 768 × 1024), Social (1080 × 1080,
   1200 × 630), Print (A4 and US Letter at 96 dpi, stated as such) and Artwork (1000 × 1000,

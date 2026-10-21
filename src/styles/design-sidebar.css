@@ -243,3 +243,24 @@
 .reference-design .stroke-alignment-control button[aria-pressed='true'] { color: var(--text-on-bright); background: var(--accent); border-color: var(--di-accent); }
 .reference-sidebar .lp-row.is-selected .lp-meta, .reference-sidebar .lp-row.is-selected.is-hidden .lp-name { color: var(--di-muted); }
 .reference-sidebar .lp-selection-bar > span:first-child { flex: 0 0 auto; white-space: nowrap; }
+
+/* Gradient fills (docs/EDITING-AUDIT.md §3.8) ------------------------------ */
+.reference-design .paint-fill-block + .paint-fill-block { margin-top: var(--space-2); }
+.reference-design .paint-value-group.has-type { grid-template-columns: 54px 18px minmax(30px, 1fr) 51px; }
+.reference-design .paint-gradient-row .paint-value-group { grid-template-columns: 54px 18px 51px; }
+.reference-design .paint-type { min-width: 0; width: 100%; height: 22px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--di-text); font-family: inherit; font-size: var(--font-size-xs); font-weight: 500; outline: 0; cursor: pointer; }
+.reference-design .paint-type:focus-visible { outline: 0; box-shadow: none; border-bottom: 1px solid var(--di-accent); }
+.reference-design .paint-gradient-preview { cursor: default; }
+.reference-design .paint-gradient-preview span { background-clip: padding-box; }
+.reference-design .paint-gradient-geometry { display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-1); padding-left: var(--space-1); }
+.reference-design .paint-gradient-field { display: flex; align-items: center; gap: var(--space-1); min-width: 0; color: var(--di-muted); font-size: var(--font-size-xs); }
+.reference-design .paint-gradient-field .paint-opacity { border-left: 0; padding-left: 0; }
+.reference-design .paint-gradient-stops-head { margin-left: auto; color: var(--di-muted); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
+.reference-design .paint-add-stop { display: grid; place-items: center; width: 22px; min-width: 22px; height: var(--control-height-sm); padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--di-text); }
+.reference-design .paint-add-stop:hover { background: var(--di-hover); color: var(--text-inverse); }
+.reference-design .paint-gradient-stops { margin-top: var(--space-1); padding-left: var(--space-2); border-left: 1px solid var(--di-divider); }
+.reference-design .paint-stop-row { display: grid; grid-template-columns: 18px minmax(30px, 1fr) 44px 44px 22px; align-items: center; gap: var(--space-1); height: 26px; }
+.reference-design .paint-stop-row .paint-opacity { justify-content: flex-start; }
+.reference-design .paint-stop-row .icon-button { display: grid; place-items: center; width: 22px; min-width: 22px; height: var(--control-height-sm); padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--di-text); }
+.reference-design .paint-stop-row .icon-button:hover:not(:disabled) { background: var(--di-hover); color: var(--text-inverse); }
+.reference-design .paint-stop-row .icon-button:disabled { opacity: .4; cursor: not-allowed; }

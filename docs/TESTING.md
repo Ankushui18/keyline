@@ -2,7 +2,7 @@
 
 What is verified, how to run it, and what the suites do **not** prove.
 
-Current suite: **421 tests across 66 test files**, plus a real Wasm smoke test, nine WebSocket
+Current suite: **459 tests across 71 test files**, plus a real Wasm smoke test, nine WebSocket
 integration checks, Rust unit tests, and optional browser suites.
 
 - [Run everything](#run-everything)
@@ -115,6 +115,7 @@ touching the document.
 | `export/code-export.test.ts` | React/CSS generation, hostile values, name collisions, bounded props. |
 | `export/delivery-export.test.ts` | Naming patterns, collisions, presets, ZIP planning. |
 | `import/svg-import.test.ts` | Path parsing, transforms, style extraction. |
+| `import/svg-import.gradients.test.ts` | `url(#…)` fills: objectBoundingBox conversion, `userSpaceOnUse`, `href` inheritance, and every warning code (pattern, missing id, spread, focal, skew, filter, open path). |
 
 ### Collaboration and UI helpers
 
@@ -127,6 +128,10 @@ touching the document.
 | `core/numeric-expression.test.ts` | Numeric field expressions. |
 | `ui/contrast-color.test.ts` | Accessible avatar/text colour selection. |
 | `ui/PropertiesPanel.states.test.tsx` | Every disabled inspector control carries a reason, rendered in three selection states. |
+| `ui/PropertiesPanel.gradient.test.tsx` | The fill type switch, stops and angle/radius rows, and the two-stop minimum, rendered from a static inspector. |
+| `core/fills.test.ts` | Gradient model: stop normalization, clone isolation, the operation-level write path, object-local geometry and preview CSS. |
+| `canvas/renderer-fill.test.ts` | The canvas paints a linear and a radial gradient in local space and refuses a degenerate one. |
+| `export/svg-export.gradient.test.ts` | Gradient `<defs>` round trip, scaled occurrences, and icon-export flattening. |
 | `ui/panel-controls.test.tsx` | Every **enabled** inspector and tool control reaches the document or its callback, across nine states (jsdom). |
 | `core/frame-presets.test.ts` | One frame-preset list: groups, preset naming, duplicate numbering, and drawing outside every frame. |
 | `ui/Toolbar.frame-menu.test.tsx` | Every preset reaches the frame menu, in its group, creating the frame it promises (jsdom). |
