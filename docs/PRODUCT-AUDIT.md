@@ -150,12 +150,13 @@ Ordered by dependency and by what a designer would feel first — not by how int
 | 2 | ~~Hover affordance (object/segment preview before clicking)~~ (done in this pass) | — | — |
 | 3 | ~~Text objects (entity, SVG round trip)~~ (slice 1, §3.9) · ~~on-canvas caret~~ (slice 2, §3.10); wrapping and rich runs remain | Still the largest gap for real typographic work | L |
 | 4 | ~~Gradient fills~~ (done, `docs/EDITING-AUDIT.md` §3.8) | — | — |
-| 5 | Command palette over existing operations | Makes 67 operations discoverable without a wider toolbar | M |
-| 6 | General boolean ops and compound paths | "Complete vector editor" claims need them; region ops only partly cover | L |
-| 7 | ~~Import warnings for skipped SVG features (mask, clip, gradient, filter)~~ (done, §3.8) | — | — |
-| 8 | Continuous autosave | Local-first promise is only half kept today | M |
-| 9 | Reference-document performance measurement | The 60 FPS and large-document claims are currently unverified | M |
-| 10 | AI operation plans through the existing validator (`core/quick-edit.ts` seed) | Everything above must be stable before generated geometry can be trusted | L |
+| 5 | Style memory: remembered defaults (§3.11), then named kits and a style painter | The product promise is that the tool remembers a style; today a corner radius and a text style silently reset between sessions | M |
+| 6 | Command palette over existing operations | Makes 67 operations discoverable without a wider toolbar | M |
+| 7 | General boolean ops and compound paths | "Complete vector editor" claims need them; region ops only partly cover | L |
+| 8 | ~~Import warnings for skipped SVG features (mask, clip, gradient, filter)~~ (done, §3.8) | — | — |
+| 9 | Continuous autosave | Local-first promise is only half kept today | M |
+| 10 | Reference-document performance measurement | The 60 FPS and large-document claims are currently unverified | M |
+| 11 | AI operation plans through the existing validator (`core/quick-edit.ts` seed) | Everything above must be stable before generated geometry can be trusted | L |
 
 ## 5. What to protect while closing those gaps
 

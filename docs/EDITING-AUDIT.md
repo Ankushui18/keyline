@@ -615,6 +615,102 @@ own contract before code.
 
 ---
 
+### 3.11 Style memory — remembered defaults, slice 1
+
+"The tool remembers your style" is only a real promise if it is a promise about **defaults**:
+what the next rectangle, path and text object look like before you touch anything. That is a
+deterministic, testable problem, and this section is its contract. Nothing here is learned,
+inferred or guessed, and nothing here needs a model.
+
+**What is already remembered, and what is not.** An inventory taken from the code, not from
+memory:
+
+| Default | Remembered today | Where |
+|---|---|---|
+| Stroke colour, width, cap, join, alignment | **yes** | `vector-studio-drawing-style` preference, read by pen, pencil, brush and every primitive |
+| Fill on/off and fill colour for new shapes | **yes** | same preference (`fillEnabled`, `fillColor`) |
+| Corner radius, polygon sides, star points, inner ratio | **no** | plain `useState` in `App.tsx`; every reload returns 16 / 6 / 5 / 0.48 |
+| Style of the next text object | **no** | `prepareTextObject` is always called with `DEFAULT_TEXT` |
+| The Paint tool's ink | **no** | `paintColor` is state seeded from `DEFAULT_FILL_COLOR` |
+
+So the gap is not a new concept; it is three specific values that silently reset. Slice 1 closes
+exactly those.
+
+**One record, one writer.** `src/core/style-memory.ts` owns a versioned record:
+
+```ts
+export interface PrimitiveDefaults {
+  cornerRadius: number;
+  polygonSides: number;
+  starPoints: number;
+  starInnerRatio: number;
+}
+
+export interface StyleMemory {
+  version: 1;
+  /** Existing type, existing normalizer: stroke/fill for the next shape or path. */
+  drawing: DrawingStyle;
+  primitives: PrimitiveDefaults;
+  /** Style only. `content` is never written to or read from memory. */
+  text: Pick<TextContent, 'family' | 'weight' | 'size' | 'lineHeight' | 'align'>;
+  /** Recent inks, most recent first, capped at 8. */
+  palette: string[];
+}
+
+export function readStyleMemory(): StyleMemory;
+export function rememberStyle(patch: Partial<Omit<StyleMemory, 'version'>>): StyleMemory;
+export function resetStyleMemory(): StyleMemory;
+export const DEFAULT_STYLE_MEMORY: StyleMemory;
+```
+
+**Normalization rules, reused rather than re-invented.** `drawing` goes through the existing
+`normalizeDrawingStyle`. Numbers are clamped by the same bounds the tools already enforce —
+corner radius `0 … 512`, polygon sides `3 … 24`, star points `3 … 24`, inner ratio `0.05 … 0.95`
+— so a hand-edited or corrupt record cannot produce a shape the tool could not otherwise draw. A
+colour that is not `#rrggbb` falls back to the document default, exactly as
+`normalizeDrawingStyle` already does. `text.content` and any other unknown key are dropped, so a
+record edited by hand cannot smuggle content into someone's next text object.
+
+**Storage is `localStorage`, not IndexedDB, and never the document.** The record is chrome state
+measured in hundreds of bytes. It is read through the existing `readPreference` /
+`writePreference` pair, which already degrades to an in-memory map when storage is denied, so a
+blocked or full store cannot stop anyone drawing. It is deliberately **not** in IndexedDB: that
+database holds user files, it would need a schema version bump and an async load path for
+data this small, and a brand kit sitting in the same store as artwork is the wrong shape of
+thing. It is also **not** in `.keyline.json` — a preset must never ride along inside a shared
+file, both for privacy and because a document that repaints itself on open is a surprise, not a
+feature.
+
+**What "remembered" means, precisely.** A value is written when the person **commits** it: a
+stroke width in the dialog, a corner radius in the inspector, a text style on an object they
+just set. Not while a slider is dragged — remembering a value the user abandoned with `Escape`
+is worse than not remembering, and it would fill the store on every pointer move.
+
+**Migration.** `vector-studio-drawing-style` is the current key and stays readable. On first run
+with the new code, an absent `style-memory` record is seeded from that key, and the old key stops
+being written. A downgraded build would read a stale drawing style; that is stated here rather
+than hidden, and it costs a colour, not artwork.
+
+**The only way to lose a value is to ask.** `resetStyleMemory()` writes the defaults back
+explicitly and is reachable from Settings; nothing in the app clears the record implicitly.
+
+**How this slice is verified.** `src/core/style-memory.ts` is pure and DOM-free, so all of it is
+testable in Node: empty store yields the defaults; every clamped field rejects `NaN`, `0`,
+negative and oversized input; a malformed colour falls back; `content` never round-trips;
+`rememberStyle` is a whole-record round trip; `resetStyleMemory` restores the defaults; and the
+existing tools receive the remembered values (a primitive plan built from memory uses the
+remembered radius). The storage path is exercised through an injected storage shim, including
+the denied-storage path that must still return usable defaults.
+
+**Refusals, stated so the slice stays small.** No cloud sync, no per-family or per-artboard
+presets, no automatic inference of a style from existing artwork ("guess my brand from this
+file" is unverifiable and would quietly repaint work), no presets inside documents, and no model
+of any kind. Named brand kits and a style painter are slice 2 of this idea and get their own
+section; they need an *apply* plan that goes through the same operations as every other edit,
+which is a different problem from remembering a default.
+
+---
+
 ## 4. What to protect while doing this
 
 1. **The operation boundary.** UI must keep calling `manager.execute(...)`; no
@@ -638,11 +734,24 @@ own contract before code.
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
 | 3 | ~~General-purpose framing: frame presets beyond icon sizes, neutral empty state~~ (done, 3.7) | — |
-| 4 | ~~Gradients~~ (done, 3.8) · ~~Text, slice 1~~ (done, 3.9) · ~~On-canvas text editing~~ (done, 3.10); wrapping and rich runs next | — |
-| 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
+| 4 | ~~Gradients~~ (done, 3.8) · ~~Text, slice 1~~ (done, 3.9) · ~~On-canvas text editing~~ (done, 3.10); wrapping and rich runs need their own contract | — |
+| 5 | **Style memory, slice 1** — remembered defaults (3.11) | the tool stops forgetting a corner radius or a text style between sessions |
+| 6 | Style memory, slice 2 — named kits and a style painter | consistency across a set of logos or illustrations; needs an apply plan |
+| 7 | Clipping masks, then blend modes | illustration containment and shading; both change the schema, the renderer, export and hit testing |
+| 8 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived
 quality gain, and it needs no new model concepts.
+
+**Why masks and blend modes rank above freeform (mesh) gradients.** The first two have an honest
+export target: a clip is `<clipPath>` in SVG and `context.clip()` on Canvas 2D, a blend mode is
+`mix-blend-mode` and `globalCompositeOperation`. A mesh gradient has no such target — SVG 2's
+`<meshgradient>` is not implemented by browsers, Illustrator or most consumers — so exporting one
+means either dropping it or rasterising the object, and this project does not drop paint
+silently. That is a fidelity decision, not an implementation detail, and it needs its own section
+before any code. Step 7 is therefore ordered masks → blend modes → (only then) a decision on
+mesh gradients, with the WebGL preview falling back to Canvas 2D for documents that use either
+new feature, exactly as text already does.
 
 ---
 
