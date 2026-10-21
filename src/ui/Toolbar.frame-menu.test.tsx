@@ -12,6 +12,7 @@ import { Toolbar } from './Toolbar';
  */
 function renderToolbar() {
   const onAddFrame = vi.fn();
+  const onAddText = vi.fn();
   const noop = () => {};
   const toolbar = render(createElement(Toolbar, {
     canUndo: false, canRedo: false, documentName: 'Untitled', onRenameDocument: noop,
@@ -19,13 +20,24 @@ function renderToolbar() {
     solverStatus: 'ready', collaborationStatus: null, collaborators: [],
     onHome: noop, onShare: noop, onOpenSettings: noop, onOpenCommand: noop,
     onOpenMotion: noop, onOpenCheck: noop, onOpenSet: noop,
-    onAddFrame, onToggleConstraints: noop, onExport: noop, onUndo: noop, onRedo: noop,
+    onAddFrame, onAddText, onToggleConstraints: noop, onExport: noop, onUndo: noop, onRedo: noop,
   } as never));
   fireEvent.click(toolbar.getByLabelText('More'));
-  return { ...toolbar, onAddFrame };
+  return { ...toolbar, onAddFrame, onAddText };
 }
 
 describe('frame menu', () => {
+  it('offers Add text and calls back once, closing the menu', () => {
+    const { container, getByLabelText, unmount, onAddText } = renderToolbar();
+    const item = container.querySelector('button[aria-label="Add text"]') as HTMLButtonElement;
+    expect(item).toBeTruthy();
+    fireEvent.click(item);
+    expect(onAddText).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.topbar-more-menu')).toBeNull();
+    expect(getByLabelText('More').getAttribute('aria-expanded')).toBe('false');
+    unmount();
+  });
+
   it('lists every preset from the shared list, grouped, with its size', () => {
     const { container, unmount } = renderToolbar();
     for (const preset of FRAME_PRESETS) {

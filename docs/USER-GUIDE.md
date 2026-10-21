@@ -10,6 +10,7 @@ Everything you can do in Keyline, from the first icon to a delivered set.
 - [The Design inspector](#the-design-inspector)
 - [Constraints](#constraints)
 - [Fills, regions and stroke widths](#fills-regions-and-stroke-widths)
+- [Text](#text)
 - [Parametric groups](#parametric-groups)
 - [The icon-set view and consistency check](#the-icon-set-view-and-consistency-check)
 - [Families and QA](#families-and-qa)
@@ -260,6 +261,29 @@ Every object fill has a **Solid / Linear / Radial** switch in the Design panel.
   gradient with that solid colour; Undo brings it back.
 - Region fills and strokes are still solid in this release. A radial gradient on a
   non-uniformly scaled object is drawn as an ellipse, as SVG does.
+
+---
+
+## Text
+
+Add text from **More → Add text** (or the command palette, `⌘K`). The object appears at the
+centre of the active frame and is selected, so the Design panel's **Text** section is ready.
+
+- **Content** is a plain field: `Return` starts a new line. Text never wraps; the box is as wide
+  as its longest line.
+- **Family** — Sans, Serif or Mono, mapped to the fonts listed in `src/core/text.ts`.
+- **Weight** — Regular, Medium, Semibold or Bold.
+- **Size** and **line height** are numbers; alignment is left, centre or right.
+- Every edit is one undoable step, and the panel shows the measured box ("2 lines · 120 × 60 px").
+- Text is an ordinary object: it selects from its box, moves, rotates and scales with the same
+  handles as everything else, sits in the Layers list under its own words, and can be duplicated.
+- Text fills take **solid or gradient** colour like any other fill. A stroke on text is not drawn
+  in this release.
+- SVG export writes a real `<text>` element with one `<tspan>` per line, and importing one brings
+  it back as editable text.
+- Not in this release: a text tool, an on-canvas caret or selection inside the text, wrapping,
+  several styles inside one object, custom fonts, and text on a path. Importing a file that uses
+  those reports each one in the import receipt.
 
 ---
 

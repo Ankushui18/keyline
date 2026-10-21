@@ -286,7 +286,11 @@ export function VectorCanvas({
     if (!context) return;
     const rect = canvas.getBoundingClientRect();
     let webglRendered = false;
-    if (rendererMode === 'webgl' && webglCanvasRef.current) {
+    // The WebGL preview has no glyph atlas, so a document containing text draws on Canvas 2D
+    // instead. Falling back beats rendering text as nothing (docs/EDITING-AUDIT.md §3.9).
+    const drawWithWebGL = rendererMode === 'webgl' &&
+      ![...manager.document.objects.values()].some((object) => object.text);
+    if (drawWithWebGL && webglCanvasRef.current) {
       webglRendered = renderWebGLScene(webglCanvasRef.current, {
         width: rect.width,
         height: rect.height,

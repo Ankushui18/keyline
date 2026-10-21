@@ -1218,7 +1218,11 @@ function cloneLayer(layer: LayerNode): LayerNode {
 }
 
 function cloneObject(object: NetworkObject): NetworkObject {
-  return { ...object, transform: { ...object.transform } };
+  return {
+    ...object,
+    transform: { ...object.transform },
+    ...(object.text ? { text: { ...object.text } } : {}),
+  };
 }
 
 function cloneAppearance(appearance: Appearance): Appearance {

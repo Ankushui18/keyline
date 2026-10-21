@@ -30,6 +30,11 @@ import './styles/phase1-parity.css';
 import './styles/layers.css';
 import './styles/motion.css';
 import './styles/design-sidebar.css';
+import { installCanvasTextMetrics } from './canvas/text-metrics';
+
+// Text bounds must match the glyphs the canvas draws, so measurement is installed once,
+// before the first render (docs/EDITING-AUDIT.md §3.9).
+installCanvasTextMetrics();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -264,3 +264,10 @@
 .reference-design .paint-stop-row .icon-button { display: grid; place-items: center; width: 22px; min-width: 22px; height: var(--control-height-sm); padding: 0; border: 0; border-radius: var(--radius-xs); background: transparent; color: var(--di-text); }
 .reference-design .paint-stop-row .icon-button:hover:not(:disabled) { background: var(--di-hover); color: var(--text-inverse); }
 .reference-design .paint-stop-row .icon-button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Text objects (docs/EDITING-AUDIT.md §3.9) --------------------------------- */
+.reference-design .di-text-content { display: block; width: 100%; min-height: 52px; max-height: 132px; padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); background: var(--di-field); color: var(--di-text); font-family: inherit; font-size: var(--font-size-xs); line-height: var(--line-height-normal); resize: vertical; }
+.reference-design .di-text-content:focus-visible { border-color: var(--di-accent); outline: 0; }
+.reference-design .di-text-select { width: 100%; height: var(--control-height-sm); padding: 0 var(--space-1); border: 1px solid transparent; border-radius: var(--radius-xs); background: var(--di-field); color: var(--di-text); font-family: inherit; font-size: var(--font-size-xs); }
+.reference-design .di-text-select:focus-visible { border-color: var(--di-accent); outline: 0; }
+.reference-design .di-text-align { justify-content: flex-start; }

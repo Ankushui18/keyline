@@ -289,6 +289,27 @@ export interface ObjectTransform {
   scaleY: number;
 }
 
+export type TextFamily = 'sans' | 'serif' | 'mono';
+export type TextWeight = 400 | 500 | 600 | 700;
+export type TextAlign = 'left' | 'center' | 'right';
+
+/**
+ * A text object's content and style (docs/EDITING-AUDIT.md §3.9, slice 1). Layout — lines,
+ * widths, the box — is derived at render time from a metrics provider and never stored, so a
+ * document stays portable across fonts and machines.
+ */
+export interface TextContent {
+  /** `\n` separates lines. Text never wraps in slice 1. */
+  content: string;
+  family: TextFamily;
+  /** px, measured at object scale 1. */
+  size: number;
+  weight: TextWeight;
+  /** Multiplier of `size`, at least 0.5. */
+  lineHeight: number;
+  align: TextAlign;
+}
+
 export interface NetworkObject {
   id: EntityId;
   name: string;
@@ -297,6 +318,8 @@ export interface NetworkObject {
   /** Optional shared family style. Geometry always remains independently editable. */
   appearanceRuleId?: EntityId;
   transform: ObjectTransform;
+  /** Present only on text objects; absent on every geometric object. */
+  text?: TextContent;
 }
 
 export type LayerNodeKind = 'layer' | 'group' | 'object';

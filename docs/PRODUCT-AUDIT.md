@@ -7,7 +7,7 @@
 - **Status:** this is the P0 deliverable — a gap report, not a rewrite.
 
 > The plan this responds to describes the repository as "v0.1.0, 318 automated tests". That figure is
-> out of date: the suite at this commit is **459 tests across 71 files**, plus a real Wasm smoke test,
+> out of date: the suite at this commit is **498 tests across 76 files**, plus a real Wasm smoke test,
 > nine WebSocket relay checks, a design-system gate and a documentation gate. Everything below was
 > re-verified at `a375b5e` rather than taken from the repository description.
 
@@ -21,7 +21,7 @@ a world-class direct-selection and path-editing experience, and do not start wit
 
 | Source | What it establishes |
 |---|---|
-| `npm run check` at this commit | build, strict TypeScript, **459 tests / 71 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
+| `npm run check` at this commit | build, strict TypeScript, **498 tests / 76 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
 | Full read of `src/core/operations.ts` | 67 operation types; every document mutation is expressed as one |
 | Hit testing, transform and history read-through | the claims in the matrix below cite `file:line`, not documentation |
 | Targeted experiments | z-order hit testing (below), inspector availability, rotation about the centre |
@@ -74,7 +74,7 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 | Arbitrary artwork, nested groups, layers, multiple pages and artboards | Verified | `core/document.ts` (`objectsForArtboard`, `_moveLayer`, pages/artboards) |
 | Stable ids and versioned serialization | Verified | id factory in `core/ids.ts`; `version` field and snapshot validation in `core/document.ts` |
 | Transaction boundary: no UI path mutates geometry directly | Verified | 67 operations in `core/operations.ts`; `OperationManager` is the only writer used by tools and UI |
-| Text objects | **Missing** | no text entity in `core/types.ts` |
+| Text objects | **Partial** — slice 1 | `NetworkObject.text` in `core/types.ts`, layout in `core/text.ts`, insert/edit in `App.tsx` + `ui/PropertiesPanel.tsx`, export/import in `export/svg-export.ts` + `import/svg-import.ts`. No on-canvas caret, wrapping or multi-run styling yet (`docs/EDITING-AUDIT.md` §3.9) |
 | Gradient fills | Verified | `core/fills.ts` (model, normalization, cloning); Canvas paint in `canvas/renderer.ts`; `<defs>` export in `export/svg-export.ts`; `url(#…)` import in `import/svg-import.ts` |
 | Masks and clipping | **Missing** | `Clip content` is disabled and states why |
 | Images | **Missing** | no image entity |
@@ -148,7 +148,7 @@ Ordered by dependency and by what a designer would feel first — not by how int
 |---|---|---|---|
 | 1 | ~~Group entry on the canvas~~ (done in this pass) | — | — |
 | 2 | ~~Hover affordance (object/segment preview before clicking)~~ (done in this pass) | — | — |
-| 3 | Text objects (entity, editing, SVG round trip) | Excludes branding and typography entirely — the largest single missing capability | L |
+| 3 | ~~Text objects (entity, SVG round trip)~~ (slice 1 done, §3.9); on-canvas caret, wrapping and rich runs remain | Still the largest gap for real typographic work | L |
 | 4 | ~~Gradient fills~~ (done, `docs/EDITING-AUDIT.md` §3.8) | — | — |
 | 5 | Command palette over existing operations | Makes 67 operations discoverable without a wider toolbar | M |
 | 6 | General boolean ops and compound paths | "Complete vector editor" claims need them; region ops only partly cover | L |

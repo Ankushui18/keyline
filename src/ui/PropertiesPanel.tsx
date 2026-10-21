@@ -6,6 +6,7 @@ import type { VectorDocument } from '../core/document';
 import { applyCornerRadii, currentRadii, inspectCorners } from '../core/corner-radius';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
 import { prepareRotateTo } from '../core/object-resize';
+import { layoutText, TEXT_ALIGNMENTS, TEXT_FAMILIES, TEXT_WEIGHTS, textLines } from '../core/text';
 import {
   previewGeometryPropagation,
   type GeometryConflictResolution,
@@ -44,6 +45,7 @@ import type {
   ParametricTransform,
   Segment,
   SelectionState,
+  TextContent,
   ToolId,
   VectorNode,
 } from '../core/types';
@@ -1614,6 +1616,88 @@ function SectionHead({ title, onAdd, addLabel }: { title: string; onAdd?: () => 
   );
 }
 
+/**
+ * Text editing in the inspector (docs/EDITING-AUDIT.md §3.9). Slice 1 has no on-canvas caret,
+ * so every text property is edited here; each commit is one `UPDATE_OBJECT`, hence one Undo.
+ */
+function TextSection({ text, onChange }: { text: TextContent; onChange: (text: TextContent) => void }) {
+  const layout = layoutText(text);
+  const lines = textLines(text.content).length;
+  return (
+    <section className="di-section di-text-section">
+      <DesignSectionHead title="Text" />
+      <div className="di-control-block">
+        <span className="di-label">Content</span>
+        <textarea
+          className="di-text-content"
+          aria-label="Text content"
+          defaultValue={text.content}
+          key={text.content}
+          rows={Math.min(6, Math.max(2, lines))}
+          spellCheck={false}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') { event.currentTarget.value = text.content; event.currentTarget.blur(); }
+          }}
+          onBlur={(event) => {
+            if (event.target.value === text.content) return;
+            onChange({ ...text, content: event.target.value });
+          }}
+        />
+      </div>
+      <div className="di-two-columns">
+        <div className="di-control-block">
+          <span className="di-label">Family</span>
+          <select
+            className="di-text-select"
+            aria-label="Text family"
+            value={text.family}
+            onChange={(event) => onChange({ ...text, family: event.currentTarget.value as TextContent['family'] })}
+          >
+            {TEXT_FAMILIES.map((family) => (
+              <option key={family} value={family}>{family === 'sans' ? 'Sans' : family === 'serif' ? 'Serif' : 'Mono'}</option>
+            ))}
+          </select>
+        </div>
+        <div className="di-control-block">
+          <span className="di-label">Weight</span>
+          <select
+            className="di-text-select"
+            aria-label="Text weight"
+            value={String(text.weight)}
+            onChange={(event) => onChange({ ...text, weight: Number(event.currentTarget.value) as TextContent['weight'] })}
+          >
+            {TEXT_WEIGHTS.map((weight) => (
+              <option key={weight} value={String(weight)}>{weight === 400 ? 'Regular' : weight === 500 ? 'Medium' : weight === 600 ? 'Semibold' : 'Bold'}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="di-two-columns">
+        <DesignNumberField label="Text size" suffix="px" value={text.size} min={4} max={512} onCommit={(size) => onChange({ ...text, size })} />
+        <DesignNumberField label="Text line height" suffix="×" value={text.lineHeight} min={0.5} max={4} onCommit={(lineHeight) => onChange({ ...text, lineHeight })} />
+      </div>
+      <div className="di-control-block">
+        <span className="di-label">Alignment</span>
+        <div className="di-segment-group di-text-align">
+          {TEXT_ALIGNMENTS.map((align) => (
+            <DesignIconButton
+              key={align}
+              icon={align === 'left' ? 'left' : align === 'center' ? 'center-x' : 'right'}
+              label={`Align text ${align}`}
+              pressed={text.align === align}
+              onClick={() => onChange({ ...text, align })}
+            />
+          ))}
+        </div>
+      </div>
+      <p className="di-note">
+        {layout.lines.length} {layout.lines.length === 1 ? 'line' : 'lines'} ·{' '}
+        {Math.round(layout.width)} × {Math.round(layout.height)} px · no wrapping
+      </p>
+    </section>
+  );
+}
+
 function ObjectInspector({
   document,
   manager,
@@ -1750,7 +1834,13 @@ function ObjectInspector({
       <div className="di-selection-summary">
         <DesignIcon name="vector" size={14} />
         <input className="di-object-name" aria-label="Object name" defaultValue={object.name} key={object.name} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} onBlur={(event) => { const name = event.target.value.trim(); if (name && name !== object.name) onUpdate(object.id, { name }); else event.target.value = object.name; }} />
-        <DesignIconButton icon="edit" label="Edit points" onClick={onEnterEdit} />
+        <DesignIconButton
+          icon="edit"
+          label="Edit points"
+          disabled={Boolean(object.text)}
+          disabledReason="text has no points to edit"
+          onClick={onEnterEdit}
+        />
       </div>
       <section className="di-section di-position-section">
         <DesignAlignment
@@ -1779,6 +1869,10 @@ function ObjectInspector({
           <DesignNumberField label="Object height" prefix="H" value={bounds.height} min={0.001} onCommit={(value) => resize('height', value)} />
         </div><DesignIconButton icon={aspectLocked ? 'ratio' : 'ratio-unlocked'} label="Constrain proportions" pressed={aspectLocked} onClick={() => setAspectLocked((value) => !value)} /></div></div>
       </section>
+      {object.text && <TextSection
+        text={object.text}
+        onChange={(text) => onUpdate(object.id, { text })}
+      />}
       {appearance && <section className="di-section di-appearance-section">
         <DesignSectionHead title="Appearance"><DesignIconButton icon="eye" label="Hide object" onClick={onHide} /><DesignIconButton
           icon="fill"

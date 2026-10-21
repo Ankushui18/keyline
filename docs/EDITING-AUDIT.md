@@ -446,16 +446,108 @@ operation-level write path; `src/canvas/renderer-fill.test.ts` pins the canvas p
 `src/export/svg-export.gradient.test.ts` pins the `<defs>` round trip, including a scaled
 occurrence and the icon-export flattening; `src/import/svg-import.gradients.test.ts` pins
 objectBoundingBox conversion, `userSpaceOnUse`, `href` inheritance and every warning code;
-`src/ui/PropertiesPanel.gradient.test.tsx` pins the inspector rows. The suite is **459 tests
-in 71 files** as of this section.
+`src/ui/PropertiesPanel.gradient.test.tsx` pins the inspector rows. The suite is **498 tests
+in 76 files** as of this section.
 
-### 3.9 Typography is absent, and why
+### 3.9 Text objects — slice 1 done
 
-There is no text entity. Gradients landed in 3.8; text is the remaining half of roadmap
-step 4. Text is a feature project, not an interaction fix: it needs an entity type, glyph
-runs with their own hit-testing and editing model, and an SVG round trip. It should be
-sequenced after the interaction layer — otherwise there is a sophisticated engine with
-nothing comfortable to write with — and it needs its own contract section before any code.
+There was no text entity, which was the single largest missing capability in
+[`docs/PRODUCT-AUDIT.md`](PRODUCT-AUDIT.md) §4: without text, a vector editor can draw marks but
+not a page. It is also the riskiest thing to bolt on, because every existing interaction —
+selection, hit testing, bounds, transform, export — assumes nodes and segments. This section
+was written as the contract before any code; it now describes what ships, for **slice 1**
+only.
+
+**What slice 1 is.** One-run text objects that can be inserted, edited in the inspector,
+rendered on the canvas, selected, moved, rotated and scaled by the existing object transform,
+exported as SVG `<text>` and imported back. Nothing about the geometry model changed.
+
+**What slice 1 is not.** No caret, no selection inside text, no wrapping or auto-size, no
+multiple runs inside one object, no custom fonts, no text on a path, no outlines. Those are
+later slices, and each needs its own contract. Saying so here is what keeps the first slice
+small enough to verify.
+
+**The model.** `NetworkObject` gains one optional field:
+
+```ts
+interface TextContent {
+  content: string;        // '\n' separates lines; text never wraps
+  family: 'sans' | 'serif' | 'mono';
+  size: number;           // px, at object scale 1
+  weight: 400 | 500 | 600 | 700;
+  lineHeight: number;     // multiplier of size, at least 0.5
+  align: 'left' | 'center' | 'right';
+}
+```
+
+Text lives **on the existing object**, with an empty network, rather than becoming a new
+document-level entity. That single decision is what makes the slice small: layers, z-order,
+lock/visibility, the appearance rules, `UPDATE_OBJECT`, undo, duplication, clipboard and the
+document snapshot all keep working unchanged, because a text object is an object. A document
+with no text is serialised exactly as before — the field is absent, not empty.
+
+**Layout is derived, never stored.** `src/core/text.ts` turns content plus style into lines and
+a box. Measurement comes from a provider: the app installs a canvas-backed one, while node and
+the test suite use a deterministic fallback, so a test can assert numbers. Nothing measured is
+persisted, so a file opened on another machine is laid out in that machine's fonts instead of
+carrying stale pixel widths. The box is object-local — `0…width` by `0…lines × lineHeight ×
+size`, origin at the object transform's origin, top-left — which is the same convention as
+nodes, so nothing downstream needs a new coordinate space.
+
+**Bounds.** `objectLocalPoints` returns the text box corners for a text object, so selection,
+hit testing, alignment, arrangement, zoom-to-fit and artwork export bounds work with **no new
+paths and no per-tool exceptions**. Refusal: a text object cannot join a parametric group or a
+geometry component; both are geometry features and text has no geometry to substitute.
+
+**Measurement, and its one honest caveat.** The app installs a canvas-backed metrics provider
+(`src/canvas/text-metrics.ts`) at startup, so a text box matches the glyphs the canvas draws.
+Node, workers and the test suite use the deterministic fallback in `src/core/text.ts`. A
+document therefore carries no pixel widths, and a file opened where the fonts differ is laid
+out there — which is correct for text and is why nothing measured is persisted.
+
+**Rendering.** Lines are painted with the object's first visible fill — solid **or gradient**,
+in object-local space, so gradient text costs nothing extra — under the object transform, its
+opacity and its alignment. A text object's stroke is not drawn in slice 1.
+
+**Export.** One `<text>` element with the occurrence's `transform="matrix(…)"`, `font-family`
+from the family stack, `font-size`, `font-weight`, `fill`, and one `<tspan>` per line with
+`x`/`y`; alignment becomes `text-anchor`. Because the tspans carry explicit positions, another
+renderer does not have to agree with our metrics to place the lines.
+
+**Import.** `<text>` and its `<tspan>` children become a text object: content from the text
+nodes, `font-size`, `font-weight`, `text-anchor`, and the `transform` decomposed into
+translate/rotate/uniform-scale on the object. Everything this model cannot carry is
+**reported** through the same `SvgImportResult.warnings` channel as gradients (§3.8): a
+`textPath`, per-run fills in one `<text>`, a non-uniform or skewed transform, `letter-spacing`,
+and `textLength`. A `<text>` we cannot read at all is skipped with a warning, never silently.
+
+**Editing, and how text gets into a document.** Slice 1 edits text in the Design panel: a
+content field, family, size, weight, line height and align, each committed as one undoable
+`UPDATE_OBJECT`; the section also shows the measured box. Insertion comes from the
+**More → Add text** menu item and the command palette, which places a text object at the active
+frame's centre and selects it. There is no text tool and no on-canvas caret yet; that is the
+next slice, and this section will be updated when it exists. The **Edit points** control is
+disabled for text with the reason "text has no points to edit" rather than opening a point
+editor that has nothing to edit.
+
+**The WebGL preview falls back to Canvas 2D for a document containing text.** The WebGL path
+has no glyph atlas; drawing text as nothing would be a silent lie, so the renderer mode is
+honoured everywhere else and text always paints.
+
+**Refusals, stated rather than discovered.** No wrapping; no multi-run styling inside one
+object; no text in parametric groups or geometry components; no text on a path; no stroke on
+text; no custom or uploaded fonts (three families map to named stacks). Each refusal produces a
+warning on import where the file asks for it, and a disabled control with a reason in the
+inspector where the UI would otherwise imply support.
+
+**Tests.** `src/core/text.test.ts` pins normalization, the deterministic metrics, layout,
+bounds through `object-geometry`, selection, duplicate, undo and the snapshot round trip;
+`src/canvas/renderer-text.test.ts` pins baselines, alignment offsets, transform, opacity and
+gradient text; `src/export/svg-export.text.test.ts` pins the `<text>`/`<tspan>` export,
+escaping and gradient fills; `src/import/svg-import.text.test.ts` pins content, lines,
+alignment, transform decomposition, every text warning code and a full export→import round
+trip; `src/ui/PropertiesPanel.text.test.tsx` and the toolbar menu test pin the controls. The
+suite is **498 tests in 76 files** as of this section.
 
 ---
 
@@ -482,7 +574,7 @@ nothing comfortable to write with — and it needs its own contract section befo
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
 | 3 | ~~General-purpose framing: frame presets beyond icon sizes, neutral empty state~~ (done, 3.7) | — |
-| 4 | ~~Gradients~~ (done, 3.8); text still absent (3.9) | — |
+| 4 | ~~Gradients~~ (done, 3.8) · ~~Text, slice 1~~ (done, 3.9); on-canvas caret, wrapping and runs next | — |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived

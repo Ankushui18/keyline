@@ -54,6 +54,8 @@ import type {
 import { emptySelection, enterNetworkEditMode, exitNetworkEditMode } from './tools/select-tool';
 import { prepareBulkNodePositions, type BulkNodeAction } from './tools/lasso-tool';
 import { preparePrimitiveObject } from './tools/primitive-tool';
+import { prepareTextObject } from './tools/text-tool';
+import { DEFAULT_TEXT, textLocalBounds } from './core/text';
 import { connectedSelection, prepareClosePath, prepareDeletePoint, prepareJoinEndpoints, prepareReversePath } from './tools/path-commands';
 import { prepareSplitAtPoint } from './tools/cut-tool';
 import { ConstraintContextMenu, ConstraintPalette } from './ui/ConstraintPalette';
@@ -1018,6 +1020,34 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     }
   }, [announce, document, manager]);
 
+  /**
+   * Inserts a text object in the active frame and selects it (docs/EDITING-AUDIT.md §3.9).
+   * Slice 1 has no text tool, so this menu action is how text enters a document.
+   */
+  const addText = useCallback(() => {
+    const frame = document.activeArtboard.frame;
+    const bounds = textLocalBounds(DEFAULT_TEXT);
+    const origin = {
+      x: frame.x + (frame.width - bounds.width) / 2,
+      y: frame.y + (frame.height - bounds.height) / 2,
+    };
+    try {
+      const plan = prepareTextObject(document, origin);
+      manager.beginTransaction('Add text');
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+      setSelection({ mode: 'object', objectIds: new Set([plan.objectId]), nodeIds: new Set(), segmentIds: new Set() });
+      setSelectedLayerIds(new Set([plan.layerId]));
+      setSelectedArtboardIds(new Set());
+      setActiveTool('select');
+      setShowEmptyStart(false);
+      announce('Added a text object. Edit it in the Design panel.');
+    } catch (error) {
+      manager.rollbackTransaction();
+      announce(`Unable to add text: ${error instanceof Error ? error.message : 'unknown error'}`, 'error');
+    }
+  }, [announce, document, manager]);
+
   const openStarterSample = useCallback(() => {
     addFrame(24, 24);
     const frame = document.activeArtboard.frame;
@@ -1825,6 +1855,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       tool('bend', 'Bend', 'D', 'curve'), tool('cut', 'Cut', 'X', 'split'), tool('fillet', 'Round corner', 'F', 'fillet radius'),
       tool('offset', 'Offset', 'O', 'outline copy'), tool('width', 'Stroke width', 'W', 'variable thickness'), tool('eraser', 'Eraser', '⇧ E'),
       tool('lasso', 'Lasso', 'Q', 'select points align'), tool('shape-builder', 'Shape builder', 'B', 'merge union subtract combine'), tool('paint', 'Fill areas', '⇧ B', 'paint colour'),
+      { id: 'add-text', label: 'Add text', group: 'Actions', keywords: 'type label copy typography write', run: addText },
       { id: 'frame-24', label: 'New icon frame 24 × 24', group: 'Frames', keywords: 'artboard add', run: () => addFrame(24, 24) },
       { id: 'frame-32', label: 'New icon frame 32 × 32', group: 'Frames', keywords: 'artboard add', run: () => addFrame(32, 32) },
       ...FRAME_PRESETS.filter((preset) => !isIconPreset(preset)).map((preset) => ({
@@ -2067,6 +2098,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
         onOpenCheck={openCheck}
         onOpenSet={openSet}
         onAddFrame={addFrame}
+        onAddText={addText}
         onToggleConstraints={() => setConstraintsOpen((open) => !open)}
         onExport={() => setExportOpen(true)}
         onUndo={() => manager.undo()}

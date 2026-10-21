@@ -1,10 +1,14 @@
 import { createEntityId } from '../core/ids';
 import { normalizeStops } from '../core/fills';
+import { clampTextWeight, layoutText, normalizeTextContent } from '../core/text';
 import type { ClipboardObject, VectorClipboardPayload } from '../core/clipboard';
 import type {
   Appearance,
   AppearanceFill,
+  NetworkObject,
   Point,
+  TextAlign,
+  TextContent,
   Segment,
   StrokeStyle,
   VectorNode,
@@ -79,6 +83,9 @@ export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
     if (!id) return;
     if (element.localName === 'pattern') patterns.add(id); else gradients.set(id, element);
   });
+  const textItems: Array<{
+    name: string; style: SvgStyle; matrix: Matrix; text: TextContent; origin: Point; transform: TextTransform;
+  }> = [];
   const warnings: SvgImportWarning[] = [];
   const warningKeys = new Set<string>();
   const warn = (code: string, message: string, element?: string) => {
@@ -118,6 +125,17 @@ export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
       return;
     }
 
+    if (tag === 'text') {
+      const parsed = readTextElement(element, context, localMatrix);
+      if (parsed) {
+        textItems.push({
+          name: elementName(element, items.length + textItems.length + 1),
+          style, matrix: localMatrix, ...parsed,
+        });
+      } else skippedElementCount += 1;
+      return;
+    }
+
     if (SHAPE_TAGS.has(tag)) {
       try {
         const paths = pathsForElement(element).filter((path) => path.segments.length > 0);
@@ -147,7 +165,10 @@ export function parseSvgDocument(root: SVGSVGElement): SvgImportResult {
     paths: item.paths.map((path) => transformSubpath(path, item.matrix)),
   }));
   const viewport = svgViewport(root, transformed.flatMap((item) => item.paths));
-  const objects = transformed.map((item) => clipboardObject(item.name, item.paths, item.style, item.matrix, item.localBox, context));
+  const objects = [
+    ...transformed.map((item) => clipboardObject(item.name, item.paths, item.style, item.matrix, item.localBox, context)),
+    ...textItems.map((item) => textClipboardObject(item.name, item.style, item)),
+  ];
   return {
     viewport,
     payload: {
@@ -715,5 +736,177 @@ function gradientFillFor(
     type: 'radial', center,
     radius: Math.max(1e-6, radiusUser * scale),
     stops, opacity, visible: true,
+  };
+}
+
+/* ------------------------------------------------------------- Text import */
+
+/**
+ * Reads a `<text>` element into the slice-1 model (docs/EDITING-AUDIT.md §3.9): one run,
+ * explicit lines, no wrapping. Anything richer is reported rather than guessed at.
+ */
+function readTextElement(
+  element: Element,
+  context: ImportContext,
+  matrix: Matrix,
+): { text: TextContent; origin: Point; transform: TextTransform } | undefined {
+  const declarations = parseDeclarations(element.getAttribute('style') ?? '');
+  const attribute = (name: string) => declarations.get(name) ?? element.getAttribute(name) ?? undefined;
+  const lines = collectTextLines(element, context);
+  if (lines.length === 0) return undefined;
+
+  const runs = [...element.querySelectorAll('tspan')];
+  if (runs.some((run) => {
+    const runStyle = run.getAttribute('style') ?? '';
+    return ['fill', 'font-size', 'font-weight', 'font-family'].some((name) =>
+      run.hasAttribute(name) || runStyle.includes(`${name}:`));
+  })) {
+    context.warn('text-runs', 'Text with more than one style was imported as a single run using the element’s own style.', 'text');
+  }
+  if (attribute('letter-spacing') && attribute('letter-spacing') !== 'normal') {
+    context.warn('text-letter-spacing', 'Letter spacing is not supported; the text was imported with default spacing.', 'text');
+  }
+  if (attribute('textLength')) {
+    context.warn('text-length', 'A forced text length is not supported; the text was imported at its natural width.', 'text');
+  }
+
+  const anchor = attribute('text-anchor');
+  const align: TextAlign = anchor === 'middle' ? 'center' : anchor === 'end' ? 'right' : 'left';
+  const lineHeightText = attribute('line-height');
+  const lineHeight = lineHeightText && /^[\d.]+$/.test(lineHeightText.trim())
+    ? Number.parseFloat(lineHeightText)
+    : undefined;
+  const text = normalizeTextContent({
+    content: lines.join('\n'),
+    family: textFamilyFor(attribute('font-family'), context),
+    size: lengthFromCss(attribute('font-size')) ?? 16,
+    weight: clampTextWeight(lengthFromCss(attribute('font-weight')) ?? 400),
+    lineHeight,
+    align,
+  });
+  if (!text) return undefined;
+  const transform = textTransformFor(matrix, context);
+  if (!transform) return undefined;
+  const layout = layoutText(text);
+  // SVG places the first baseline at x/y; our box starts at its top-left. Shift so both agree.
+  const anchorY = numeric(attribute('y'), 0);
+  const anchorX = numeric(attribute('x'), 0);
+  return {
+    text,
+    origin: { x: anchorX + transform.translate.x, y: anchorY - layout.firstBaselineOffset + transform.translate.y },
+    transform,
+  };
+}
+
+interface TextTransform {
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+  translate: Point;
+}
+
+function textTransformFor(matrix: Matrix, context: ImportContext): TextTransform | undefined {
+  const scaleX = Math.hypot(matrix[0], matrix[1]);
+  if (scaleX < 1e-9) {
+    context.warn('text-transform', 'A text element with no usable size was skipped.', 'text');
+    return undefined;
+  }
+  const rotation = Math.atan2(matrix[1], matrix[0]) * 180 / Math.PI;
+  const scaleY = (matrix[0] * matrix[3] - matrix[1] * matrix[2]) / scaleX;
+  const skew = (matrix[0] * matrix[2] + matrix[1] * matrix[3]) / scaleX;
+  if (Math.abs(skew) > 1e-6) {
+    context.warn('text-transform', 'A skewed text transform was approximated by a uniform scale.', 'text');
+  }
+  return { rotation, scaleX, scaleY, translate: { x: matrix[4], y: matrix[5] } };
+}
+
+/** Lines of text, one per `tspan` that sets its own `y`/`dy`; plain runs concatenate. */
+function collectTextLines(element: Element, context: ImportContext): string[] {
+  const lines: string[] = [];
+  let current = '';
+  const walk = (node: Node) => {
+    for (const child of Array.from(node.childNodes)) {
+      if (child.nodeType === 3) {
+        current += child.textContent ?? '';
+        continue;
+      }
+      if (child.nodeType !== 1) continue;
+      const childElement = child as Element;
+      if (childElement.localName === 'textPath') {
+        context.warn('text-path', 'Text on a path is not supported; its characters were imported as plain text.', 'text');
+        walk(childElement);
+        continue;
+      }
+      if (childElement.localName === 'tspan' &&
+        (childElement.hasAttribute('y') || childElement.hasAttribute('dy')) && current.trim().length > 0) {
+        lines.push(current);
+        current = '';
+      }
+      walk(childElement);
+    }
+  };
+  walk(element);
+  lines.push(current);
+  const cleaned = lines
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter((line, _index, all) => line.length > 0 || all.length === 1);
+  return cleaned;
+}
+
+/** Maps an SVG `font-family` onto one of the three supported stacks, saying when it changes. */
+function textFamilyFor(value: string | undefined, context: ImportContext) {
+  const first = (value ?? '').split(',')[0]?.replace(/["']/g, '').trim().toLowerCase() ?? '';
+  if (!first) return 'sans' as const;
+  if (/mono|courier|consolas|menlo/.test(first)) return 'mono' as const;
+  if (/serif|georgia|times|garamond/.test(first) && !/sans-serif/.test(first)) return 'serif' as const;
+  if (/inter|arial|helvetica|roboto|system-ui|sans/.test(first)) return 'sans' as const;
+  context.warn('text-family', `“${first}” is not one of the three bundled families; the text uses the sans stack.`, 'text');
+  return 'sans' as const;
+}
+
+/** CSS lengths as the importer understands them: px, em and percent of the default size. */
+function lengthFromCss(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim().toLowerCase();
+  const parsed = Number.parseFloat(trimmed);
+  if (!Number.isFinite(parsed)) return undefined;
+  if (trimmed.endsWith('%')) return parsed / 100 * 16;
+  if (trimmed.endsWith('em')) return parsed * 16;
+  return parsed;
+}
+
+/** A text object as a clipboard payload: an ordinary object with an empty network. */
+function textClipboardObject(
+  name: string,
+  style: SvgStyle,
+  item: { text: TextContent; origin: Point; transform: TextTransform },
+): ClipboardObject {
+  const networkId = createEntityId();
+  const appearanceId = createEntityId();
+  const objectId = createEntityId();
+  const layerId = createEntityId();
+  const { text, origin, transform } = item;
+  const fill = paint(style.fill, style.color) ?? DEFAULT_IMPORT_INK;
+  const appearance: Appearance = {
+    id: appearanceId,
+    fills: [{ type: 'solid', color: fill, opacity: clamp01(style.fillOpacity), visible: true }],
+    opacity: clamp01(style.opacity),
+  };
+  const object: NetworkObject = {
+    id: objectId, name, networkId, appearanceId,
+    transform: {
+      x: origin.x, y: origin.y,
+      rotation: transform.rotation,
+      scaleX: transform.scaleX,
+      scaleY: transform.scaleY,
+    },
+    text,
+  };
+  return {
+    object,
+    layer: { id: layerId, kind: 'object', name, artboardId: '', childIds: [], objectId, visible: true, locked: false, expanded: true },
+    appearance,
+    network: { id: networkId, nodeIds: [], pathIds: [] },
+    nodes: [], paths: [], segments: [],
   };
 }

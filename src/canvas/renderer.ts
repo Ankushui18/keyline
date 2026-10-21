@@ -14,6 +14,7 @@ import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
 import { fillColor, normalizeStops } from '../core/fills';
+import { layoutText, normalizeTextContent, textCssFont } from '../core/text';
 import { INTERACTION_BOUNDS_POLICY, objectBounds, type GeometryBounds } from '../core/object-geometry';
 import { axisAlignedFrame, frameHandlePoints, framePoint, objectFrame, type SelectionFrame } from '../core/object-resize';
 import {
@@ -30,7 +31,9 @@ import {
   transformPoint,
   type Matrix2D,
 } from '../core/transforms';
-import type { AppearanceFill, ConstructionExtent, Constraint, EntityId, Point, Region, Segment, SelectionState } from '../core/types';
+import type {
+  AppearanceFill, ConstructionExtent, Constraint, EntityId, Point, Region, Segment, SelectionState, TextContent,
+} from '../core/types';
 import type { Viewport } from './viewport';
 import type { PrimitiveKind } from '../tools/primitive-tool';
 import type { SnapResult } from '../tools/snapping';
@@ -841,7 +844,38 @@ function drawObjectFills(context: CanvasRenderingContext2D, document: VectorDocu
         for (const matrix of parametricInstanceMatrices(document, group)) fillPath(pathId, matrix);
       }
     }
+    // Text keeps its z-order because it is painted in the same object loop as geometry.
+    if (object.text) drawTextObject(context, objectMatrix, object.text, appearance.opacity, fills);
   }
+}
+
+/**
+ * Paints one text object's lines in object-local space with the object's first visible fill.
+ * A gradient works unchanged: its endpoints are already object-local. Exported so the paint
+ * path can be asserted against a recording context, like `fillPaint`.
+ */
+export function drawTextObject(
+  context: CanvasRenderingContext2D,
+  matrix: Matrix2D,
+  text: TextContent,
+  opacity: number,
+  fills: AppearanceFill[],
+): void {
+  const paintFill = fills.find((fill) => fill.visible && fill.opacity > 0);
+  if (!paintFill) return;
+  const layout = layoutText(text);
+  context.save();
+  context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f);
+  context.font = textCssFont(normalizeTextContent(text) ?? text);
+  context.textBaseline = 'alphabetic';
+  context.textAlign = 'left';
+  context.fillStyle = fillPaint(context, paintFill) ?? fillColor(paintFill);
+  context.globalAlpha = opacity * paintFill.opacity;
+  layout.lines.forEach((line, index) => {
+    if (line.text.length === 0) return;
+    context.fillText(line.text, layout.lineLeft(line), layout.baseline(index));
+  });
+  context.restore();
 }
 
 function drawAlignedObjectStrokes(

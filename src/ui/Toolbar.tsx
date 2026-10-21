@@ -27,6 +27,7 @@ interface ToolbarProps {
   onOpenSet: () => void;
   /** Creates a frame from any entry point: preset size, custom size, or a named preset. */
   onAddFrame: (width: number, height: number, name?: string) => void;
+  onAddText: () => void;
   onToggleConstraints: () => void;
   onExport: () => void;
   onUndo: () => void;
@@ -56,6 +57,7 @@ export function Toolbar({
   onOpenCheck,
   onOpenSet,
   onAddFrame,
+  onAddText,
   onToggleConstraints,
   onExport,
   onUndo,
@@ -159,6 +161,7 @@ export function Toolbar({
           {frameMenuOpen && (
             <div className="topbar-frame-menu topbar-more-menu" role="menu" aria-label="More">
               <button type="button" role="menuitem" onClick={() => { setFrameMenuOpen(false); onOpenCommand(); }}><strong>Search or ask</strong><span>{MODIFIER_LABEL} K</span></button>
+              <button type="button" role="menuitem" aria-label="Add text" onClick={() => { setFrameMenuOpen(false); onAddText(); }}><strong>Add text</strong><span>Center of the frame</span></button>
               <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenSet(); }}><strong>Set</strong><span>All icons together</span></button>
               <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenMotion(); }}><strong>Motion</strong><span>M</span></button>
               <button type="button" role="menuitem" disabled={isEmpty} onClick={() => { setFrameMenuOpen(false); onOpenCheck(); }}><strong>Check consistency</strong><span>{MODIFIER_LABEL} ⇧ C</span></button>

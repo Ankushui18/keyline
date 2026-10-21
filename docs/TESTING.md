@@ -2,7 +2,7 @@
 
 What is verified, how to run it, and what the suites do **not** prove.
 
-Current suite: **459 tests across 71 test files**, plus a real Wasm smoke test, nine WebSocket
+Current suite: **498 tests across 76 test files**, plus a real Wasm smoke test, nine WebSocket
 integration checks, Rust unit tests, and optional browser suites.
 
 - [Run everything](#run-everything)
@@ -130,6 +130,11 @@ touching the document.
 | `ui/PropertiesPanel.states.test.tsx` | Every disabled inspector control carries a reason, rendered in three selection states. |
 | `ui/PropertiesPanel.gradient.test.tsx` | The fill type switch, stops and angle/radius rows, and the two-stop minimum, rendered from a static inspector. |
 | `core/fills.test.ts` | Gradient model: stop normalization, clone isolation, the operation-level write path, object-local geometry and preview CSS. |
+| `core/text.test.ts` | Text model and layout: normalization, deterministic metrics, box maths, bounds through `object-geometry`, selection, duplicate, undo, snapshot. |
+| `canvas/renderer-text.test.ts` | Text paints baselines, alignment offsets, transform, opacity and gradients; nothing without a visible fill. |
+| `export/svg-export.text.test.ts` | `<text>`/`<tspan>` export, anchors, escaping, gradient fills, icon-ink flattening. |
+| `import/svg-import.text.test.ts` | Text import: content, lines, anchors, transform decomposition, every text warning code, export→import round trip. |
+| `ui/PropertiesPanel.text.test.tsx` | The text section's controls, the alignment state, and the disabled Edit points reason. |
 | `canvas/renderer-fill.test.ts` | The canvas paints a linear and a radial gradient in local space and refuses a degenerate one. |
 | `export/svg-export.gradient.test.ts` | Gradient `<defs>` round trip, scaled occurrences, and icon-export flattening. |
 | `ui/panel-controls.test.tsx` | Every **enabled** inspector and tool control reaches the document or its callback, across nine states (jsdom). |

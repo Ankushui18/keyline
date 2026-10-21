@@ -7,6 +7,19 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- **Text objects, slice 1.** Text is now a document object: `NetworkObject.text` carries content
+  and style, layout lives in `src/core/text.ts`, and because text is an ordinary object, layers,
+  selection, hit testing from its box, transform, opacity, duplication, undo and the document
+  snapshot all apply with no new paths. Lines are measured by a canvas-backed metrics provider
+  in the app and a deterministic fallback in tests, and nothing measured is persisted, so a file
+  is laid out in the fonts of the machine that opens it. Add text from **More → Add text** or the
+  command palette; edit content, family (sans/serif/mono), weight, size, line height and
+  alignment in the Design panel. Text fills take solid or gradient paint, exports as SVG `<text>`
+  with a `<tspan>` per line, and imports back as editable text with warnings for anything the
+  model cannot carry (`textPath`, per-run styling, `letter-spacing`, `textLength`, unknown
+  families, skewed transforms). The WebGL preview falls back to Canvas 2D when a document
+  contains text, so text is never invisible. Not yet: a text tool, an on-canvas caret or
+  selection inside text, wrapping, multi-run styling, custom fonts, text on a path, text stroke.
 - **Gradient fills.** An object fill can now be a solid, a linear gradient or a radial gradient.
   `AppearanceFill` is a discriminated union in `src/core/types.ts`; gradient endpoints are stored
   **object-local**, the same space as nodes, so a gradient moves, scales and rotates with its
