@@ -7,7 +7,7 @@
 - **Status:** this is the P0 deliverable — a gap report, not a rewrite.
 
 > The plan this responds to describes the repository as "v0.1.0, 318 automated tests". That figure is
-> out of date: the suite at this commit is **401 tests across 62 files**, plus a real Wasm smoke test,
+> out of date: the suite at this commit is **409 tests across 63 files**, plus a real Wasm smoke test,
 > nine WebSocket relay checks, a design-system gate and a documentation gate. Everything below was
 > re-verified at `a375b5e` rather than taken from the repository description.
 
@@ -21,7 +21,7 @@ a world-class direct-selection and path-editing experience, and do not start wit
 
 | Source | What it establishes |
 |---|---|
-| `npm run check` at this commit | build, strict TypeScript, **401 tests / 62 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
+| `npm run check` at this commit | build, strict TypeScript, **409 tests / 63 files**, Wasm smoke, 9 relay checks, 253 design tokens, 27 stylesheets conform, 17 docs / 30 links |
 | Full read of `src/core/operations.ts` | 67 operation types; every document mutation is expressed as one |
 | Hit testing, transform and history read-through | the claims in the matrix below cite `file:line`, not documentation |
 | Targeted experiments | z-order hit testing (below), inspector availability, rotation about the centre |
@@ -44,7 +44,9 @@ missing integration), **Missing**, **Unknown** (needs hands-on use to judge).
 | Marquee select, additive with `Shift` | Verified | `VectorCanvas.tsx:1147`, `marqueePreview` |
 | Double-click enters point editing | Verified | `VectorCanvas.tsx:1217` → `enterNetworkEditMode` |
 | Anchors, handles and segments have distinct hit targets | Verified | `hitTest` node-first then `hitTestSegment`, tolerances in screen space |
-| Enter/insert a point on a segment | Verified | `tools/pen-tool.ts`, `ADD_NODE`/`SPLIT_SEGMENT` operations |
+| Enter/insert a point on a segment | **Verified — extended in this pass** | pen tool, plus double-click on a segment in point editing (`insertAnchorAt` in `tools/direct-path-tool.ts`) with a hover preview of where the anchor will land |
+| Pull Bézier handles out of a corner | **Verified — added in this pass** | `⌥`-drag in point editing → `ADD_BEZIER_HANDLES`, one transaction per drag |
+| Corner/smooth/mirrored conversion | **Verified — added in this pass** | `convertNodeTangent` derives the tangent pair alongside `SET_NODE_MODES`; 8 contract tests in `src/tools/direct-path-tool.test.ts` |
 | Escape leaves the current context without losing committed edits | Verified | `exitNetworkEditMode`, one transaction per gesture |
 | Double-click **enters a group**, `Escape` leaves | **Verified — added in this pass** | `core/group-context.ts` (`selectionTargetForObject`, `resolveObjectPress`, `exitGroupContext`); 10 contract tests in `src/core/group-context.test.ts` |
 | Hover preview of the object under the pointer | **Verified — added in this pass** | `core/target-resolution.ts` (`resolvePointerTarget`), drawn by `drawHoverTarget` in `canvas/renderer.ts`; 10 contract tests in `src/core/target-resolution.test.ts` |
@@ -179,8 +181,10 @@ increments, each shippable on its own.
    level, `Escape` steps out. Known limit: deleting a group selection leaves the empty group layer.
    Also done: hover outlines for groups and shapes, and `Alt`-click to select the parent group
    (`Alt`-drag still duplicates; the two are separated by movement).
-3. *Path editing polish* — insertion preview before commit, per-anchor corner/smooth state visible in
-   the canvas, arc-specific handles.
+3. *Path editing polish* — done in this pass for insertion and corner conversion: the insert point
+   is previewed before commit, and `Sharp` / `Smooth` / `Mirrored` derive a tangent instead of only
+   recording a mode. Still open: per-anchor corner/smooth state drawn on the canvas, and
+   arc-specific handles.
 
 AI work should start only after step 3, and only as operation plans validated by the same code
 that validates manual edits. Text and gradients are the next product-level expansion after the

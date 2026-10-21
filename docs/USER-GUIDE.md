@@ -154,6 +154,13 @@ drawn shapes.
 
 ## Tool-specific behaviour
 
+- **Point editing** — press `Enter` on a selected shape. Anchors are squares, Bézier handles
+  diamonds; drag an anchor to move it, drag a handle to reshape the curve. Double-click a segment
+  to insert an anchor exactly where the pointer meets the curve — hover first and a hollow square
+  shows where it will land — and the new anchor is selected, so the next drag moves it. `⌥`-drag a
+  corner anchor to pull a tangent pair out of it. In Design, **Sharp** / **Smooth** / **Mirrored**
+  convert the selected anchors: smooth and mirrored derive the tangent from the neighbouring
+  anchors, sharp leaves the handles where they are. Each of these is one undo step.
 - **Fillet** — choose a radius in Design, then click a corner shared by two line segments. The
   operation trims both lines, inserts a native tangent arc, and adds hard radius and tangency
   constraints in one undoable step. Fillets are arcs, not Bézier approximations.

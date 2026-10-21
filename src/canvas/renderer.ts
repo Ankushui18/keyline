@@ -117,6 +117,8 @@ interface RenderOptions {
   hoveredNodeId?: EntityId;
   hoveredSegmentId?: EntityId;
   hoveredHandle?: { nodeId: EntityId; handleType: 'in' | 'out' };
+  /** World point where a double-click would insert an anchor on the hovered segment. */
+  insertPreview?: Point;
   /** Target preview for the pointer, resolved by the shared target pipeline. */
   hoveredTarget?: { bounds: GeometryBounds; group: boolean };
   widthToolActive?: boolean;
@@ -179,6 +181,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
     hoveredSegmentId,
     hoveredHandle,
     hoveredTarget,
+    insertPreview,
     widthToolActive,
     remotePresence,
     overlayOnly = false,
@@ -251,6 +254,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
     );
     drawGeometryImpactHighlights(context, document, viewport.scale, impactObjectIds);
     if (hoveredTarget) drawHoverTarget(context, hoveredTarget, viewport.scale);
+    if (insertPreview) drawInsertPreview(context, insertPreview, viewport.scale);
     if (selection.mode === 'object') drawObjectSelection(context, document, viewport.scale, selection.objectIds);
     drawParametricControls(context, document, viewport.scale, selection);
     if (remotePresence?.length) drawRemotePresence(context, document, viewport.scale, remotePresence);
@@ -1109,6 +1113,23 @@ function drawGeometryImpactHighlights(
  * are solid, so the preview never reads as the persistent selection, which is a solid
  * frame with square handles.
  */
+/**
+ * The anchor a double-click would create: a small hollow square on the path itself, so
+ * point insertion is predictable before it happens.
+ */
+function drawInsertPreview(context: CanvasRenderingContext2D, point: Point, scale: number): void {
+  const size = 7 / scale;
+  context.save();
+  context.beginPath();
+  context.rect(point.x - size / 2, point.y - size / 2, size, size);
+  context.fillStyle = COLORS.panel;
+  context.fill();
+  context.lineWidth = 1.5 / scale;
+  context.strokeStyle = COLORS.selectedStrong;
+  context.stroke();
+  context.restore();
+}
+
 function drawHoverTarget(
   context: CanvasRenderingContext2D,
   target: { bounds: GeometryBounds; group: boolean },

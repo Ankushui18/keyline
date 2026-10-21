@@ -2,7 +2,7 @@
 
 What is verified, how to run it, and what the suites do **not** prove.
 
-Current suite: **401 tests across 62 test files**, plus a real Wasm smoke test, nine WebSocket
+Current suite: **409 tests across 63 test files**, plus a real Wasm smoke test, nine WebSocket
 integration checks, Rust unit tests, and optional browser suites.
 
 - [Run everything](#run-everything)
@@ -128,6 +128,7 @@ touching the document.
 | `ui/contrast-color.test.ts` | Accessible avatar/text colour selection. |
 | `ui/PropertiesPanel.states.test.tsx` | Every disabled inspector control carries a reason, rendered in three selection states. |
 | `ui/panel-controls.test.tsx` | Every **enabled** inspector and tool control reaches the document or its callback, across nine states (jsdom). |
+| `tools/direct-path-tool.test.ts` | Anchor insertion that preserves the curve, the anchor hit test, corner/smooth/mirrored conversion, and the three handle-mirroring modes. |
 | `core/target-resolution.test.ts` | Hover and press resolve through one pipeline: paint order, entered groups, hidden/locked ancestors, the `Alt`-click parent gesture, and a measured latency budget. |
 
 ---

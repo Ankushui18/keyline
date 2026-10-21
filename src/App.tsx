@@ -26,6 +26,7 @@ import { copyTextToClipboard } from './core/browser-clipboard';
 import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
 import { canEditObject, editableInspectorObjects } from './app/inspector-actions';
+import { convertNodeTangent } from './tools/direct-path-tool';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
 import { prepareDeleteObject, prepareFlipObjects, prepareNudgeObjects } from './core/object-operations';
 import { DEFAULT_DOCUMENT_NAME, DocumentPersistence, listDocuments, loadDocumentById, markStoredDocumentImported, saveDocument, type SaveStatus } from './core/store';
@@ -853,6 +854,24 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
       console.warn('Align objects failed.', error);
     }
   }, [document, manager]);
+
+  /**
+   * Corner conversion is two operations, not one: deriving a tangent writes handles, and
+   * the persistent mode is what makes the opposite handle follow later drags. One
+   * transaction covers both, so a single undo returns the anchor to a corner.
+   */
+  const convertNodeMode = useCallback((nodeIds: EntityId[], mode: 'corner' | 'smooth' | 'symmetric') => {
+    const plan = convertNodeTangent(document, nodeIds, mode);
+    if (!plan) return;
+    try {
+      manager.beginTransaction(mode === 'corner' ? 'Make anchor a corner' : mode === 'smooth' ? 'Smooth anchor' : 'Mirror anchor');
+      plan.operations.forEach((operation) => manager.execute(operation));
+      manager.commitTransaction();
+    } catch (error) {
+      manager.rollbackTransaction();
+      announce(error instanceof Error ? error.message : 'Anchor conversion was rejected.', 'error');
+    }
+  }, [announce, document, manager]);
 
   const setObjectLayerState = useCallback((objectIds: EntityId[], updates: { locked?: boolean; visible?: boolean }) => {
     const layers = objectIds
@@ -2388,9 +2407,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
             onUpdateConstraint={updateConstraint}
             onBulkConstraintParameter={updateConstraintParameters}
             onRemoveConstraint={removeConstraint}
-            onSetNodeMode={(nodeIds, mode) => manager.execute({
-              type: 'SET_NODE_MODES', payload: { modes: nodeIds.map((nodeId) => ({ nodeId, mode })) },
-            })}
+            onSetNodeMode={convertNodeMode}
             onPathCommand={runPathCommand}
             onUpdateObject={updateObject}
             onUpdateAppearance={updateAppearance}

@@ -255,7 +255,64 @@ Modifier precedence, settled before wiring:
 4. **`Shift`-click** adds to or removes from the selection.
 5. **A plain click** selects what the preview shows.
 
-### 3.6 Typography and gradients are absent, not weak
+### 3.6 Direct path editing — done
+
+Path editing is the point where the selection model stops describing boxes and starts
+describing geometry, so its contract is written here before any of it is wired.
+
+**Spaces.** Nodes, anchors and Bézier handles are stored in the edited object's
+**local** space; the pointer arrives in **world** space. One conversion, the object's
+transform and its inverse, sits at the boundary, and every path rule below is stated in
+local space. Frames are axis-aligned, so this transform is a translation, a rotation and
+a positive scale — never a reflection.
+
+**The four affordances.** One resolver, `resolvePointerTarget`, already answers what is
+under the pointer; path editing adds the last two rungs at the top of that ladder:
+
+| Rung | Target | Only while | Click behaviour |
+|---|---|---|---|
+| 1 | Bézier handle | its node is selected | drag the handle; mirroring follows the node's mode |
+| 2 | Anchor | the path is in point editing | click selects it, drag moves it and everything selected with it |
+| 3 | Segment body | the path is in point editing | click selects it, drag bends it; **double-click inserts an anchor** |
+| 4 | Pull out handles | a corner anchor in point editing | `⌥`-drag away from the anchor and its lines become curves, as one undo step |
+| 5 | Object body | always | select the object or its group |
+
+Hover is drawn from the same answer: anchors as squares, segments as a stroke highlight,
+handles as diamonds with their tether, and — in point editing — a small hollow square on
+the segment at the point where a double-click would insert an anchor. Nothing is previewed
+that a click would not take.
+
+**Inserting an anchor.** Double-clicking a segment body splits it at the point nearest the
+pointer through the existing `SPLIT_SEGMENT` inverse, so the curve is unchanged by the
+insertion: a Bézier insert is an exact cubic split, an arc stays an arc with the split
+angle, a line stays a line, and a width profile is split proportionally. Insertion is one
+undo step, lands in the same path, and the new anchor is selected afterwards.
+
+**Corner conversion.** A node has one of three persistent `handleMode`s. Conversion is
+`SET_NODE_MODES` and nothing else:
+
+- `corner` — handles are independent (`⌥`-drag one alone).
+- `smooth` — the opposite handle keeps its **length**, its direction mirrors.
+- `symmetric` — the opposite handle mirrors length and direction.
+
+Converting to `corner` keeps the handles where they are. Converting to `smooth` or
+`symmetric` **derives** the pair from the neighbours, so the anchor's own shape change is
+the only visible effect and the curve becomes tangent-continuous. Conversion is one undo
+step and works on a multi-selection. The inspector already exposes the three modes
+(`Sharp` / `Smooth` / `Mirrored`); this pass makes set-and-derive explicit rather than
+leaving the tangent to whatever handles happened to exist.
+
+**Mirroring while dragging.** The three modes are pinned by tests in this pass, because
+they were previously only implied by the labels: `angle` mirrors the direction and keeps
+the opposite handle's length, `mirror` mirrors direction and length, and an independent
+handle leaves the opposite one untouched. Conversion sets the persistent mode; dragging
+reads it.
+
+**Refusals, stated in the interface.** Infinite construction lines cannot be split (the
+operation already throws), native arcs keep their own specialist tools rather than being
+bent by dragging, and a locked or hidden object offers none of the five rungs.
+
+### 3.7 Typography and gradients are absent, not weak
 
 There is no text entity and no gradient fill type. These are feature projects, not
 interaction fixes, and they should be sequenced after the interaction layer —
@@ -286,7 +343,7 @@ otherwise there is a sophisticated engine with nothing comfortable to draw with.
 | 1 | ~~Object resize handles and rotation~~ (done) | the editor stops contradicting its own selection UI |
 | 2 | ~~Canvas group selection and one-level entry (3.2)~~ (done) | nested documents, real design files |
 | 3 | General-purpose framing: frame presets beyond icon sizes, neutral empty state | illustration and layout work in the same editor |
-| 4 | Text and gradients (3.6) | typography and illustration, the two missing media |
+| 4 | Text and gradients (3.7) | typography and illustration, the two missing media |
 | 5 | AI: emit operation plans through the same validator `quick-edit.ts` uses | generated work stays editable |
 
 Step 1 is deliberately first: it is the cheapest change with the highest perceived

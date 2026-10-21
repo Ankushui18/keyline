@@ -7,6 +7,17 @@ and the project uses semantic versioning once it publishes releases.
 
 ### Added
 
+- **Direct path editing.** Double-click a segment in point editing to insert an anchor exactly
+  where the pointer meets the curve — the curve does not move, because the insert is the same
+  exact split the Cut tool uses (a cubic splits into two cubics, an arc keeps its radius and
+  sweep) — and the new anchor is selected, so the next drag moves it. Hovering a segment shows a
+  hollow square where that anchor would land. `⌥`-drag a corner anchor to pull a tangent pair out
+  of it as one undo step.
+- **Corner conversion derives its tangent.** `Sharp` / `Smooth` / `Mirrored` in the inspector now
+  do more than record a mode: converting to smooth or mirrored writes a tangent pair derived from
+  the anchor's neighbours, in the same undo step as the mode. Sharp leaves the handles alone.
+  The three mirroring modes are pinned by tests for the first time (`angle` mirrors direction,
+  `mirror` mirrors direction and length).
 - **Hover previews.** Pointing at the canvas now outlines what a click will select: a dashed
   outline for a group and a solid hairline for a shape, drawn as a light preview that never reads
   as the persistent selection. Hover and press resolve through one pipeline

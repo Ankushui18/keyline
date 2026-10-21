@@ -40,6 +40,7 @@ import {
 } from '../core/target-resolution';
 import { buildShapeBuilderResult, regionAtPoint } from '../tools/shape-builder';
 import { prepareCutPaths, prepareSplitAtPoint, prepareSplitSegment } from '../tools/cut-tool';
+import { insertAnchorAt } from '../tools/direct-path-tool';
 import { addWidthPoint, hitTestWidthHandle, updateWidthPoint, type WidthHandle } from '../tools/width-tool';
 import { localEraseSpan, prepareEraseSegment } from '../tools/eraser-tool';
 import { preparePrimitiveObject, type PrimitiveKind } from '../tools/primitive-tool';
@@ -163,6 +164,7 @@ type Gesture =
   | { kind: 'cut'; pointerId: number; startScreen: Point; startWorld: Point; currentWorld: Point }
   | { kind: 'eraser'; pointerId: number; lastScreen: Point; gapNodeIds: EntityId[] }
   | { kind: 'bend-node'; pointerId: number; startScreen: Point; nodeId: EntityId }
+  | { kind: 'pull-handles'; pointerId: number; startScreen: Point; nodeId: EntityId; moving: boolean }
   | { kind: 'bend-segment'; pointerId: number; startScreen: Point; segmentId: EntityId; direct: boolean }
   | { kind: 'bend-handle'; pointerId: number; startScreen: Point; hit: HandleHit; moving: boolean }
   | { kind: 'width'; pointerId: number; handle: WidthHandle; moving: boolean }
@@ -221,6 +223,8 @@ export function VectorCanvas({
   const hoveredHandleRef = useRef<HandleHit | undefined>();
   /** Body preview for the pointer, produced by the same resolver the press uses. */
   const hoveredTargetRef = useRef<PointerTarget | undefined>();
+  /** Where a double-click would insert an anchor on the hovered segment (world space). */
+  const insertPreviewRef = useRef<Point | undefined>();
   const spacePressedRef = useRef(false);
   const altPressedRef = useRef(false);
   const initializedViewportRef = useRef(false);
@@ -319,6 +323,7 @@ export function VectorCanvas({
       hoveredNodeId: hoveredNodeRef.current,
       hoveredSegmentId: hoveredSegmentRef.current,
       hoveredHandle: hoveredHandleRef.current,
+      insertPreview: insertPreviewRef.current,
       hoveredTarget: hoveredTargetRef.current && toolRef.current === 'select'
         ? { bounds: hoveredTargetRef.current.bounds, group: hoveredTargetRef.current.group }
         : undefined,
@@ -361,6 +366,7 @@ export function VectorCanvas({
     hoveredSegmentRef.current = undefined;
     hoveredHandleRef.current = undefined;
     hoveredTargetRef.current = undefined;
+    insertPreviewRef.current = undefined;
     pencilPreviewRef.current = undefined;
     bendPreviewRef.current = undefined;
     cutPreviewRef.current = undefined;
@@ -669,10 +675,27 @@ export function VectorCanvas({
   };
 
   const handleDoubleClick = (event: ReactMouseEvent<HTMLCanvasElement>) => {
-    if (toolRef.current !== 'select' || selectionRef.current.mode !== 'object') return;
     const viewport = viewportRef.current;
     const screen = localPoint(event);
     const world = viewport.screenToWorld(screen);
+    if (toolRef.current === 'select' && selectionRef.current.mode === 'network') {
+      // Double-clicking a segment body inserts an anchor exactly where the pointer meets
+      // the curve, and selects it, so the next drag moves the point you just made.
+      const selection = selectionRef.current;
+      const hit = hitTestSegment(manager.document, world, 7 / viewport.scale, selection.editingObjectId);
+      if (hit?.kind !== 'segment') return;
+      const plan = insertAnchorAt(manager.document, hit.id, editingLocalPoint(world), selection);
+      if (!plan) return;
+      if (executeSafely({ type: 'SPLIT_SEGMENT', payload: plan.split })) {
+        onSelectionChange({ ...selection, nodeIds: new Set([plan.nodeId]), segmentIds: new Set() });
+        hoveredSegmentRef.current = undefined;
+        insertPreviewRef.current = undefined;
+        requestRender();
+      }
+      event.preventDefault();
+      return;
+    }
+    if (toolRef.current !== 'select' || selectionRef.current.mode !== 'object') return;
     const artboardHit = hitTestArtboard(manager.document, world, viewport.scale, selectedArtboardIdsRef.current);
     if (artboardHit?.part === 'title') {
       const artboard = manager.document.getArtboard(artboardHit.artboardId);
@@ -1329,6 +1352,25 @@ export function VectorCanvas({
       } else {
         const nextSelection = selectionForHit(selectionRef.current, hit, event.shiftKey);
         onSelectionChange(nextSelection);
+        const anchor = hit.kind === 'node' ? manager.document.getNode(hit.id) : undefined;
+        // Alt-drag pulls a tangent pair out of a corner, in point editing, without a trip
+        // to the Bend tool. Only corners qualify: an anchor that already has handles is
+        // dragged by its diamonds instead.
+        const canPullHandles = Boolean(anchor && (event.altKey || altPressedRef.current) &&
+          !anchor.handleIn && !anchor.handleOut &&
+          manager.document.connectedSegments(anchor.id).every(canDirectBendSegment));
+        if (anchor && canPullHandles) {
+          gestureRef.current = {
+            kind: 'pull-handles',
+            pointerId: event.pointerId,
+            startScreen: screen,
+            nodeId: anchor.id,
+            moving: false,
+          };
+          canvas.setPointerCapture(event.pointerId);
+          event.preventDefault();
+          return;
+        }
         if (hit.kind === 'node' && nextSelection.nodeIds.has(hit.id)) {
           gestureRef.current = {
             kind: 'move',
@@ -1769,6 +1811,21 @@ export function VectorCanvas({
         manager.rollbackTransaction();
         gestureRef.current = null;
       }
+      return;
+    }
+    if (gesture.kind === 'pull-handles') {
+      const node = manager.document.getNode(gesture.nodeId);
+      if (!node) return;
+      if (!gesture.moving && screenDistance(screen, gesture.startScreen) >= 3) {
+        manager.beginTransaction('Pull out handles');
+        gesture.moving = true;
+      }
+      if (!gesture.moving) return;
+      if (!executeSafely({ type: 'ADD_BEZIER_HANDLES', payload: addHandlesFromDrag(node, localWorld) })) {
+        manager.rollbackTransaction();
+        gestureRef.current = null;
+      }
+      requestRender();
       return;
     }
     if (gesture.kind === 'bend-handle') {
@@ -2247,6 +2304,9 @@ export function VectorCanvas({
         const payload = convertSegmentFromDrag(manager.document, gesture.segmentId, localWorld);
         if (payload) executeSafely({ type: 'CONVERT_TO_BEZIER', payload });
       }
+    } else if (gesture.kind === 'pull-handles' && gesture.moving) {
+      manager.commitTransaction();
+      onSelectionChange(networkSelection(manager.document, [gesture.nodeId]));
     } else if (gesture.kind === 'bend-handle' && gesture.moving) {
       manager.commitTransaction();
     }
@@ -2348,6 +2408,7 @@ export function VectorCanvas({
     hoveredSegmentRef.current = undefined;
     hoveredHandleRef.current = undefined;
     hoveredTargetRef.current = undefined;
+    insertPreviewRef.current = undefined;
     eraserPreviewRef.current = toolRef.current === 'eraser'
       ? { point: localWorld, radius: Math.max(0.5, eraserSettings.weight / 2), shape: eraserSettings.shape }
       : undefined;
@@ -2375,6 +2436,16 @@ export function VectorCanvas({
           hoveredSegmentRef.current = hit.id;
           const segment = manager.document.getSegment(hit.id);
           if (canvas && canDirectBendSegment(segment)) canvas.style.cursor = 'grab';
+          // Show where the insert will land before the double-click commits it.
+          const closest = segment && segment.role !== 'construction'
+            ? closestPointOnSegment(manager.document, segment, localWorld)
+            : undefined;
+          const editingObject = selectionRef.current.editingObjectId
+            ? manager.document.getObject(selectionRef.current.editingObjectId)
+            : undefined;
+          insertPreviewRef.current = closest && editingObject
+            ? transformPoint(closest.point, objectTransformMatrix(editingObject.transform))
+            : undefined;
         }
       }
     } else if (toolRef.current === 'shape-builder' || toolRef.current === 'paint') {
