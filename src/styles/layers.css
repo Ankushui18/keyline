@@ -5,7 +5,7 @@
 .lp-head-actions { display: flex; gap: var(--space-05); }
 .lp .lp-icon, .lp .lp-state, .lp .lp-chevron { width: 24px; height: 24px; display: inline-grid; place-items: center; border: 0; background: transparent; color: var(--text-secondary); border-radius: var(--radius-sm); padding: 0; cursor: pointer; font: inherit; }
 .lp .lp-icon:hover, .lp .lp-state:hover { background: var(--surface-active); color: var(--text-primary); }
-.lp .lp-icon.is-on { background: var(--accent); color: var(--accent); }
+.lp .lp-icon.is-on { background: var(--accent); color: var(--text-on-bright); }
 .lp-page-row { padding: 0 var(--space-25) var(--space-15) var(--space-35); }
 .lp-page-row select, .lp-page-row input { width: 100%; height: 26px; background: var(--surface-canvas); color: var(--text-primary); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 0 var(--space-2); font: inherit; }
 .lp-search { display: flex; align-items: center; gap: var(--space-15); margin: 0 var(--space-25) var(--space-15) var(--space-35); padding: 0 var(--space-1) 0 var(--space-2); height: 28px; background: var(--surface-canvas); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-muted); }
@@ -44,7 +44,7 @@
 .lp-bar-actions button:disabled { opacity: .4; cursor: default; }
 .lp-menu { position: fixed; z-index: var(--z-dialog); width: 200px; padding: var(--space-1); background: var(--graphite-775); border: 1px solid var(--graphite-650); border-radius: var(--radius-lg); box-shadow: 0 10px 30px rgba(0,0,0,.45); display: flex; flex-direction: column; }
 .lp-menu button { display: flex; align-items: center; justify-content: space-between; height: var(--control-height-md); padding: 0 var(--space-2); border: 0; background: transparent; color: var(--text-primary); border-radius: var(--radius-sm); font: inherit; text-align: left; cursor: pointer; }
-.lp-menu button:hover:not(:disabled) { background: var(--accent); color: var(--text-inverse); }
+.lp-menu button:hover:not(:disabled) { background: var(--accent-solid); color: var(--text-on-accent); }
 .lp-menu button:disabled { opacity: .4; cursor: default; }
 .lp-menu button.is-danger:hover:not(:disabled) { background: #D8504D; }
 .lp-menu kbd { font: 11px var(--font-sans); opacity: .6; }

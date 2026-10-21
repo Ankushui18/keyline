@@ -33,7 +33,7 @@
 .reference-sidebar .lp-head-actions { gap: 0; }
 .reference-sidebar .lp .lp-icon { width: 24px; height: 24px; border-radius: var(--radius-xs); color: var(--di-muted); }
 .reference-sidebar .lp .lp-icon:hover { color: var(--text-inverse); background: var(--di-hover); }
-.reference-sidebar .lp .lp-icon.is-on { color: var(--di-accent); background: var(--accent); }
+.reference-sidebar .lp .lp-icon.is-on { color: var(--text-on-bright); background: var(--accent); }
 .reference-sidebar .lp .lp-collapse { margin-left: var(--space-05); border-left: 1px solid var(--di-divider); border-radius: 0; }
 .reference-sidebar .lp-page-row { padding: var(--space-px) var(--space-3) var(--space-2); }
 .reference-sidebar .lp-page-row select, .reference-sidebar .lp-page-row input {
@@ -151,7 +151,7 @@
   color: var(--di-text); font: inherit; cursor: pointer; transition: background-color 100ms, color 100ms;
 }
 .reference-design .di-icon-button:hover:not(:disabled) { background: var(--di-hover); color: var(--text-inverse); }
-.reference-design .di-icon-button[aria-pressed='true'] { color: var(--di-accent); background: var(--accent); }
+.reference-design .di-icon-button[aria-pressed='true'] { color: var(--text-on-bright); background: var(--accent); }
 .reference-design .di-icon-button:disabled { color: var(--text-muted); opacity: .6; cursor: not-allowed; }
 .reference-design .di-alignment-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px; gap: var(--space-2); }
 .reference-design .di-segment-group { display: flex; align-items: center; min-width: 0; height: 27px; padding: 0; border: 0; border-radius: var(--radius-sm); background: var(--di-field); overflow: hidden; }
@@ -179,7 +179,7 @@
 .reference-design .di-frame-popover button:disabled { color: var(--text-muted); cursor: not-allowed; }
 .reference-design .di-frame-presets { display: flex; gap: var(--space-15); }
 .reference-design .di-frame-presets button { flex: 1; height: var(--control-height-sm); min-width: 0; padding: 0 var(--space-1); border: 1px solid var(--graphite-775); border-radius: var(--radius-xs); background: transparent; color: var(--di-text); font-size: var(--font-size-xs); cursor: pointer; }
-.reference-design .di-frame-presets button[aria-pressed='true'] { color: var(--di-text); background: var(--accent); border-color: var(--di-accent); }
+.reference-design .di-frame-presets button[aria-pressed='true'] { color: var(--text-on-bright); background: var(--accent); border-color: var(--di-accent); }
 .reference-design .di-frame-presets button:hover { background: var(--di-hover); }
 
 /* Paint values form one field; the visibility and remove actions remain outside. */
@@ -240,6 +240,6 @@
 .reference-design .stroke-alignment-control > span { color: var(--di-muted); font-size: var(--font-size-2xs); }
 .reference-design .appearance-stroke-section > .numeric-field-grid { margin-top: var(--space-2); margin-bottom: var(--space-2); }
 .reference-design .stroke-alignment-control .segmented-control { padding: 0; gap: var(--space-05); background: transparent; border: 0; border-radius: 0; }
-.reference-design .stroke-alignment-control button[aria-pressed='true'] { color: var(--di-text); background: var(--accent); border-color: var(--di-accent); }
+.reference-design .stroke-alignment-control button[aria-pressed='true'] { color: var(--text-on-bright); background: var(--accent); border-color: var(--di-accent); }
 .reference-sidebar .lp-row.is-selected .lp-meta, .reference-sidebar .lp-row.is-selected.is-hidden .lp-name { color: var(--di-muted); }
 .reference-sidebar .lp-selection-bar > span:first-child { flex: 0 0 auto; white-space: nowrap; }

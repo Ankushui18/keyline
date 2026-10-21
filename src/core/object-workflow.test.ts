@@ -11,7 +11,7 @@ import {
 } from './object-geometry';
 import { isArtworkFillPath } from './segment-semantics';
 import { Viewport } from '../canvas/viewport';
-import { prepareDeleteObject, prepareDuplicateObject, prepareFlipObjects } from './object-operations';
+import { prepareDeleteObject, prepareDuplicateObject, prepareFlipObjects, prepareNudgeObjects } from './object-operations';
 import { OperationManager } from './operations';
 import type { Segment, VectorNode, VectorPath } from './types';
 
@@ -66,6 +66,32 @@ describe('object selection and transforms', () => {
     expect(svg).toContain('M100 50L100 70');
     manager.undo();
     expect(document.getObject(object.id)?.transform).toMatchObject({ x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 });
+  });
+
+  it('nudges whole objects as one undoable step', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    const { segments } = addPath(document, manager, [{ x: 0, y: 0 }, { x: 10, y: 0 }]);
+    const object = document.getObjectForSegment(segments[0].id)!;
+    const plan = prepareNudgeObjects(document, [object.id], { x: 0, y: 10 });
+    expect(plan?.objectIds).toEqual([object.id]);
+    manager.beginTransaction('Nudge objects 10');
+    plan?.operations.forEach((operation) => manager.execute(operation));
+    manager.commitTransaction();
+    expect(document.getObject(object.id)?.transform).toMatchObject({ x: 0, y: 10 });
+    manager.undo();
+    expect(document.getObject(object.id)?.transform).toMatchObject({ x: 0, y: 0 });
+  });
+
+  it('refuses to nudge locked objects and ignores an empty delta', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    const { segments } = addPath(document, manager, [{ x: 0, y: 0 }, { x: 10, y: 0 }]);
+    const object = document.getObjectForSegment(segments[0].id)!;
+    const layer = document.getLayerForObject(object.id)!;
+    manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: layer.id, updates: { locked: true } } });
+    expect(prepareNudgeObjects(document, [object.id], { x: 1, y: 0 })).toBeNull();
+    expect(prepareNudgeObjects(document, [object.id], { x: 0, y: 0 })).toBeNull();
   });
 
   it('uses artwork bounds by default and anchor-only interaction bounds for infinite construction', () => {

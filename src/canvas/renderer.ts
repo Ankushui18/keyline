@@ -13,7 +13,8 @@ import {
 import type { VectorDocument } from '../core/document';
 import { arcSweep, evaluateSegment, isNativeArc } from '../core/geometry';
 import type { CubicCurve } from '../core/geometry';
-import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
+import { INTERACTION_BOUNDS_POLICY, objectBounds, type GeometryBounds } from '../core/object-geometry';
+import { axisAlignedFrame, frameHandlePoints, framePoint, objectFrame, type SelectionFrame } from '../core/object-resize';
 import {
   parametricGroupsForRegion,
   parametricInstanceMatrices,
@@ -116,6 +117,8 @@ interface RenderOptions {
   hoveredNodeId?: EntityId;
   hoveredSegmentId?: EntityId;
   hoveredHandle?: { nodeId: EntityId; handleType: 'in' | 'out' };
+  /** Target preview for the pointer, resolved by the shared target pipeline. */
+  hoveredTarget?: { bounds: GeometryBounds; group: boolean };
   widthToolActive?: boolean;
   remotePresence?: CollaboratorPresence[];
   overlayOnly?: boolean;
@@ -175,6 +178,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
     hoveredNodeId,
     hoveredSegmentId,
     hoveredHandle,
+    hoveredTarget,
     widthToolActive,
     remotePresence,
     overlayOnly = false,
@@ -246,6 +250,7 @@ export function renderVectorScene(context: CanvasRenderingContext2D, options: Re
       hoveredSegmentId,
     );
     drawGeometryImpactHighlights(context, document, viewport.scale, impactObjectIds);
+    if (hoveredTarget) drawHoverTarget(context, hoveredTarget, viewport.scale);
     if (selection.mode === 'object') drawObjectSelection(context, document, viewport.scale, selection.objectIds);
     drawParametricControls(context, document, viewport.scale, selection);
     if (remotePresence?.length) drawRemotePresence(context, document, viewport.scale, remotePresence);
@@ -1099,6 +1104,26 @@ function drawGeometryImpactHighlights(
   context.restore();
 }
 
+/**
+ * A light outline for whatever the pointer would select. Groups are dashed and objects
+ * are solid, so the preview never reads as the persistent selection, which is a solid
+ * frame with square handles.
+ */
+function drawHoverTarget(
+  context: CanvasRenderingContext2D,
+  target: { bounds: GeometryBounds; group: boolean },
+  scale: number,
+): void {
+  const { bounds, group } = target;
+  if (bounds.width <= 0 && bounds.height <= 0) return;
+  context.save();
+  context.strokeStyle = alpha(COLORS.selectedStrong, 0.55);
+  context.lineWidth = 1 / scale;
+  context.setLineDash(group ? [4 / scale, 3 / scale] : []);
+  context.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
+  context.restore();
+}
+
 function drawObjectSelection(
   context: CanvasRenderingContext2D,
   document: VectorDocument,
@@ -1110,7 +1135,19 @@ function drawObjectSelection(
   context.lineWidth = 1 / scale;
   context.lineCap = 'butt';
   context.setLineDash([]);
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const single = objectIds.size === 1;
   for (const objectId of objectIds) {
+    const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
+    if (bounds.width > 0 || bounds.height > 0) {
+      minX = Math.min(minX, bounds.minX);
+      minY = Math.min(minY, bounds.minY);
+      maxX = Math.max(maxX, bounds.maxX);
+      maxY = Math.max(maxY, bounds.maxY);
+    }
     const line = straightLineSelectionPoints(document, objectId);
     if (line) {
       // A one-segment open line has no useful area to box. Trace its actual
@@ -1121,10 +1158,97 @@ function drawObjectSelection(
       context.stroke();
       continue;
     }
-    const bounds = objectBounds(document, objectId, INTERACTION_BOUNDS_POLICY);
+    // A single selection draws its own oriented frame below instead, so a rotated
+    // shape is not boxed twice.
+    if (single) continue;
     if (bounds.width <= 0 && bounds.height <= 0) continue;
     context.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
   }
+
+  // The frame owns the handles, drawn exactly where they are hit tested
+  // (core/object-resize). One object rotates the frame onto its own axes.
+  const frame = single
+    ? objectFrame(document, [...objectIds][0])
+    : maxX > minX || maxY > minY
+      ? axisAlignedFrame({ minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY })
+      : undefined;
+  if (frame) {
+    const [nw, ne, se, sw] = frame.corners;
+    context.beginPath();
+    context.moveTo(nw.x, nw.y);
+    context.lineTo(ne.x, ne.y);
+    context.lineTo(se.x, se.y);
+    context.lineTo(sw.x, sw.y);
+    context.closePath();
+    context.lineWidth = 1.5 / scale;
+    context.strokeStyle = COLORS.selected;
+    context.stroke();
+
+    // Only the eight resize handles are drawn: white squares with a blue edge, the
+    // same shape the artboard handles use, so both frames read as one control.
+    // Rotation has no handle of its own — frameHitTarget owns the zone just
+    // outside each corner, and the cursor is the affordance.
+    const half = 3.5 / scale;
+    for (const { point } of frameHandlePoints(frame)) {
+      context.beginPath();
+      context.rect(point.x - half, point.y - half, half * 2, half * 2);
+      context.fillStyle = COLORS.inverse;
+      context.fill();
+      context.lineWidth = 1.5 / scale;
+      context.strokeStyle = COLORS.selected;
+      context.stroke();
+    }
+    drawSelectionSizeBadge(context, frame, scale);
+  }
+  context.restore();
+}
+
+/**
+ * Figma-style size readout under the frame: `W × H` on a blue pill that turns with
+ * the selection. Screen-sized, so it stays legible at any zoom, and it only draws
+ * when there is room for it to sit clear of the box.
+ */
+function drawSelectionSizeBadge(
+  context: CanvasRenderingContext2D,
+  frame: SelectionFrame,
+  scale: number,
+): void {
+  const width = Math.hypot(frame.corners[1].x - frame.corners[0].x, frame.corners[1].y - frame.corners[0].y);
+  const height = Math.hypot(frame.corners[3].x - frame.corners[0].x, frame.corners[3].y - frame.corners[0].y);
+  if (width <= 0 && height <= 0) return;
+  const label = `${Math.round(width)} × ${Math.round(height)}`;
+  // Screen-sized, never world-sized: the readout is chrome, not artwork.
+  const fontSize = 10 / scale;
+  const paddingX = 4.5 / scale;
+  const barHeight = 15 / scale;
+  context.save();
+  context.font = `590 ${fontSize}px Geist, system-ui, sans-serif`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  const barWidth = context.measureText(label).width + paddingX * 2;
+  // At icon scale the pill would be wider than the shape and cover it, so it only
+  // appears once the selection is comfortably bigger than the readout.
+  if (width * scale < barWidth * 1.15 || height * scale < barHeight * 2) {
+    context.restore();
+    return;
+  }
+  // Text must never render upside down. When the frame has turned past a quarter
+  // turn, the readout hangs off the top edge instead, rotated back into the
+  // readable half turn, so it still follows the shape without inverting.
+  const normalized = ((frame.rotation % 360) + 360) % 360;
+  const flipped = normalized > 90 && normalized < 270;
+  // Outside the frame, whichever edge it hangs from.
+  const gap = flipped ? -barHeight - 7 / scale : 7 / scale;
+  const anchor = framePoint(frame, 0.5, flipped ? 0 : 1);
+  context.translate(anchor.x, anchor.y);
+  context.rotate((frame.rotation + (flipped ? 180 : 0)) * Math.PI / 180);
+  context.beginPath();
+  context.roundRect(-barWidth / 2, gap, barWidth, barHeight, 2.5 / scale);
+  // The deeper blue: white 10 px on the bright frame blue is only 2.9:1.
+  context.fillStyle = COLORS.selectedStrong;
+  context.fill();
+  context.fillStyle = COLORS.inverse;
+  context.fillText(label, 0, gap + barHeight / 2);
   context.restore();
 }
 

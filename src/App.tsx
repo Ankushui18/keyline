@@ -25,8 +25,9 @@ import { createEntityId } from './core/ids';
 import { copyTextToClipboard } from './core/browser-clipboard';
 import { readPreference, writePreference } from './core/preferences';
 import { OperationManager, type SegmentRoleUpdate } from './core/operations';
+import { canEditObject, editableInspectorObjects } from './app/inspector-actions';
 import { pathHasConstruction, selectionIsConstructionOnly } from './core/segment-semantics';
-import { prepareDeleteObject, prepareFlipObjects } from './core/object-operations';
+import { prepareDeleteObject, prepareFlipObjects, prepareNudgeObjects } from './core/object-operations';
 import { DEFAULT_DOCUMENT_NAME, DocumentPersistence, listDocuments, loadDocumentById, markStoredDocumentImported, saveDocument, type SaveStatus } from './core/store';
 import type {
   Appearance,
@@ -469,7 +470,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   }, [announce, document, manager]);
 
   const updateObject = useCallback((objectId: EntityId, updates: Partial<NetworkObject>) => {
-    if (document.isObjectLocked(objectId) || !document.isObjectVisible(objectId)) return;
+    if (!canEditObject(document, objectId)) return;
     const layer = document.getLayerForObject(objectId);
     const syncName = typeof updates.name === 'string' && layer && updates.name !== layer.name;
     if (syncName) manager.beginTransaction('Rename object');
@@ -488,7 +489,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   const updateAppearance = useCallback((appearanceId: EntityId, updates: Partial<Appearance>) => {
     const owner = [...document.objects.values()].find((object) => object.appearanceId === appearanceId);
     const appearance = document.getAppearance(appearanceId);
-    if (!owner || !appearance || document.isObjectLocked(owner.id) || !document.isObjectVisible(owner.id)) return;
+    if (!owner || !appearance || !canEditObject(document, owner.id)) return;
     if (owner.appearanceRuleId) {
       const rule = document.getAppearanceRule(owner.appearanceRuleId);
       if (!rule) return;
@@ -523,10 +524,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
   }, [announce, manager]);
 
   const updateObjects = useCallback((objectIds: EntityId[], updates: Partial<NetworkObject['transform']>) => {
-    const objects = objectIds
-      .map((id) => document.getObject(id))
-      .filter((object): object is NetworkObject => object !== undefined)
-      .filter((object) => document.isObjectVisible(object.id) && !document.isObjectLocked(object.id));
+    const objects = editableInspectorObjects(document, objectIds);
     if (objects.length === 0) return;
     try {
       manager.beginTransaction(objects.length > 1 ? 'Update objects' : 'Update object');
@@ -562,10 +560,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
     updates: AppearanceUpdates,
     continuous = false,
   ) => {
-    const objects = objectIds
-      .map((id) => document.getObject(id))
-      .filter((object): object is NetworkObject => object !== undefined)
-      .filter((object) => document.isObjectVisible(object.id) && !document.isObjectLocked(object.id));
+    const objects = editableInspectorObjects(document, objectIds);
     if (objects.length === 0) return;
     try {
       if (!continuous) manager.beginTransaction(objects.length > 1 ? 'Update object appearances' : 'Update object appearance');
@@ -1827,9 +1822,31 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
         }
         return;
       }
-      const nudgeDirection = !modifier && !event.altKey && selection.mode === 'network'
+      const arrowDirection = !modifier && !event.altKey
         ? ({ ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } } as const)[event.key as 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown']
         : undefined;
+      if (arrowDirection && selection.mode === 'object' && selection.objectIds.size > 0) {
+        // Arrow keys move whole objects too, one pixel or ten with Shift, and the
+        // whole nudge is one undoable step.
+        const distance = event.shiftKey ? 10 : 1;
+        const plan = prepareNudgeObjects(document, selection.objectIds, {
+          x: arrowDirection.x * distance,
+          y: arrowDirection.y * distance,
+        });
+        if (plan) {
+          event.preventDefault();
+          manager.beginTransaction(distance === 10 ? 'Nudge objects 10' : 'Nudge objects');
+          try {
+            plan.operations.forEach((operation) => manager.execute(operation));
+            manager.commitTransaction();
+          } catch (error) {
+            manager.rollbackTransaction();
+            console.warn('Nudge rejected by constraint pre-validation.', error);
+          }
+        }
+        return;
+      }
+      const nudgeDirection = selection.mode === 'network' ? arrowDirection : undefined;
       if (nudgeDirection && selection.nodeIds.size > 0) {
         const distance = event.shiftKey ? 10 : 1;
         const positions = [...selection.nodeIds]
@@ -2162,6 +2179,7 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           activeTool={activeTool}
           constructionExtent={constructionExtent}
           toolDisabledReasons={toolDisabledReasons}
+          interactionBlocked={commandOpen || exportOpen || shareOpen || settingsOpen || motionOpen || setViewOpen || familyCollectionOpen || constraintsOpen}
           selection={selection}
           selectedArtboardIds={selectedArtboardIds}
           impactObjectIds={geometryImpactObjectIds}
@@ -2178,6 +2196,12 @@ function Workspace({ runtime, loadError, initialName, start, onHome }: { runtime
           onPresenceCursor={(point) => collaborationRef.current?.setCursor(point)}
           onSelectionChange={(next) => {
             setSelection(next);
+            // While inside a group the Layers panel highlights the group being edited;
+            // a group selection at the root highlights every member, as it always did.
+            if (next.groupContext) {
+              setSelectedLayerIds(new Set([next.groupContext]));
+              return;
+            }
             const layerIds = [...next.objectIds]
               .map((objectId) => document.getLayerForObject(objectId)?.id)
               .filter((id): id is EntityId => Boolean(id));

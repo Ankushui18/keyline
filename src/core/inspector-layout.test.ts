@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { preparePrimitiveObject } from '../tools/primitive-tool';
 import { prepareCreateIconArtboard } from './artboard-operations';
 import { VectorDocument } from './document';
-import { alignmentUpdates, arrangementUpdates, resizedObjectTransform, verticalDistributionUpdates, type InspectorTransformUpdate, type ObjectAlignment } from './inspector-layout';
+import {
+  alignmentUpdates, arrangementUpdates, canAlignObjects, canArrangeObjects, canDistributeObjects,
+  editableObjectIds, resizedObjectTransform, verticalDistributionUpdates,
+  type InspectorTransformUpdate, type ObjectAlignment,
+} from './inspector-layout';
 import { objectBounds, objectBoundsForTransform } from './object-geometry';
 import { OperationManager } from './operations';
 
@@ -113,6 +117,50 @@ describe('reference Design inspector geometry', () => {
     expect(first.minY).toBe(100);
     expect(third.maxY).toBe(290);
     expect(second.minY - first.maxY).toBeCloseTo(third.minY - second.maxY);
+  });
+
+  it('reports availability from the same set the commands act on', () => {
+    const { document, manager, add } = fixture();
+    const first = add(90, 100);
+    const second = add(190, 180);
+    const third = add(290, 250);
+    expect(canAlignObjects(document, [first.id])).toBe(true);
+    expect(canAlignObjects(document, [first.id, second.id])).toBe(true);
+    expect(canAlignObjects(document, [])).toBe(false);
+    expect(canDistributeObjects(document, [first.id, second.id])).toBe(false);
+    expect(canDistributeObjects(document, [first.id, second.id, third.id])).toBe(true);
+    expect(canArrangeObjects(document, [first.id, second.id])).toBe(true);
+    expect(canArrangeObjects(document, [first.id, first.id])).toBe(false);
+    expect(editableObjectIds(document, [first.id, second.id])).toEqual([first.id, second.id]);
+    manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: document.getLayerForObject(second.id)!.id, updates: { locked: true } } });
+    manager.execute({ type: 'UPDATE_LAYER', payload: { layerId: document.getLayerForObject(third.id)!.id, updates: { visible: false } } });
+    expect(editableObjectIds(document, [first.id, second.id, third.id])).toEqual([first.id]);
+    // One editable object among several cannot fall back to the frame, so alignment is not offered.
+    expect(canAlignObjects(document, [first.id, second.id])).toBe(false);
+    expect(canDistributeObjects(document, [first.id, second.id, third.id])).toBe(false);
+    expect(canArrangeObjects(document, [first.id, second.id])).toBe(false);
+  });
+
+  it('does not offer alignment for artwork that lives outside every frame', () => {
+    const document = VectorDocument.createEmpty();
+    const manager = new OperationManager(document);
+    manager.execute({ type: 'UPDATE_ARTBOARD', payload: { artboardId: document.activeArtboardId, updates: { frame: { x: 0, y: 0, width: 20, height: 20 } } } });
+    const plan = preparePrimitiveObject(document, 'rectangle', { x: 200, y: 200 }, { x: 240, y: 240 })!;
+    manager.beginTransaction('Artwork on the canvas root');
+    plan.operations.forEach((operation) => manager.execute(operation));
+    manager.commitTransaction();
+    const layer = document.getLayerForObject(plan.objectId)!;
+    expect(document.getArtboard(layer.artboardId)?.isCanvasRoot).toBe(true);
+    expect(canAlignObjects(document, [plan.objectId])).toBe(false);
+    expect(alignmentUpdates(document, [plan.objectId], 'left')).toEqual([]);
+  });
+
+  it('skips distribution transforms that would not move anything', () => {
+    const { document, add } = fixture();
+    // Already evenly spaced: 100..140, 174..214, 248..288 with equal 34 gaps.
+    const objects = [add(90, 100, 40, 40), add(190, 174, 40, 40), add(290, 248, 40, 40)];
+    expect(verticalDistributionUpdates(document, objects.map(({ id }) => id))).toEqual([]);
+    expect(canDistributeObjects(document, objects.map(({ id }) => id))).toBe(true);
   });
 
   it('resizes with and without the ratio lock while preserving visual position', () => {

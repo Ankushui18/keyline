@@ -9,7 +9,7 @@ and export production-ready SVG, PNG, React and CSS — from your browser, with 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/Ankushui18/keyline/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
-  <img src="https://img.shields.io/badge/tests-318%20passing-brightgreen" alt="318 tests passing">
+  <img src="https://img.shields.io/badge/tests-401%20passing-brightgreen" alt="401 tests passing">
   <img src="https://img.shields.io/badge/node-20.19%2B%20%7C%2022.12%2B-339933" alt="Node 20.19+ or 22.12+">
   <img src="https://img.shields.io/badge/storage-on%20this%20device-6b7686" alt="Stored on this device">
 </p>
@@ -32,7 +32,7 @@ Keyline is a **web app you run locally**, not a hosted service. Pick the path th
 | **See what's missing** (honest list) | [Known limits](#known-limits) |
 | **Read the security/audit record** | [SECURITY.md](SECURITY.md) · [docs/AUDIT.md](docs/AUDIT.md) |
 
-> **Status: v0.1.0, source release.** Covers the icon workflow described below, verified by 318
+> **Status: v0.1.0, source release.** Covers the icon workflow described below, verified by 401
 > automated tests. It is not a hosted product and has no user accounts.
 
 ---
@@ -128,6 +128,8 @@ Full walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
 | [docs/COLLABORATION.md](docs/COLLABORATION.md) | Yjs model, relay limits, deployment boundary, revocation reality. |
 | [docs/FAQ.md](docs/FAQ.md) | Storage, privacy, offline use, compatibility, common confusions. |
 | [docs/AUDIT.md](docs/AUDIT.md) | The full audit-and-remediation record with evidence. |
+| [docs/EDITING-AUDIT.md](docs/EDITING-AUDIT.md) | How selection and editing behave today, against what a conventional vector editor does, and the smallest change set that closes the gap. |
+| [docs/PRODUCT-AUDIT.md](docs/PRODUCT-AUDIT.md) | The whole product measured against the P0–P5 plan: a per-area feature matrix (verified / partial / missing / unknown) with source evidence, and the gap report in dependency order. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · [CHANGELOG.md](CHANGELOG.md) | How to contribute, how to report a vulnerability, what changed. |
 | [solver/README.md](solver/README.md) · [src/constraints/README.md](src/constraints/README.md) | Wasm boundary and the two-solver contract. |
 
@@ -178,18 +180,20 @@ keyline/
 ```bash
 npm ci
 npm run check      # design gate + build + tests + Wasm smoke + relay + doc links
-npm test           # 318 tests across 57 test files
+npm test           # 401 tests across 62 test files
 npm run test:solver
 npm run test:collaboration
 npm run check:docs # every relative doc link resolves
 npm run check:design # tokens, CSS↔TS parity, colour/type/radius/z-index, contrast
 npm run audit:design # design-consistency report: how many values each dimension uses
+npm run test:conformance # resolve the cascade; check contrast + button geometry
+npm run proof:design # render the design system to design-proof/index.html
 ```
 
 Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 
 - **Strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`) and a production Vite build.
-- **318 tests / 57 files** covering geometry, native arcs, regions, constraints, transactions,
+- **401 tests / 62 files** covering geometry, native arcs, regions, constraints, transactions,
   persistence, export fidelity and escaping, collaboration replay, and performance budgets.
 - **A real Wasm smoke test** that loads the committed artifact and checks native-arc solving —
   not a mock of the boundary.
@@ -199,6 +203,9 @@ Every push runs [CI](.github/workflows/ci.yml) on Node 22 and Rust stable:
 - **A design-system gate** so one palette stays one palette: token integrity, CSS↔TS parity,
   a literal-colour ratchet, no dangling `var(--x)`, type/radius/spacing/z-index on scale, and
   eleven WCAG contrast pairs.
+- **A conformance run** that resolves the entire cascade and checks 361 ink/background pairs and
+  the geometry of 27 button classes — it caught four invisible-on-active icons and nine sub-AA
+  text pairs the source-level gate could not see.
 - **Documentation checks** so relative links cannot rot and the published test count cannot drift.
 
 Browser suites are available locally but are **not** in CI because they require a preinstalled

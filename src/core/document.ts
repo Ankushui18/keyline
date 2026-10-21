@@ -99,6 +99,9 @@ export class VectorDocument implements VectorDocumentData {
   activePageId: EntityId;
   activeArtboardId: EntityId;
   isolatedLayerId?: EntityId;
+  /** Bumped by every document mutation so derived caches can tell when they are stale. */
+  private revisionCounter = 0;
+  private layerIndex?: { revision: number; byObject: Map<EntityId, LayerNode> };
 
   constructor(snapshot?: DocumentSnapshot) {
     this.id = snapshot?.id ?? createEntityId();
@@ -187,7 +190,13 @@ export class VectorDocument implements VectorDocumentData {
     return document;
   }
 
+  /** Monotonic document revision. Any mutation changes it; nothing else does. */
+  get revision(): number { return this.revisionCounter; }
+
+  private touch(): void { this.revisionCounter += 1; }
+
   _replaceFromSnapshot(snapshot: DocumentSnapshot): void {
+    this.touch();
     const replacement = new VectorDocument(snapshot);
     this.id = replacement.id;
     this.networks = replacement.networks;
@@ -294,7 +303,16 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   getLayerForObject(objectId: EntityId): LayerNode | undefined {
-    return [...this.layers.values()].find((item) => item.kind === 'object' && item.objectId === objectId);
+    // Pointer moves ask this for every object under the cursor, so the scan is replaced
+    // by an index that is rebuilt only when the document revision changes.
+    if (!this.layerIndex || this.layerIndex.revision !== this.revision) {
+      const byObject = new Map<EntityId, LayerNode>();
+      for (const layer of this.layers.values()) {
+        if (layer.kind === 'object' && layer.objectId) byObject.set(layer.objectId, layer);
+      }
+      this.layerIndex = { revision: this.revision, byObject };
+    }
+    return this.layerIndex.byObject.get(objectId);
   }
 
   objectsForArtboard(artboardId: EntityId): NetworkObject[] {
@@ -440,6 +458,7 @@ export class VectorDocument implements VectorDocumentData {
   // These methods are intentionally prefixed internal: OperationManager is the
   // only production caller, keeping every graph mutation transactional.
   _addNetwork(network: VectorNetwork, index?: number): void {
+    this.touch();
     if (this.getNetwork(network.id)) throw new Error(`Network ${network.id} already exists.`);
     if (network.nodeIds.length > 0 || network.pathIds.length > 0) {
       throw new Error('Add a network before attaching graph entities.');
@@ -448,6 +467,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _removeNetwork(networkId: EntityId): void {
+    this.touch();
     const network = this.getNetwork(networkId);
     if (!network) throw new Error(`Unknown network ${networkId}.`);
     if (network.nodeIds.length > 0 || network.pathIds.length > 0) {
@@ -460,6 +480,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addNode(node: VectorNode, networkId: EntityId, index?: number): void {
+    this.touch();
     if (this.nodes.has(node.id)) throw new Error(`Node ${node.id} already exists.`);
     const network = this.requireNetwork(networkId);
     this.nodes.set(node.id, cloneNode(node));
@@ -467,6 +488,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _removeNode(nodeId: EntityId, networkId: EntityId): void {
+    this.touch();
     for (const segment of this.segments.values()) {
       if (segment.startNodeId === nodeId || segment.endNodeId === nodeId) {
         throw new Error(`Cannot remove connected node ${nodeId}.`);
@@ -477,6 +499,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _moveNode(nodeId: EntityId, delta: { x: number; y: number }): void {
+    this.touch();
     const node = this.requireNode(nodeId);
     node.position.x += delta.x;
     node.position.y += delta.y;
@@ -491,17 +514,20 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setNodeMode(nodeId: EntityId, mode: VectorNode['handleMode']): void {
+    this.touch();
     const node = this.requireNode(nodeId);
     node.handleMode = mode;
   }
 
   _addPath(path: VectorPath, networkId: EntityId, index?: number): void {
+    this.touch();
     if (this.paths.has(path.id)) throw new Error(`Path ${path.id} already exists.`);
     this.paths.set(path.id, clonePath(path));
     insertAt(this.requireNetwork(networkId).pathIds, path.id, index);
   }
 
   _removePath(pathId: EntityId, networkId: EntityId): void {
+    this.touch();
     const path = this.requirePath(pathId);
     if (path.segmentIds.length > 0) throw new Error(`Cannot remove non-empty path ${pathId}.`);
     this.paths.delete(pathId);
@@ -509,6 +535,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addSegment(segment: Segment, pathId: EntityId, index?: number): void {
+    this.touch();
     if (this.segments.has(segment.id)) throw new Error(`Segment ${segment.id} already exists.`);
     validateSegmentGeometry(segment);
     const start = this.requireNode(segment.startNodeId);
@@ -520,11 +547,13 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _removeSegment(segmentId: EntityId, pathId: EntityId): void {
+    this.touch();
     this.segments.delete(segmentId);
     removeValue(this.requirePath(pathId).segmentIds, segmentId);
   }
 
   _setPathClosed(pathId: EntityId, isClosed: boolean): void {
+    this.touch();
     this.requirePath(pathId).isClosed = isClosed;
   }
 
@@ -538,6 +567,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setSegmentType(segmentId: EntityId, type: Segment['type']): void {
+    this.touch();
     const segment = this.segments.get(segmentId);
     if (!segment) throw new Error(`Unknown segment ${segmentId}.`);
     const geometry: Segment = { ...segment, type };
@@ -553,6 +583,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setSegmentGeometry(segmentId: EntityId, geometry: Segment): void {
+    this.touch();
     const segment = this.segments.get(segmentId);
     if (!segment) throw new Error(`Unknown segment ${segmentId}.`);
     if (geometry.id !== segmentId) throw new Error('Segment geometry cannot change its entity ID.');
@@ -597,6 +628,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setSegmentWidthProfile(segmentId: EntityId, widthProfile: Segment['widthProfile']): void {
+    this.touch();
     const segment = this.segments.get(segmentId);
     if (!segment) throw new Error(`Unknown segment ${segmentId}.`);
     const geometry: Segment = {
@@ -608,16 +640,19 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addParametricGroup(group: ParametricGroup): void {
+    this.touch();
     if (this.parametricGroups.has(group.id)) throw new Error(`Parametric group ${group.id} already exists.`);
     assertValidParametricGroup(this, group);
     this.parametricGroups.set(group.id, cloneParametricGroup(group));
   }
 
   _removeParametricGroup(groupId: EntityId): void {
+    this.touch();
     this.parametricGroups.delete(groupId);
   }
 
   _setParametricGroup(groupId: EntityId, group: ParametricGroup): void {
+    this.touch();
     if (!this.parametricGroups.has(groupId)) throw new Error(`Unknown parametric group ${groupId}.`);
     if (group.id !== groupId) throw new Error('Parametric group cannot change its entity ID.');
     assertValidParametricGroup(this, group);
@@ -625,29 +660,35 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addExportVariable(variable: ExportVariable): void {
+    this.touch();
     if (this.exportVariables.has(variable.id)) throw new Error(`Export variable ${variable.id} already exists.`);
     this.exportVariables.set(variable.id, { ...variable });
   }
 
   _updateExportVariable(variableId: EntityId, variable: ExportVariable): void {
+    this.touch();
     if (!this.exportVariables.has(variableId)) throw new Error(`Unknown export variable ${variableId}.`);
     this.exportVariables.set(variableId, { ...variable, id: variableId });
   }
 
   _removeExportVariable(variableId: EntityId): void {
+    this.touch();
     this.exportVariables.delete(variableId);
   }
 
   _setExportMetadata(metadata: DocumentExportMetadata): void {
+    this.touch();
     this.exportMetadata = cloneExportMetadata(metadata);
   }
 
   _addAppearanceRule(rule: AppearanceRule): void {
+    this.touch();
     if (this.appearanceRules.has(rule.id)) throw new Error(`Appearance rule ${rule.id} already exists.`);
     this.appearanceRules.set(rule.id, cloneAppearanceRule(rule));
   }
 
   _removeAppearanceRule(ruleId: EntityId): void {
+    this.touch();
     if (this.objectsForAppearanceRule(ruleId).length > 0) {
       throw new Error(`Cannot remove appearance rule ${ruleId} while objects still use it.`);
     }
@@ -655,6 +696,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setAppearanceRule(ruleId: EntityId, rule: AppearanceRule): void {
+    this.touch();
     if (!this.appearanceRules.has(ruleId)) throw new Error(`Unknown appearance rule ${ruleId}.`);
     if (rule.id !== ruleId) throw new Error('Appearance rule cannot change its entity ID.');
     const next = cloneAppearanceRule(rule);
@@ -666,6 +708,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addGeometryComponent(component: GeometryComponent): void {
+    this.touch();
     if (this.geometryComponents.has(component.id)) {
       throw new Error(`Geometry component ${component.id} already exists.`);
     }
@@ -674,6 +717,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setGeometryComponent(componentId: EntityId, component: GeometryComponent): void {
+    this.touch();
     if (!this.geometryComponents.has(componentId)) {
       throw new Error(`Unknown geometry component ${componentId}.`);
     }
@@ -685,12 +729,14 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _removeGeometryComponent(componentId: EntityId): void {
+    this.touch();
     if (!this.geometryComponents.delete(componentId)) {
       throw new Error(`Unknown geometry component ${componentId}.`);
     }
   }
 
   _setNodePosition(nodeId: EntityId, position: { x: number; y: number }): void {
+    this.touch();
     const node = this.requireNode(nodeId);
     this._moveNode(nodeId, {
       x: position.x - node.position.x,
@@ -699,12 +745,14 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addConstraint(constraint: Constraint): void {
+    this.touch();
     if (this.constraints.has(constraint.id)) throw new Error(`Constraint ${constraint.id} already exists.`);
     this.constraints.set(constraint.id, cloneConstraint(constraint));
     this.attachConstraint(constraint);
   }
 
   _removeConstraint(constraintId: EntityId): void {
+    this.touch();
     this.constraints.delete(constraintId);
     for (const node of this.nodes.values()) {
       removeValue(node.constraintIds, constraintId);
@@ -712,6 +760,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _updateConstraint(constraintId: EntityId, constraint: Constraint): void {
+    this.touch();
     if (!this.constraints.has(constraintId)) throw new Error(`Unknown constraint ${constraintId}.`);
     this._removeConstraint(constraintId);
     this.constraints.set(constraintId, cloneConstraint(constraint));
@@ -719,15 +768,18 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setRegions(regions: Region[]): void {
+    this.touch();
     this.regions = regions;
   }
 
   _rebuildConstraintAttachments(): void {
+    this.touch();
     for (const node of this.nodes.values()) node.constraintIds = [];
     for (const constraint of this.constraints.values()) this.attachConstraint(constraint);
   }
 
   _setRegionFill(regionId: EntityId, fill: Region['fill']): void {
+    this.touch();
     const region = this.regions.find((item) => item.id === regionId);
     if (!region) throw new Error(`Unknown region ${regionId}.`);
     if (fill && (fill.type !== 'solid' || typeof fill.color !== 'string' || fill.color.length === 0)) {
@@ -737,6 +789,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setRegionFillRule(regionId: EntityId, fillRule: FillRule): void {
+    this.touch();
     const region = this.regions.find((item) => item.id === regionId);
     if (!region) throw new Error(`Unknown region ${regionId}.`);
     if (fillRule !== 'nonzero' && fillRule !== 'evenodd') {
@@ -746,12 +799,14 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addPage(page: DocumentPage, index?: number): void {
+    this.touch();
     if (this.getPage(page.id)) throw new Error(`Page ${page.id} already exists.`);
     if (page.artboardIds.length > 0) throw new Error('Add a page before attaching artboards.');
     insertAt(this.pages, clonePage(page), index);
   }
 
   _removePage(pageId: EntityId): void {
+    this.touch();
     const page = this.getPage(pageId);
     if (!page) throw new Error(`Unknown page ${pageId}.`);
     if (page.artboardIds.length > 0) throw new Error(`Cannot remove non-empty page ${pageId}.`);
@@ -761,6 +816,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setPage(pageId: EntityId, page: DocumentPage): void {
+    this.touch();
     const index = this.pages.findIndex((item) => item.id === pageId);
     if (index < 0) throw new Error(`Unknown page ${pageId}.`);
     if (page.id !== pageId) throw new Error('Page cannot change its entity ID.');
@@ -768,6 +824,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _movePage(pageId: EntityId, index: number): void {
+    this.touch();
     const current = this.pages.findIndex((item) => item.id === pageId);
     if (current < 0) throw new Error(`Unknown page ${pageId}.`);
     const [page] = this.pages.splice(current, 1);
@@ -775,6 +832,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addArtboard(artboard: Artboard, pageId: EntityId, index?: number): void {
+    this.touch();
     if (this.artboards.has(artboard.id)) throw new Error(`Artboard ${artboard.id} already exists.`);
     if (artboard.layerIds.length > 0) throw new Error('Add an artboard before attaching layers.');
     const page = this.getPage(pageId);
@@ -784,6 +842,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _removeArtboard(artboardId: EntityId, pageId: EntityId): void {
+    this.touch();
     const artboard = this.artboards.get(artboardId);
     if (!artboard) throw new Error(`Unknown artboard ${artboardId}.`);
     if (artboard.layerIds.length > 0) throw new Error(`Cannot remove non-empty artboard ${artboardId}.`);
@@ -798,12 +857,14 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setArtboard(artboardId: EntityId, artboard: Artboard): void {
+    this.touch();
     if (!this.artboards.has(artboardId)) throw new Error(`Unknown artboard ${artboardId}.`);
     if (artboard.id !== artboardId) throw new Error('Artboard cannot change its entity ID.');
     this.artboards.set(artboardId, cloneArtboard(artboard));
   }
 
   _moveArtboard(artboardId: EntityId, pageId: EntityId, index: number): void {
+    this.touch();
     const page = this.getPage(pageId);
     const artboard = this.getArtboard(artboardId);
     if (!page || !artboard || artboard.pageId !== pageId) throw new Error('Artboard must belong to the page.');
@@ -814,6 +875,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addLayer(layer: LayerNode, index?: number): void {
+    this.touch();
     if (this.layers.has(layer.id)) throw new Error(`Layer ${layer.id} already exists.`);
     if (layer.childIds.length > 0) throw new Error('Add a layer before attaching child layers.');
     if (layer.kind === 'object') {
@@ -827,6 +889,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _removeLayer(layerId: EntityId): void {
+    this.touch();
     const layer = this.layers.get(layerId);
     if (!layer) throw new Error(`Unknown layer ${layerId}.`);
     if (layer.childIds.length > 0) throw new Error(`Cannot remove non-empty layer ${layerId}.`);
@@ -835,6 +898,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setLayer(layerId: EntityId, layer: LayerNode): void {
+    this.touch();
     const current = this.layers.get(layerId);
     if (!current) throw new Error(`Unknown layer ${layerId}.`);
     if (layer.id !== layerId) throw new Error('Layer cannot change its entity ID.');
@@ -845,6 +909,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _moveLayer(layerId: EntityId, parentId: EntityId | undefined, artboardId: EntityId, index?: number): void {
+    this.touch();
     const layer = this.layers.get(layerId);
     if (!layer) throw new Error(`Unknown layer ${layerId}.`);
     if (parentId === layerId || (parentId && this.layerContains(layerId, parentId))) {
@@ -859,6 +924,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addObject(object: NetworkObject): void {
+    this.touch();
     if (this.objects.has(object.id)) throw new Error(`Object ${object.id} already exists.`);
     if (!this.getNetwork(object.networkId)) throw new Error(`Unknown network ${object.networkId}.`);
     if (!this.appearances.has(object.appearanceId)) throw new Error(`Unknown appearance ${object.appearanceId}.`);
@@ -870,6 +936,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _removeObject(objectId: EntityId): void {
+    this.touch();
     if (this.getLayerForObject(objectId)) throw new Error(`Cannot remove object ${objectId} while it is in the layer tree.`);
     if (this.geometryComponentForObject(objectId)) {
       throw new Error(`Cannot remove object ${objectId} while it belongs to a geometry component.`);
@@ -878,6 +945,7 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setObject(objectId: EntityId, object: NetworkObject): void {
+    this.touch();
     if (!this.objects.has(objectId)) throw new Error(`Unknown object ${objectId}.`);
     if (object.id !== objectId) throw new Error('Object cannot change its entity ID.');
     if (!this.getNetwork(object.networkId)) throw new Error(`Unknown network ${object.networkId}.`);
@@ -889,11 +957,13 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _addAppearance(appearance: Appearance): void {
+    this.touch();
     if (this.appearances.has(appearance.id)) throw new Error(`Appearance ${appearance.id} already exists.`);
     this.appearances.set(appearance.id, cloneAppearance(appearance));
   }
 
   _removeAppearance(appearanceId: EntityId): void {
+    this.touch();
     if ([...this.objects.values()].some((item) => item.appearanceId === appearanceId)) {
       throw new Error(`Cannot remove appearance ${appearanceId} while it is in use.`);
     }
@@ -901,17 +971,20 @@ export class VectorDocument implements VectorDocumentData {
   }
 
   _setAppearance(appearanceId: EntityId, appearance: Appearance): void {
+    this.touch();
     if (!this.appearances.has(appearanceId)) throw new Error(`Unknown appearance ${appearanceId}.`);
     if (appearance.id !== appearanceId) throw new Error('Appearance cannot change its entity ID.');
     this.appearances.set(appearanceId, cloneAppearance(appearance));
   }
 
   _setLayerIsolation(layerId?: EntityId): void {
+    this.touch();
     if (layerId && !this.layers.has(layerId)) throw new Error(`Unknown layer ${layerId}.`);
     this.isolatedLayerId = layerId;
   }
 
   _setActiveLocation(pageId: EntityId, artboardId: EntityId): void {
+    this.touch();
     const page = this.getPage(pageId);
     const artboard = this.artboards.get(artboardId);
     if (!page || !artboard || artboard.pageId !== pageId || !page.artboardIds.includes(artboardId)) {

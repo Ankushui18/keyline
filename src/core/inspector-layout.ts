@@ -6,6 +6,41 @@ export type ObjectAlignment = 'left' | 'center-x' | 'right' | 'top' | 'center-y'
 export type LayoutArrangement = 'horizontal' | 'vertical' | 'grid';
 export interface InspectorTransformUpdate { objectId: EntityId; transform: NetworkObject['transform'] }
 
+/** The ids an inspector command can actually move: existing, visible and unlocked. */
+export function editableObjectIds(document: VectorDocument, ids: EntityId[]): EntityId[] {
+  return [...new Set(ids)]
+    .filter((id) => document.getObject(id) !== undefined)
+    .filter((id) => document.isObjectVisible(id) && !document.isObjectLocked(id));
+}
+
+/**
+ * True when alignment has an area to align against: two or more editable objects, or one
+ * object that sits inside a real frame. The canvas root has no bounds, so a lone shape
+ * outside every frame has nothing to align to.
+ */
+export function canAlignObjects(document: VectorDocument, ids: EntityId[]): boolean {
+  const editable = editableObjectIds(document, ids);
+  if (editable.length >= 2) return true;
+  if (editable.length !== 1 || new Set(ids).size > 1) return false;
+  const layer = document.getLayerForObject(editable[0]);
+  const frame = layer ? document.getArtboard(layer.artboardId) : undefined;
+  return Boolean(frame && !frame.isCanvasRoot);
+}
+
+/** Arrangement needs two or more movable objects with real geometry. */
+export function canArrangeObjects(document: VectorDocument, ids: EntityId[]): boolean {
+  return editableObjectIds(document, ids)
+    .filter((id) => {
+      const bounds = objectBounds(document, id, ARTWORK_BOUNDS_POLICY);
+      return bounds.width > 0 || bounds.height > 0;
+    }).length >= 2;
+}
+
+/** Distribution needs three or more movable objects; the outer two stay put. */
+export function canDistributeObjects(document: VectorDocument, ids: EntityId[]): boolean {
+  return editableObjectIds(document, ids).length >= 3;
+}
+
 function editableObjects(document: VectorDocument, ids: EntityId[]) {
   return [...new Set(ids)]
     .map((id) => document.getObject(id))
@@ -81,6 +116,9 @@ export function verticalDistributionUpdates(document: VectorDocument, ids: Entit
     const transform = { ...object.transform, y: object.transform.y + cursor - bounds.minY };
     cursor += bounds.height + gap;
     return { objectId: object.id, transform };
+  }).filter(({ objectId, transform }) => {
+    const current = document.getObject(objectId)!.transform;
+    return Math.abs(current.y - transform.y) > 1e-9;
   });
 }
 

@@ -30,9 +30,14 @@ import {
   hitTest,
   hitTestObject,
   hitTestSegment,
+  nextObjectUnderPoint,
+  objectsUnderPoint,
   selectionForHit,
-  selectionForObjectHit,
 } from '../tools/select-tool';
+import { exitGroupContext, selectionForTarget } from '../core/group-context';
+import {
+  parentGroupTarget, resolveObjectPress, resolvePointerTarget, type PointerTarget,
+} from '../core/target-resolution';
 import { buildShapeBuilderResult, regionAtPoint } from '../tools/shape-builder';
 import { prepareCutPaths, prepareSplitAtPoint, prepareSplitSegment } from '../tools/cut-tool';
 import { addWidthPoint, hitTestWidthHandle, updateWidthPoint, type WidthHandle } from '../tools/width-tool';
@@ -50,6 +55,19 @@ import {
 } from '../tools/bend-tool';
 import { closestPointOnSegment, pointInPolygon, segmentCurve } from '../core/geometry';
 import { INTERACTION_BOUNDS_POLICY, objectBounds } from '../core/object-geometry';
+import {
+  frameCenter,
+  frameHitTarget,
+  prepareResizeObjects,
+  prepareRotateObjects,
+  resizeCursor,
+  selectionFrame,
+  transformTargets,
+  type FrameHandle,
+  type ResizeHandle,
+  type SelectionFrame,
+  type TransformTarget,
+} from '../core/object-resize';
 import { prepareDuplicateArtboard } from '../core/artboard-operations';
 import { prepareDuplicateObject } from '../core/object-operations';
 import { parametricSourceObjectId, resolveParametricTransform } from '../core/parametric';
@@ -65,7 +83,7 @@ import {
   type PrimitivePreview,
 } from './renderer';
 import { renderWebGLScene } from './webgl-renderer';
-import { Viewport } from './viewport';
+import { Viewport, wheelIntent } from './viewport';
 
 interface ShapeBuilderState {
   regionIds: EntityId[];
@@ -77,6 +95,8 @@ interface VectorCanvasProps {
   activeTool: ToolId;
   constructionExtent: ConstructionExtent;
   toolDisabledReasons?: Partial<Record<ToolId, string>>;
+  /** True while a modal owns the screen; the pointer preview must not survive it. */
+  interactionBlocked?: boolean;
   selection: SelectionState;
   selectedArtboardIds: Set<EntityId>;
   impactObjectIds?: ReadonlySet<EntityId>;
@@ -108,12 +128,18 @@ interface VectorCanvasProps {
 type ArtboardResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 type ArtboardHit = { artboardId: EntityId; part: 'title' | 'border' | ArtboardResizeHandle };
 
+// Figma's rotate cursor: a short curved arrow with a barbed head at each end, a
+// near-black stroke on a white halo so it reads over the light artboard and the
+// dark canvas alike. Same trick as the pen cursor — an inline SVG with
+// URL-encoded colours, so no literal reaches CSS.
+const ROTATE_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M8.73 10.54A7.2 7.2 0 1 1 21.02 17.63' fill='none' stroke='%23ffffff' stroke-width='4.15' stroke-linecap='round'/%3E%3Cpath d='M7.73 13.31L10.57 11.05L8.43 11.37L7.00 9.75Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M19.12 19.89L19.65 16.29L20.45 18.31L22.57 18.74Z' fill='%23ffffff' stroke='%23ffffff' stroke-width='1.1' stroke-linejoin='round'/%3E%3Cpath d='M8.73 10.54A7.2 7.2 0 1 1 21.02 17.63' fill='none' stroke='%231e1e1e' stroke-width='1.95' stroke-linecap='round'/%3E%3Cpath d='M7.73 13.31L10.57 11.05L8.43 11.37L7.00 9.75Z' fill='%231e1e1e' stroke='%231e1e1e' stroke-width='0.45' stroke-linejoin='round'/%3E%3Cpath d='M19.12 19.89L19.65 16.29L20.45 18.31L22.57 18.74Z' fill='%231e1e1e' stroke='%231e1e1e' stroke-width='0.45' stroke-linejoin='round'/%3E%3C/svg%3E") 14 14, crosshair`;
+
 const PEN_CURSOR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='m4 21 4.4-1.1L20 8.3 15.7 4 4.1 15.6 4 21Z' fill='white' stroke='%231f2328' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='m13.8 6 4.2 4.2M5 19.8l4-4' fill='none' stroke='%231f2328' stroke-width='1.4'/%3E%3C/svg%3E") 4 21, crosshair`;
 
 type Gesture =
   | { kind: 'pan'; pointerId: number; lastScreen: Point }
   | { kind: 'move'; pointerId: number; startScreen: Point; lastWorld: Point; nodeIds: EntityId[]; moving: boolean }
-  | { kind: 'move-object'; pointerId: number; startScreen: Point; lastWorld: Point; objectIds: EntityId[]; moving: boolean; duplicateOnDrag: boolean }
+  | { kind: 'move-object'; pointerId: number; startScreen: Point; lastWorld: Point; objectIds: EntityId[]; moving: boolean; duplicateOnDrag: boolean; leafObjectId: EntityId }
   | {
       kind: 'move-artboard'; pointerId: number; startScreen: Point; startWorld: Point; artboardIds: EntityId[];
       frames: Array<{ artboardId: EntityId; frame: { x: number; y: number; width: number; height: number } }>;
@@ -122,6 +148,8 @@ type Gesture =
       duplicateOnDrag: boolean;
     }
   | { kind: 'resize-artboard'; pointerId: number; startScreen: Point; startWorld: Point; artboardId: EntityId; handle: ArtboardResizeHandle; frame: { x: number; y: number; width: number; height: number }; moving: boolean }
+  | { kind: 'resize-object'; pointerId: number; startScreen: Point; handle: ResizeHandle; frame: SelectionFrame; targets: TransformTarget[]; moving: boolean }
+  | { kind: 'rotate-object'; pointerId: number; startScreen: Point; startWorld: Point; center: Point; frame: SelectionFrame; targets: TransformTarget[]; moving: boolean }
   | { kind: 'parametric-control'; pointerId: number; startScreen: Point; lastWorld: Point; groupId: EntityId; moving: boolean }
   | {
       kind: 'pen'; pointerId: number; startScreen: Point;
@@ -165,6 +193,7 @@ export function VectorCanvas({
   onArtboardSelectionChange,
   onShapeBuilderStateChange,
   onRequestToolChange,
+  interactionBlocked,
   onOpenConstraintMenu,
   onViewportChange,
   viewportFocusRequest,
@@ -190,6 +219,8 @@ export function VectorCanvas({
   const hoveredNodeRef = useRef<EntityId | undefined>();
   const hoveredSegmentRef = useRef<EntityId | undefined>();
   const hoveredHandleRef = useRef<HandleHit | undefined>();
+  /** Body preview for the pointer, produced by the same resolver the press uses. */
+  const hoveredTargetRef = useRef<PointerTarget | undefined>();
   const spacePressedRef = useRef(false);
   const altPressedRef = useRef(false);
   const initializedViewportRef = useRef(false);
@@ -288,6 +319,9 @@ export function VectorCanvas({
       hoveredNodeId: hoveredNodeRef.current,
       hoveredSegmentId: hoveredSegmentRef.current,
       hoveredHandle: hoveredHandleRef.current,
+      hoveredTarget: hoveredTargetRef.current && toolRef.current === 'select'
+        ? { bounds: hoveredTargetRef.current.bounds, group: hoveredTargetRef.current.group }
+        : undefined,
       widthToolActive: toolRef.current === 'width',
       remotePresence,
       overlayOnly: webglRendered,
@@ -326,6 +360,7 @@ export function VectorCanvas({
     hoveredNodeRef.current = undefined;
     hoveredSegmentRef.current = undefined;
     hoveredHandleRef.current = undefined;
+    hoveredTargetRef.current = undefined;
     pencilPreviewRef.current = undefined;
     bendPreviewRef.current = undefined;
     cutPreviewRef.current = undefined;
@@ -404,9 +439,30 @@ export function VectorCanvas({
     requestRender();
   }, [manager, onViewportChange, requestRender, viewportFocusRequest]);
 
+  /** Keyboard zoom around the canvas centre, for pointers without a wheel. */
+  const zoomStep = useCallback((direction: 1 | -1) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    viewportRef.current.zoomAt({ x: rect.width / 2, y: rect.height / 2 }, direction === 1 ? 1.25 : 0.8);
+    onViewportChange(viewportRef.current.scale);
+    requestRender();
+  }, [onViewportChange, requestRender]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
+      if ((event.ctrlKey || event.metaKey) && (event.key === '=' || event.key === '+')) {
+        event.preventDefault();
+        zoomStep(1);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && (event.key === '-' || event.key === '_')) {
+        event.preventDefault();
+        zoomStep(-1);
+        return;
+      }
       if (event.code === 'Space') {
         spacePressedRef.current = true;
         event.preventDefault();
@@ -439,7 +495,7 @@ export function VectorCanvas({
         }
         const gesture = gestureRef.current;
         if (gesture?.kind === 'width' ||
-          ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'bend-handle') && gesture.moving)) {
+          ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'resize-object' || gesture?.kind === 'rotate-object' || gesture?.kind === 'bend-handle') && gesture.moving)) {
           manager.rollbackTransaction();
         }
         gestureRef.current = null;
@@ -449,8 +505,16 @@ export function VectorCanvas({
           onShapeBuilderStateChange({ regionIds: [], resultPathIds: [] });
         }
         if (selectionRef.current.mode === 'network') {
-          onSelectionChange(exitNetworkEditMode(selectionRef.current));
+          const exited = exitNetworkEditMode(selectionRef.current);
+          onSelectionChange(selectionRef.current.groupContext
+            ? { ...exited, groupContext: selectionRef.current.groupContext }
+            : exited);
           onRequestToolChange('select');
+        } else if (selectionRef.current.mode === 'object' && selectionRef.current.groupContext) {
+          // One Escape leaves one level of grouping and keeps the group selected, so the
+          // next Escape walks further out rather than clearing the selection outright.
+          const { context, target } = exitGroupContext(manager.document, selectionRef.current.groupContext);
+          onSelectionChange(selectionForTarget(selectionRef.current, target, false, context));
         } else if (toolRef.current !== 'select' && toolRef.current !== 'pen' && toolRef.current !== 'pencil' && toolRef.current !== 'brush') {
           onRequestToolChange('select');
         } else if (toolRef.current === 'select' && selectedArtboardIdsRef.current.size > 0) {
@@ -480,7 +544,14 @@ export function VectorCanvas({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [manager, onArtboardSelectionChange, onRequestToolChange, onSelectionChange, onShapeBuilderStateChange, requestRender]);
+  }, [manager, onArtboardSelectionChange, onRequestToolChange, onSelectionChange, onShapeBuilderStateChange, requestRender, zoomStep]);
+
+  useEffect(() => {
+    // A preview belongs to the tool that produced it, and no preview may sit on top of
+    // a modal that has taken the pointer away.
+    clearHover();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, interactionBlocked]);
 
   const clearPreviews = () => {
     penPreviewRef.current = undefined;
@@ -1043,6 +1114,45 @@ export function VectorCanvas({
     }
 
     if (toolRef.current === 'select' && selectionRef.current.mode === 'object') {
+      // Object handles win over artboard handles: the selection you can see is the
+      // one you grab, and a selected artboard clears the object selection anyway.
+      const objectHandle = selectedArtboardIdsRef.current.size === 0
+        ? hitTestObjectFrameHandle(
+            manager.document,
+            selectionRef.current.objectIds,
+            world,
+            viewport.scale,
+          )
+        : undefined;
+      if (objectHandle) {
+        const targets = transformTargets(manager.document, selectionRef.current.objectIds);
+        const frame = selectionFrame(manager.document, targets.map((target) => target.objectId));
+        if (frame) {
+          gestureRef.current = objectHandle === 'rotate'
+            ? {
+                kind: 'rotate-object',
+                pointerId: event.pointerId,
+                startScreen: screen,
+                startWorld: world,
+                center: frameCenter(frame),
+                frame,
+                targets,
+                moving: false,
+              }
+            : {
+                kind: 'resize-object',
+                pointerId: event.pointerId,
+                startScreen: screen,
+                handle: objectHandle,
+                frame,
+                targets,
+                moving: false,
+              };
+          canvas.setPointerCapture(event.pointerId);
+          event.preventDefault();
+          return;
+        }
+      }
       const artboardHit = hitTestArtboard(manager.document, world, viewport.scale, selectedArtboardIdsRef.current);
       if (artboardHit) {
         const artboard = manager.document.getArtboard(artboardHit.artboardId);
@@ -1115,12 +1225,36 @@ export function VectorCanvas({
     }
 
     if (selectionRef.current.mode === 'object') {
+      // Ctrl/⌘-click walks down the stack under the pointer, so the shape you can
+      // see behind another one is reachable without a trip to the Layers panel.
+      const stack = (event.ctrlKey || event.metaKey)
+        ? objectsUnderPoint(manager.document, world, 7 / viewport.scale)
+        : [];
+      if (stack.length > 1) {
+        const next = nextObjectUnderPoint(manager.document, world, 7 / viewport.scale, selectionRef.current.objectIds);
+        if (next) {
+          onArtboardSelectionChange(new Set());
+          onSelectionChange({ mode: 'object', objectIds: new Set([next.id]), nodeIds: new Set(), segmentIds: new Set() });
+          event.preventDefault();
+          return;
+        }
+      }
       const objectHit = hitTestObject(manager.document, world, 7 / viewport.scale);
       if (objectHit || !event.shiftKey) onArtboardSelectionChange(new Set());
-      if (objectHit && isDirectDoubleClick) {
+      // A click only resolves inside the group the user has entered when the artwork
+      // it lands on is actually in that group; anything else drops the context first.
+      // One double-click descends one level, so nested groups are walked a step at a time.
+      const press = resolveObjectPress(manager.document, selectionRef.current, objectHit?.id, {
+        doubleClick: isDirectDoubleClick,
+        additive: event.shiftKey,
+      });
+      const context = press.selection.groupContext;
+      if (objectHit && press.enteredGroup) {
+        onSelectionChange(press.selection);
+      } else if (objectHit && isDirectDoubleClick) {
         const editing = enterNetworkEditMode(manager.document, objectHit.id);
         const nextSelection = selectionForHit(editing, objectHit.geometryHit ?? null, false);
-        onSelectionChange(nextSelection);
+        onSelectionChange(context ? { ...nextSelection, groupContext: context } : nextSelection);
       } else if (!objectHit) {
         gestureRef.current = {
           kind: 'marquee',
@@ -1135,14 +1269,7 @@ export function VectorCanvas({
         marqueePreviewRef.current = { start: world, end: world, mode: 'contain' };
         canvas.setPointerCapture(event.pointerId);
       } else {
-        const nextSelection = !event.shiftKey && selectionRef.current.objectIds.has(objectHit.id)
-          ? {
-              ...selectionRef.current,
-              objectIds: new Set(selectionRef.current.objectIds),
-              nodeIds: new Set<EntityId>(),
-              segmentIds: new Set<EntityId>(),
-            }
-          : selectionForObjectHit(selectionRef.current, objectHit, event.shiftKey);
+        const nextSelection = press.selection;
         onSelectionChange(nextSelection);
         if (nextSelection.objectIds.has(objectHit.id)) {
           gestureRef.current = {
@@ -1153,6 +1280,7 @@ export function VectorCanvas({
             objectIds: [...nextSelection.objectIds],
             moving: false,
             duplicateOnDrag: event.altKey || altPressedRef.current,
+            leafObjectId: objectHit.id,
           };
           canvas.setPointerCapture(event.pointerId);
         }
@@ -1229,6 +1357,24 @@ export function VectorCanvas({
     event.preventDefault();
   };
 
+  const clearHover = () => {
+    hoveredTargetRef.current = undefined;
+    hoveredNodeRef.current = undefined;
+    hoveredSegmentRef.current = undefined;
+    hoveredHandleRef.current = undefined;
+    hoveredRegionRef.current = undefined;
+    requestRender();
+  };
+
+  const handlePointerLeave = () => {
+    onPresenceCursor(undefined);
+    // A stale preview would keep outlining something the pointer has left behind, but a
+    // live gesture owns its visuals until it ends.
+    if (gestureRef.current) return;
+    eraserPreviewRef.current = undefined;
+    clearHover();
+  };
+
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const screen = localPoint(event);
     const viewport = viewportRef.current;
@@ -1246,6 +1392,56 @@ export function VectorCanvas({
     if (gesture.kind === 'pan') {
       viewport.panBy(screen.x - gesture.lastScreen.x, screen.y - gesture.lastScreen.y);
       gesture.lastScreen = screen;
+      requestRender();
+      return;
+    }
+    if (gesture.kind === 'rotate-object') {
+      if (!gesture.moving) {
+        if (screenDistance(screen, gesture.startScreen) < 2) return;
+        manager.beginTransaction(gesture.targets.length > 1 ? 'Rotate objects' : 'Rotate object');
+        gesture.moving = true;
+      }
+      const plan = prepareRotateObjects(
+        gesture.targets,
+        gesture.frame,
+        gesture.startWorld,
+        world,
+        { snap: event.shiftKey },
+      );
+      if (!plan) return;
+      for (const operation of plan.operations) {
+        if (!executeSafely(operation)) {
+          manager.rollbackTransaction();
+          gestureRef.current = null;
+          return;
+        }
+      }
+      requestRender();
+      return;
+    }
+    if (gesture.kind === 'resize-object') {
+      if (!gesture.moving) {
+        if (screenDistance(screen, gesture.startScreen) < 2) return;
+        manager.beginTransaction(gesture.targets.length > 1 ? 'Resize objects' : 'Resize object');
+        gesture.moving = true;
+      }
+      // Every frame is computed from the transforms captured at pointer-down, so
+      // dragging back and forth never compounds scale.
+      const plan = prepareResizeObjects(
+        gesture.targets,
+        gesture.frame,
+        gesture.handle,
+        world,
+        { proportional: event.shiftKey },
+      );
+      if (!plan) return;
+      for (const operation of plan.operations) {
+        if (!executeSafely(operation)) {
+          manager.rollbackTransaction();
+          gestureRef.current = null;
+          return;
+        }
+      }
       requestRender();
       return;
     }
@@ -1680,6 +1876,21 @@ export function VectorCanvas({
       return;
     }
 
+    if (gesture.kind === 'move-object' && !gesture.moving && event.altKey) {
+      // Alt-click without a drag steps out one group level. Alt-drag keeps duplicating:
+      // the two gestures are separated by movement, not by a second modifier.
+      const parent = parentGroupTarget(
+        manager.document,
+        gesture.leafObjectId,
+        selectionRef.current.groupContext,
+      );
+      gestureRef.current = null;
+      if (parent) {
+        onSelectionChange(selectionForTarget(selectionRef.current, parent, false, parent.context));
+        requestRender();
+        return;
+      }
+    }
     if (gesture.kind === 'move-object') {
       if (!gesture.moving && screenDistance(screen, gesture.startScreen) >= 2) {
         manager.beginTransaction(
@@ -1873,7 +2084,7 @@ export function VectorCanvas({
           selectionRef.current.editingObjectId,
         ));
       }
-    } else if ((gesture.kind === 'move' || gesture.kind === 'move-object' || gesture.kind === 'move-artboard' || gesture.kind === 'resize-artboard' || gesture.kind === 'parametric-control') && gesture.moving) {
+    } else if ((gesture.kind === 'move' || gesture.kind === 'move-object' || gesture.kind === 'move-artboard' || gesture.kind === 'resize-artboard' || gesture.kind === 'resize-object' || gesture.kind === 'rotate-object' || gesture.kind === 'parametric-control') && gesture.moving) {
       manager.commitTransaction();
     } else if (gesture.kind === 'move-artboard' && gesture.duplicateOnDrag) {
       const selected = manager.document.getArtboard(gesture.artboardIds[0]);
@@ -2050,7 +2261,7 @@ export function VectorCanvas({
   const handlePointerCancel = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const gesture = gestureRef.current;
     if (gesture?.kind === 'width' || gesture?.kind === 'eraser' ||
-      ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'parametric-control' || gesture?.kind === 'bend-handle') && gesture.moving)) {
+      ((gesture?.kind === 'move' || gesture?.kind === 'move-object' || gesture?.kind === 'move-artboard' || gesture?.kind === 'resize-artboard' || gesture?.kind === 'resize-object' || gesture?.kind === 'rotate-object' || gesture?.kind === 'parametric-control' || gesture?.kind === 'bend-handle') && gesture.moving)) {
       manager.rollbackTransaction();
     }
     gestureRef.current = null;
@@ -2063,13 +2274,28 @@ export function VectorCanvas({
   const updateHover = (world: Point, constrainPen = false) => {
     const localWorld = editingLocalPoint(world);
     const canvas = canvasRef.current;
+    if (toolRef.current === 'select' && !gestureRef.current) {
+      hoveredTargetRef.current = resolvePointerTarget(manager.document, {
+        point: world,
+        localPoint: localWorld,
+        tolerance: 7 / viewportRef.current.scale,
+        selection: selectionRef.current,
+      });
+    }
     if (canvas && toolRef.current === 'select' && selectionRef.current.mode === 'object') {
+      const objectHandle = selectedArtboardIdsRef.current.size === 0
+        ? hitTestObjectFrameHandle(manager.document, selectionRef.current.objectIds, world, viewportRef.current.scale)
+        : undefined;
       const artboardHit = hitTestArtboard(manager.document, world, viewportRef.current.scale, selectedArtboardIdsRef.current);
-      canvas.style.cursor = artboardHit
-        ? isArtboardResizeHandle(artboardHit.part)
-          ? artboardResizeCursor(artboardHit.part)
-          : 'move'
-        : '';
+      canvas.style.cursor = objectHandle === 'rotate'
+        ? ROTATE_CURSOR
+        : objectHandle
+          ? resizeCursor(objectHandle)
+        : artboardHit
+          ? isArtboardResizeHandle(artboardHit.part)
+            ? artboardResizeCursor(artboardHit.part)
+            : 'move'
+          : '';
     } else if (canvas) {
       canvas.style.cursor = toolRef.current === 'pen' ? PEN_CURSOR : '';
     }
@@ -2121,6 +2347,7 @@ export function VectorCanvas({
     hoveredNodeRef.current = undefined;
     hoveredSegmentRef.current = undefined;
     hoveredHandleRef.current = undefined;
+    hoveredTargetRef.current = undefined;
     eraserPreviewRef.current = toolRef.current === 'eraser'
       ? { point: localWorld, radius: Math.max(0.5, eraserSettings.weight / 2), shape: eraserSettings.shape }
       : undefined;
@@ -2181,9 +2408,14 @@ export function VectorCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    viewportRef.current.zoomAt(screen, Math.exp(-event.deltaY * 0.0015));
-    onViewportChange(viewportRef.current.scale);
+    const intent = wheelIntent(event, rect.height);
+    if (intent.kind === 'zoom') {
+      viewportRef.current.zoomAt({ x: event.clientX - rect.left, y: event.clientY - rect.top }, intent.factor);
+      onViewportChange(viewportRef.current.scale);
+    } else {
+      // The sheet follows the gesture: scrolling down walks you down the canvas.
+      viewportRef.current.panBy(-intent.deltaX, -intent.deltaY);
+    }
     requestRender();
   }, [onViewportChange, requestRender]);
 
@@ -2209,19 +2441,9 @@ export function VectorCanvas({
         onPointerDown={handlePointerDown}
         onDoubleClick={handleDoubleClick}
         onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
-        onPointerLeave={() => {
-          onPresenceCursor(undefined);
-          if (!gestureRef.current) {
-            hoveredRegionRef.current = undefined;
-            hoveredNodeRef.current = undefined;
-            hoveredSegmentRef.current = undefined;
-            hoveredHandleRef.current = undefined;
-            eraserPreviewRef.current = undefined;
-            requestRender();
-          }
-        }}
       />
       {artboardRename && (
         <input
@@ -2260,6 +2482,18 @@ export function VectorCanvas({
         <div className="isolation-banner" role="status">
           <span>Editing only <strong>{layerBreadcrumb(manager.document, manager.document.isolatedLayerId)}</strong></span>
           <button type="button" onClick={() => manager.execute({ type: 'SET_LAYER_ISOLATION', payload: { layerId: undefined } })}>Exit isolation</button>
+        </div>
+      )}
+      {!manager.document.isolatedLayerId && selection.groupContext && manager.document.getLayer(selection.groupContext) && (
+        <div className="isolation-banner" role="status">
+          <span>Inside group <strong>{layerBreadcrumb(manager.document, selection.groupContext)}</strong> · <kbd>Esc</kbd> to leave</span>
+          <button
+            type="button"
+            onClick={() => {
+              const { context, target } = exitGroupContext(manager.document, selection.groupContext!);
+              onSelectionChange(selectionForTarget(selection, target, false, context));
+            }}
+          >Exit group</button>
         </div>
       )}
       {selection.mode === 'network' && (
@@ -2718,7 +2952,20 @@ function toolHint(tool: ToolId, selection: SelectionState, selectedArtboardCount
   if (tool === 'offset') return <><span className="hint-dot cut" />Click a path to offset <kbd>Alt</kbd> opposite side</>;
   if (tool === 'lasso') return <><span className="hint-dot select" />Draw around nodes <kbd>Shift</kbd> add to selection</>;
   if (tool === 'eraser') return <><span className="hint-dot cut" />Click and drag to erase with the current weight and tip shape</>;
-  return <><span className="hint-dot select" />Select and drag objects <kbd>Drag empty space</kbd> marquee <kbd>← intersect</kbd> <kbd>Shift</kbd> add</>;
+  return <><span className="hint-dot select" />Drag objects to move <kbd>Handles</kbd> resize <kbd>⤾</kbd> rotate <kbd>Shift</kbd> snap <kbd>Drag empty space</kbd> marquee</>;
+}
+
+function hitTestObjectFrameHandle(
+  document: VectorDocument,
+  objectIds: ReadonlySet<EntityId>,
+  point: Point,
+  scale: number,
+): FrameHandle | undefined {
+  // Locked objects show no handles: a grabbed handle that cannot move anything
+  // would be a dead zone over the shape.
+  const frame = selectionFrame(document, transformTargets(document, objectIds).map((target) => target.objectId));
+  if (!frame) return undefined;
+  return frameHitTarget(frame, point, { scale });
 }
 
 function hitTestArtboard(

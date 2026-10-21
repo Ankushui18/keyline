@@ -2,7 +2,7 @@
 
 What is verified, how to run it, and what the suites do **not** prove.
 
-Current suite: **318 tests across 57 test files**, plus a real Wasm smoke test, nine WebSocket
+Current suite: **401 tests across 62 test files**, plus a real Wasm smoke test, nine WebSocket
 integration checks, Rust unit tests, and optional browser suites.
 
 - [Run everything](#run-everything)
@@ -24,8 +24,12 @@ npm ci
 npm run check
 ```
 
-`check` runs, in order: production build (with strict TypeScript), the Vitest suite, the Wasm
-smoke test, the WebSocket relay suite, and the documentation check.
+`check` runs, in order: the design-system checks, the production build (with strict TypeScript), the
+Vitest suite, the Wasm smoke test, the WebSocket relay suite, and the documentation check.
+
+Two suites render React into jsdom (`@testing-library/react`), which is why `jsdom`,
+`@testing-library/react` and `@testing-library/dom` are dev dependencies. Everything else runs in
+plain Node.
 
 Individual commands:
 
@@ -122,6 +126,9 @@ touching the document.
 | `core/drawing-style.test.ts` | Style defaults and normalization. |
 | `core/numeric-expression.test.ts` | Numeric field expressions. |
 | `ui/contrast-color.test.ts` | Accessible avatar/text colour selection. |
+| `ui/PropertiesPanel.states.test.tsx` | Every disabled inspector control carries a reason, rendered in three selection states. |
+| `ui/panel-controls.test.tsx` | Every **enabled** inspector and tool control reaches the document or its callback, across nine states (jsdom). |
+| `core/target-resolution.test.ts` | Hover and press resolve through one pipeline: paint order, entered groups, hidden/locked ancestors, the `Alt`-click parent gesture, and a measured latency budget. |
 
 ---
 

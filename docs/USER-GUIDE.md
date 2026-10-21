@@ -87,6 +87,42 @@ operable, and both width and split height persist on the device.
 
 Press `Enter` on a selected object to edit its points; `Enter` or `Escape` leaves point editing.
 
+A selected object shows a frame with eight square resize handles, drawn on the object's own axes so
+it rotates with the shape. The frame also prints its size (`W × H`, the object's own width and height) on a small blue pill
+whenever the selection is large enough for the readout to fit. The pill hangs under the bottom edge
+and turns with the shape, but never renders upside down: past a quarter turn it moves to the top
+edge and reads the right way up. There is no separate
+rotate handle: as in Figma, move the pointer just outside a corner and it becomes a rotate arrow.
+
+- Drag a corner or edge handle to resize — `Shift` on a corner keeps the aspect ratio.
+- Drag just outside a corner, where the cursor turns into a rotate arrow, to rotate — `Shift`
+  snaps to 15° steps. The `Rotation` field and the 90° button in Design do the same thing by
+  number, about the same centre, so a shape never leaves its artboard when you type an angle.
+- Dragging anywhere else inside the frame moves the object, so `Alt`-drag still duplicates.
+- Pointing at the canvas previews what a click will select: a dashed outline for a group, a thin solid
+  outline for a shape. Inside a group the preview follows the level you are editing, so the same shape
+  previews as its group at the page root and as itself once you have entered the group. The preview is
+  lighter than the selection and disappears when the pointer leaves the canvas, a dialog opens, or you
+  switch tools.
+- To select a whole group while you are inside one, `Alt`-click: it steps out one level per click and
+  leaves the selection at that level. `Alt`-drag still duplicates, so a click that moves nothing
+  selects the parent and a drag that moves duplicates.
+- Clicking picks the shape painted on top, following layer order in the Layers panel. To reach a shape
+  behind another, `Ctrl/⌘`-click: each click walks down the stack under the pointer and wraps.
+
+**Groups behave like containers.** A click on grouped artwork selects the whole outermost group, and
+the selection covers every shape inside it, so moving, resizing, rotating and deleting work on the
+group as one. Double-click to step inside — each double-click descends one nested level, and the
+canvas banner names the group you are in. Inside a group, clicks select that group's own children.
+`Escape` (or the banner's **Exit group** button) steps back out one level and keeps the group selected;
+clicking artwork outside the group leaves it automatically. Entering a group changes nothing about
+visibility — unlike **isolation**, which hides everything else.
+- Several selected objects share one axis-aligned frame; resizing and rotating there apply to the
+  whole selection at once.
+
+Every resize and rotation is one undoable step. Artboards keep their own handles, shown only while
+a frame is selected; resizing a frame never scales the artwork inside it.
+
 | Tool | Key | What it does |
 |---|---|---|
 | Select | `V` | Object selection; `Enter` enters point editing. |
@@ -389,9 +425,12 @@ Modifier is `Ctrl` on Windows/Linux and `⌘` on macOS.
 | Flip horizontal / vertical | `⇧ H` / `⇧ V` |
 | Copy / cut / paste | `Ctrl/⌘ C` / `X` / `V` |
 | Undo / redo | `Ctrl/⌘ Z` / `Ctrl/⌘ ⇧ Z` |
-| Nudge points | Arrow keys (1 px), `Shift` + arrows (10 px) |
+| Select the shape behind another | `Ctrl/⌘` + click (cycles the stack, wrapping) |
+| Enter a group / leave one level | Double-click the group / `Escape` |
+| Nudge objects or points | Arrow keys (1 px), `Shift` + arrows (10 px) |
 | Delete selection or point | `Delete` / `Backspace` |
-| Pan / zoom | Middle-drag or `Space` + drag / wheel |
+| Pan | Wheel or two-finger scroll, `Shift` + wheel (horizontal), middle-drag, `Space` + drag |
+| Zoom | `Ctrl/⌘` + wheel or pinch, `Ctrl/⌘ +` / `Ctrl/⌘ -` |
 
 Shortcuts are ignored while typing in a field or while a dialog is open.
 

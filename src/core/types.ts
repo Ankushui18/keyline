@@ -441,6 +441,12 @@ export interface SelectionState {
   editingObjectId?: EntityId;
   nodeIds: Set<EntityId>;
   segmentIds: Set<EntityId>;
+  /**
+   * The group layer the canvas is currently inside, if any. Clicks resolve to that
+   * group's direct children instead of the page root, which is what makes nested
+   * artwork editable without reaching the shapes behind it.
+   */
+  groupContext?: EntityId;
 }
 
 export type ToolId =
